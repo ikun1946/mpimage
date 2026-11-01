@@ -129,6 +129,16 @@ export const config = {
   adminSetupKey: process.env.ADMIN_SETUP_KEY || '',
   /** 优雅退出令牌；留空则关闭 /api/shutdown 接口（桌面端/控制台会注入随机值） */
   shutdownToken: process.env.SHUTDOWN_TOKEN || '',
+  /** 当前应用版本；桌面端安装包里会注入，留空时从 server/package.json 读取 */
+  appVersion: process.env.APP_VERSION || '',
+  /** 更新检查的 GitHub 仓库（owner/repo） */
+  updateRepo: process.env.UPDATE_REPO || 'ikun1946/huajing-image-web',
+  /** 自定义更新源地址；非空时优先于 GitHub，桌面端可指向自己的发布接口 */
+  updateFeedUrl: process.env.UPDATE_FEED_URL || '',
+  /** 访问 GitHub 私有/限流时的令牌；公开仓库留空即可 */
+  updateToken: process.env.UPDATE_TOKEN || '',
+  /** UPDATE_CHECK_DISABLED=1 时完全不联网查版本（离线环境用） */
+  updateDisabled: process.env.UPDATE_CHECK_DISABLED === '1',
   corsOrigins: listFromEnv('CORS_ORIGINS', [
     'http://localhost:5173',
     'http://127.0.0.1:5173',

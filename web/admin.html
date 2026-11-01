@@ -29,6 +29,28 @@
     </header>
 
     <main class="admin-main">
+      <section class="admin-section" id="section-registrations">
+        <div class="section-head">
+          <h2>待审核账号</h2>
+          <span class="badge" id="registration-count">待审 0</span>
+        </div>
+        <p class="section-note">客户端提交的账号申请需要在这里通过后才能登录；拒绝会删除该申请。</p>
+        <p class="form-msg" id="registration-msg" role="status"></p>
+        <div class="admin-table-shell">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>用户名</th>
+                <th>昵称</th>
+                <th>申请时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="registrations-body"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="admin-section" id="section-accounts">
         <div class="section-head">
           <h2>账号管理</h2>
@@ -50,6 +72,72 @@
             <tbody id="users-body"></tbody>
           </table>
         </div>
+      </section>
+
+      <section class="admin-section" id="section-limits">
+        <div class="section-head">
+          <h2>限流与并发</h2>
+        </div>
+        <p class="section-note">保存后即时生效；限流关闭时不再对任何客户端返回 429。</p>
+        <div class="settings-grid">
+          <form class="settings-card" id="rate-limit-form">
+            <h3 class="sub-head settings-title">请求限流</h3>
+            <label class="check-row">
+              <input type="checkbox" id="rate-limit-enabled">
+              <span>启用限流</span>
+            </label>
+            <p class="settings-hint" id="rate-limit-state">读取中…</p>
+            <div class="settings-fields">
+              <label class="settings-field">
+                <span>窗口秒数</span>
+                <input class="input" id="rate-limit-window" type="number" min="1" max="3600" step="1" inputmode="numeric">
+              </label>
+              <label class="settings-field">
+                <span>每窗口最大请求数</span>
+                <input class="input" id="rate-limit-max" type="number" min="1" max="100000" step="1" inputmode="numeric">
+              </label>
+            </div>
+            <div class="settings-actions">
+              <button class="button primary" id="rate-limit-save" type="submit">保存</button>
+              <span class="form-msg" id="rate-limit-msg" role="status"></span>
+            </div>
+          </form>
+
+          <form class="settings-card" id="concurrency-form">
+            <h3 class="sub-head settings-title">生图并发</h3>
+            <div class="settings-fields">
+              <label class="settings-field">
+                <span>并发上限（1–8）</span>
+                <input class="input" id="concurrency-limit" type="number" min="1" max="8" step="1" inputmode="numeric">
+              </label>
+            </div>
+            <p class="settings-hint" id="concurrency-state">读取中…</p>
+            <div class="settings-actions">
+              <button class="button primary" id="concurrency-save" type="submit">保存</button>
+              <span class="form-msg" id="concurrency-msg" role="status"></span>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="admin-section" id="section-upstream">
+        <div class="section-head">
+          <h2>上游设置</h2>
+          <span class="status-tag" id="upstream-source">读取中…</span>
+        </div>
+        <p class="section-note">生图请求实际发往的上游地址；保存后即时生效，无需重启服务。</p>
+        <form class="settings-card" id="upstream-form">
+          <label class="settings-field">
+            <span>上游地址</span>
+            <input class="input" id="upstream-base-url" type="text" inputmode="url" autocomplete="off" placeholder="https://api.example.com">
+          </label>
+          <p class="settings-hint">当前模型：<strong id="upstream-model">—</strong></p>
+          <div class="settings-actions">
+            <button class="button primary" id="upstream-save" type="submit">保存</button>
+            <button class="button ghost" id="upstream-test" type="button">测试连通</button>
+            <span class="form-msg" id="upstream-msg" role="status"></span>
+          </div>
+        </form>
       </section>
 
       <section class="admin-section" id="section-feedback">
@@ -106,6 +194,28 @@
             <span class="stat-unit">MB</span>
           </div>
         </div>
+
+        <h3 class="sub-head">服务流量</h3>
+        <div class="stat-cards" id="traffic-cards">
+          <div class="stat-card">
+            <span class="stat-label">请求数</span>
+            <strong class="stat-value" id="traffic-requests">—</strong>
+            <span class="stat-unit">次</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">流量</span>
+            <strong class="stat-value" id="traffic-bytes">—</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">运行时间</span>
+            <strong class="stat-value is-text" id="traffic-uptime">—</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">限流状态</span>
+            <strong class="stat-value is-text" id="traffic-rate">—</strong>
+          </div>
+        </div>
+        <p class="form-msg" id="traffic-msg" role="status"></p>
 
         <h3 class="sub-head">生图趋势</h3>
         <div class="trend-card">

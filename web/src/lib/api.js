@@ -194,3 +194,68 @@ export function updateFeedbackStatus(id, status) {
     body: JSON.stringify({ status }),
   })
 }
+
+// ---------- 版本更新 ----------
+
+/** force=true 时绕过服务端的检查缓存，其余情况沿用最近一次结果 */
+export function getUpdateStatus(force = false) {
+  return request(`/api/update/status${force ? '?force=1' : ''}`, { method: 'GET' })
+}
+
+// ---------- 后台管理 ----------
+
+export function getRegistrations() {
+  return request('/api/admin/registrations', { method: 'GET' })
+}
+
+export function approveRegistration(id) {
+  return request(`/api/admin/registrations/${encodeURIComponent(id)}/approve`, { method: 'POST' })
+}
+
+export function rejectRegistration(id) {
+  return request(`/api/admin/registrations/${encodeURIComponent(id)}/reject`, { method: 'POST' })
+}
+
+export function getRateLimit() {
+  return request('/api/admin/rate-limit', { method: 'GET' })
+}
+
+export function saveRateLimit(payload) {
+  return request('/api/admin/rate-limit', {
+    method: 'PUT',
+    body: JSON.stringify(payload || {}),
+  })
+}
+
+export function getConcurrency() {
+  return request('/api/admin/concurrency', { method: 'GET' })
+}
+
+export function saveConcurrency(limit) {
+  return request('/api/admin/concurrency', {
+    method: 'PUT',
+    body: JSON.stringify({ limit }),
+  })
+}
+
+export function getUpstream() {
+  return request('/api/admin/upstream', { method: 'GET' })
+}
+
+export function saveUpstream(baseUrl) {
+  return request('/api/admin/upstream', {
+    method: 'PUT',
+    body: JSON.stringify({ baseUrl }),
+  })
+}
+
+export function testUpstream(baseUrl) {
+  return request('/api/admin/upstream/test', {
+    method: 'POST',
+    body: JSON.stringify({ baseUrl }),
+  })
+}
+
+export function getMonitor() {
+  return request('/api/admin/monitor', { method: 'GET' })
+}

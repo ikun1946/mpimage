@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 import { config } from '../config.js'
 import { checkHealth } from '../services/magpie.js'
+import type { SettingsStore } from '../services/settings-store.js'
 
 export function registerMetaRoutes(
   app: FastifyInstance,
-  deps: { concurrency?: () => number } = {},
+  deps: { concurrency?: () => number; settings: SettingsStore },
 ): void {
   app.get('/api/config', async () => ({
     ratios: config.ratios.map(({ id, label, shortLabel, width, height, nativeWidth, nativeHeight, promptHint }) => ({
@@ -32,8 +33,8 @@ export function registerMetaRoutes(
 
   app.get('/api/health', async () => {
     const magpie = await checkHealth({
-      baseUrl: config.magpieBaseUrl,
-      model: config.imageModel,
+      baseUrl: await deps.settings.getBaseUrl(),
+      model: deps.settings.getModel(),
       timeoutMs: config.requestTimeoutMs,
     })
     return {

@@ -17,6 +17,7 @@
  */
 
 import {
+  ApiRequestError,
   activateProject,
   createProject,
   deleteProject,
@@ -28,6 +29,7 @@ import {
   fetchServerConfig,
   fetchStyleLibrary,
   generateImage,
+  getUpdateStatus,
   logout,
   updateMyProfile,
   saveStyleLibrary,
@@ -3624,6 +3626,10 @@ import { ratioOptions } from '../lib/ratio.js'
         const source = user.displayName || user.username || '境'
         letter.textContent = Array.from(source)[0] || '境'
       }
+
+      // 后台入口只有管理员看得到；非管理员留着也打不开，只是干扰
+      const adminLink = document.querySelector('#admin-link')
+      if (adminLink) adminLink.hidden = user.role !== 'admin'
     }
 
     /* 启动顺序很重要：必须**先确认当前是谁**，再读本地快照并渲染。
@@ -3840,3 +3846,156 @@ import { ratioOptions } from '../lib/ratio.js'
       renderFeedbackModal()
       feedbackCategories.querySelector(`[data-feedback-category="${feedbackCategory}"]`)?.focus()
     })
+
+    /* ===== 关于与更新 ===== */
+
+    /* 版本号与反馈同源：vite.config.ts 从 web/package.json 注入 */
+    const ABOUT_VERSION_LABEL = `v${FEEDBACK_APP_VERSION}`
+    /* 首屏还在抢请求，晚 6 秒再问更新；同一标签页 2 小时内不重复问，
+       否则反复开页面会把更新接口打成热点 */
+    const ABOUT_AUTO_CHECK_DELAY = 6000
+    const ABOUT_CHECK_INTERVAL = 2 * 60 * 60 * 1000
+    const ABOUT_LAST_CHECK_KEY = 'huajing.update.lastCheckAt'
+
+    const aboutModal = document.querySelector('#about-modal')
+    const aboutCurrent = document.querySelector('#about-current')
+    const aboutStatus = document.querySelector('#about-status')
+    const aboutNotesWrap = document.querySelector('#about-notes-wrap')
+    const aboutNotes = document.querySelector('#about-notes')
+    const aboutMsg = document.querySelector('#about-msg')
+    const aboutDownload = document.querySelector('#about-download')
+    const aboutRecheck = document.querySelector('#about-recheck')
+    const aboutMenuLabel = document.querySelector('#about-menu-label')
+    const aboutMenuVersion = document.querySelector('#about-menu-version')
+    const avatarButton = document.querySelector('#user-avatar')
+
+    let aboutOverlayHandle = null
+    let aboutChecking = false
+
+    if (aboutMenuVersion) aboutMenuVersion.textContent = ABOUT_VERSION_LABEL
+    if (aboutCurrent) aboutCurrent.textContent = ABOUT_VERSION_LABEL
+
+    function markUpdateChecked() {
+      try {
+        sessionStorage.setItem(ABOUT_LAST_CHECK_KEY, String(Date.now()))
+      } catch {
+        // 隐私模式禁用 sessionStorage，没记住就当没有节流
+      }
+    }
+
+    /** 只在成功检查后记时间：失败往往是临时的，不该把它锁两小时 */
+    function shouldAutoCheck() {
+      try {
+        const last = Number(sessionStorage.getItem(ABOUT_LAST_CHECK_KEY) || 0)
+        return !last || Date.now() - last > ABOUT_CHECK_INTERVAL
+      } catch {
+        return true
+      }
+    }
+
+    /** 把一次检查结果铺到弹窗与头像上：成功、无更新、有更新、失败四种落点 */
+    function applyUpdateStatus(info) {
+      if (!info) return
+      const latest = info.latestVersion ? `v${info.latestVersion}` : ''
+      const hasUpdate = Boolean(info.hasUpdate && info.latestVersion)
+
+      if (aboutStatus) {
+        if (info.error) aboutStatus.textContent = '检查失败'
+        else if (info.disabled) aboutStatus.textContent = '当前版本未开启更新检查'
+        else if (hasUpdate) aboutStatus.textContent = `有新版本 ${latest}`
+        else aboutStatus.textContent = '已是最新版本'
+      }
+
+      if (aboutMsg) aboutMsg.textContent = info.error || ''
+
+      const notes = hasUpdate ? String(info.releaseNotes || '').trim() : ''
+      if (aboutNotesWrap && aboutNotes) {
+        aboutNotesWrap.hidden = !notes
+        aboutNotes.textContent = notes
+      }
+
+      if (aboutDownload) {
+        const url = hasUpdate ? info.downloadUrl || info.pageUrl : ''
+        aboutDownload.hidden = !url
+        aboutDownload.href = url || '#'
+        aboutDownload.textContent = info.downloadUrl ? '下载安装包' : '前往发布页'
+      }
+
+      avatarButton?.classList.toggle('has-update-dot', hasUpdate)
+      if (aboutMenuLabel) {
+        aboutMenuLabel.textContent = hasUpdate ? `有新版本 ${latest}` : '关于画境'
+      }
+    }
+
+    async function checkUpdate(force = false) {
+      if (aboutChecking) return
+      aboutChecking = true
+      if (aboutRecheck) aboutRecheck.disabled = true
+      if (aboutStatus) aboutStatus.textContent = '正在检查更新…'
+      if (aboutMsg) aboutMsg.textContent = ''
+      try {
+        const info = await getUpdateStatus(force)
+        markUpdateChecked()
+        applyUpdateStatus(info)
+      } catch (error) {
+        if (aboutStatus) aboutStatus.textContent = '检查失败'
+        // 网络层抛的是 TypeError，直接显示 message 会是英文
+        if (aboutMsg) {
+          aboutMsg.textContent = error instanceof ApiRequestError
+            ? error.message
+            : '无法连接更新服务，请检查网络后重试'
+        }
+      } finally {
+        aboutChecking = false
+        if (aboutRecheck) aboutRecheck.disabled = false
+      }
+    }
+
+    function silentUpdateCheck() {
+      if (!shouldAutoCheck()) return
+      getUpdateStatus(false)
+        .then(info => {
+          markUpdateChecked()
+          applyUpdateStatus(info)
+        })
+        .catch(() => {})
+    }
+
+    function openAboutModal() {
+      if (!aboutModal) return
+      aboutModal.classList.add('visible')
+      if (!aboutOverlayHandle) {
+        aboutOverlayHandle = activateOverlay(aboutModal, {
+          onRequestClose: closeAboutModal,
+          initialFocus: aboutRecheck,
+        })
+      }
+      // 重开时 overlay 不会重新定焦点（handle 复用），这里补上
+      aboutRecheck?.focus()
+      checkUpdate(false)
+    }
+
+    function closeAboutModal() {
+      aboutOverlayHandle?.release()
+      aboutOverlayHandle = null
+      aboutModal?.classList.remove('visible')
+    }
+
+    document.querySelector('#about-button')?.addEventListener('click', event => {
+      event.stopPropagation()
+      avatarMenu.close()
+      openAboutModal()
+    })
+
+    document.querySelector('#admin-link')?.addEventListener('click', () => {
+      // 新标签由链接自己开（target=_blank + rel=noopener），这里只收起菜单
+      avatarMenu.close()
+    })
+
+    document.querySelector('#about-close')?.addEventListener('click', closeAboutModal)
+    aboutModal?.addEventListener('click', event => {
+      if (event.target === aboutModal) closeAboutModal()
+    })
+    aboutRecheck?.addEventListener('click', () => checkUpdate(true))
+
+    setTimeout(silentUpdateCheck, ABOUT_AUTO_CHECK_DELAY)

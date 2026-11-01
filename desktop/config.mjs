@@ -10,7 +10,6 @@ import { join } from 'node:path'
 const DEFAULTS = {
   HOST: '0.0.0.0',
   PORT: '8787',
-  PANEL_PORT: '8790',
   MAGPIE_BASE_URL: 'http://127.0.0.1:3425',
   MAGPIE_IMAGE_MODEL: 'codex/gpt-image-2',
   IMAGE_TIMEOUT_MS: '300000',

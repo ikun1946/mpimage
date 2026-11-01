@@ -1,11 +1,11 @@
 import { app, BrowserWindow, Menu, Tray, clipboard, dialog, nativeImage, shell } from 'electron'
-import { spawn, spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs'
+import os from 'node:os'
 import { join } from 'node:path'
-import { randomBytes } from 'node:crypto'
-import { setTimeout as delay } from 'node:timers/promises'
 import { appRoot, dataRoot } from './paths.mjs'
 import { loadConfig } from './config.mjs'
+import { initServer, restartServer, serverState, startServer, stopServer, waitForServer } from './server.mjs'
+import { checkForUpdate, downloadInstaller, launchInstaller } from './updater.mjs'
 
 /* ===== 基础路径：数据一律写在数据根，绝不碰安装目录 ===== */
 const ROOT = appRoot()
@@ -21,20 +21,16 @@ for (const dir of [DATA, LOG_DIR, join(DATA, 'generated'), join(DATA, 'styles'),
 }
 
 const config = loadConfig(DATA)
-const PANEL_PORT = Number(config.PANEL_PORT) || 8790
 const SERVER_PORT = Number(config.PORT) || 8787
-const PANEL_URL = `http://127.0.0.1:${PANEL_PORT}/`
-const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}/`
-const CLIENT_URL = `${SERVER_URL}batch.html`
-const CLIENT_LOGIN_URL = `${SERVER_URL}login.html`
-/** 每次启动换一个：只有本进程知道，服务端的 /api/shutdown 靠它验身 */
-const SHUTDOWN_TOKEN = randomBytes(24).toString('hex')
+const SERVER_ORIGIN = `http://127.0.0.1:${SERVER_PORT}`
+const CLIENT_URL = `${SERVER_ORIGIN}/batch.html`
+const CLIENT_LOGIN_URL = `${SERVER_ORIGIN}/login.html`
 
-let panelChild = null
 let mainWindow = null
 let tray = null
 let quitting = false
 let serviceRunning = false
+let updateBusy = false
 
 function log(message) {
   const line = `[${new Date().toISOString()}] ${message}\n`
@@ -42,108 +38,45 @@ function log(message) {
   if (!app.isPackaged) process.stdout.write(line)
 }
 
+initServer({ root: ROOT, data: DATA, logDir: LOG_DIR, config, log })
+
 function iconPath() {
   const file = join(app.getAppPath(), 'build', 'icon.png')
   return existsSync(file) ? file : undefined
 }
 
-/* ===== 控制台子进程（用 Electron 自带的 Node 跑，不依赖用户装 Node） ===== */
-function panelEnv() {
-  return {
-    ...process.env,
-    ELECTRON_RUN_AS_NODE: '1',
-    PANEL_EMBEDDED: '1',
-    PANEL_ROOT: ROOT,
-    SERVER_ENTRY: join(ROOT, 'server', 'dist', 'index.js'),
-    LOGS_DIR: LOG_DIR,
-    // 数据目录全部指向数据根
-    STORAGE_DIR: join(DATA, 'generated'),
-    STYLE_LIBRARY_PATH: join(DATA, 'styles'),
-    USER_DATABASE_PATH: join(DATA, 'users.json'),
-    USAGE_DATABASE_PATH: join(DATA, 'usage.json'),
-    PROJECT_DATABASE_PATH: join(DATA, 'projects.json'),
-    DATA_DIR: join(DATA, 'data'),
-    LOG_DIR,
-    WEB_DIST_DIR: join(ROOT, 'web', 'dist'),
-    SHUTDOWN_TOKEN,
-    ...config,
-    PORT: String(SERVER_PORT),
-    PANEL_PORT: String(PANEL_PORT),
-  }
-}
-
-function startPanel() {
-  const entry = join(ROOT, 'scripts', 'control-panel.mjs')
-  if (!existsSync(entry)) throw new Error(`控制台脚本缺失：${entry}`)
-
-  panelChild = spawn(process.execPath, [entry], {
-    cwd: ROOT,
-    env: panelEnv(),
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true,
-  })
-  panelChild.stdout.on('data', chunk => log(`[panel] ${String(chunk).trimEnd()}`))
-  panelChild.stderr.on('data', chunk => log(`[panel:err] ${String(chunk).trimEnd()}`))
-  panelChild.on('exit', (code, signal) => {
-    log(`控制台进程退出 code=${code} signal=${signal}`)
-    if (panelChild) panelChild = null
-  })
-  log(`控制台已启动 pid=${panelChild.pid} root=${ROOT}`)
-}
-
-async function waitForOk(url, timeoutMs) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(1200) })
-      if (response.ok) return true
-    } catch {}
-    await delay(300)
-  }
-  return false
-}
-
-async function probe(url) {
+async function authNeedsSetup() {
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(800) })
-    return response.status < 500
+    const response = await fetch(`${SERVER_ORIGIN}/api/auth/status`, { signal: AbortSignal.timeout(2000) })
+    return Boolean((await response.json())?.needsSetup)
   } catch {
     return false
   }
 }
 
-async function startBackend() {
-  if (!(await waitForOk(`${PANEL_URL}api/status`, 15000))) {
-    throw new Error(`控制台没有在 15 秒内就绪，端口 ${PANEL_PORT} 可能被占用或被防火墙拦截`)
-  }
-  // 控制台设计上不会自动拉起主服务，这里点一次启动
+/* ===== 窗口：主窗口就是客户端，浏览器只作为「分享给局域网」的替代入口 ===== */
+function isSameOrigin(url) {
   try {
-    const response = await fetch(`${PANEL_URL}api/start`, { method: 'POST' })
-    log(`请求启动主服务：${response.status} ${await response.text().catch(() => '')}`)
-  } catch (error) {
-    log(`请求启动主服务失败：${error.message}`)
+    return new URL(url).origin === SERVER_ORIGIN
+  } catch {
+    return false
   }
-  if (!(await waitForOk(`${SERVER_URL}api/health`, 20000))) {
-    throw new Error(`主服务没有在 20 秒内就绪，端口 ${SERVER_PORT} 可能被占用`)
-  }
-  log('主服务就绪')
 }
 
-/* ===== 窗口 ===== */
-function createMainWindow() {
+function createMainWindow(targetUrl = CLIENT_URL) {
   mainWindow = new BrowserWindow({
     width: 1320,
     height: 900,
     minWidth: 960,
     minHeight: 640,
-    title: '画境 · 服务控制台',
+    title: '画境',
     backgroundColor: '#f4f0e6',
     icon: iconPath(),
     show: false,
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
   })
 
-  mainWindow.loadURL(PANEL_URL)
+  mainWindow.loadURL(targetUrl)
   mainWindow.once('ready-to-show', () => mainWindow.show())
   mainWindow.on('close', event => {
     if (!quitting) {
@@ -155,8 +88,15 @@ function createMainWindow() {
 
   // 页面里的外链（比如「新窗口 ↗」）交给系统浏览器，不在应用内开
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
+  })
+
+  // 只放行主服务同源内的跳转（登录页 → 工作台），别处一律走系统浏览器
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (isSameOrigin(url)) return
+    event.preventDefault()
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
   })
 }
 
@@ -170,14 +110,10 @@ function showMainWindow() {
   mainWindow.focus()
 }
 
-/**
- * 客户端（8787 的工作台）留在浏览器里，桌面端只负责服务端/控制台。
- * 这里用系统默认浏览器打开，局域网其他设备依旧访问控制台里显示的那个局域网地址。
- */
 async function openClientInBrowser() {
   try {
     // 账号库为空时先给初始化页，否则直接进工作台
-    const status = await fetch(`${SERVER_URL}api/auth/status`, { signal: AbortSignal.timeout(2000) })
+    const status = await fetch(`${SERVER_ORIGIN}/api/auth/status`, { signal: AbortSignal.timeout(2000) })
     const needsSetup = Boolean((await status.json())?.needsSetup)
     await shell.openExternal(needsSetup ? CLIENT_LOGIN_URL : CLIENT_URL)
   } catch {
@@ -185,56 +121,35 @@ async function openClientInBrowser() {
   }
 }
 
-/* ===== 菜单 / 托盘 ===== */
-/**
- * 服务控制：带 x-desktop-token 直接调用控制台。
- * 桌面端就是主服务的父进程，控制自己的子进程不需要再在网页里登录一次。
- */
-async function panelAction(label, path) {
-  try {
-    const response = await fetch(`${PANEL_URL}${path}`, {
-      method: 'POST',
-      headers: { 'x-desktop-token': SHUTDOWN_TOKEN },
-      signal: AbortSignal.timeout(30000),
-    })
-    const payload = await response.json().catch(() => ({}))
-
-    if (!response.ok) {
-      dialog.showMessageBox({
-        type: 'warning',
-        title: label,
-        message: payload.error || `操作失败（${response.status}）`,
-        detail: `控制台日志：${MAIN_LOG}`,
-      })
-      return
+function lanAddress() {
+  for (const entries of Object.values(os.networkInterfaces())) {
+    for (const entry of entries || []) {
+      if ((entry.family === 'IPv4' || entry.family === 4) && !entry.internal) {
+        return `http://${entry.address}:${SERVER_PORT}/batch.html`
+      }
     }
-    // 已在运行 / 本来就没运行：这是状态提示，不是错误
-    if (payload.ok === false) {
-      dialog.showMessageBox({ type: 'info', title: label, message: payload.message || '无需操作' })
-      await refreshServiceState()
-      return
-    }
-    await refreshServiceState()
-    showMainWindow()
-  } catch (error) {
-    dialog.showMessageBox({ type: 'error', title: label, message: '控制台没有响应', detail: error.message })
   }
+  return ''
 }
 
-/** 读一次服务状态，顺便更新托盘提示与菜单项（启用/禁用） */
-async function refreshServiceState() {
-  try {
-    const response = await fetch(`${PANEL_URL}api/status`, { signal: AbortSignal.timeout(2000) })
-    const status = await response.json()
-    serviceRunning = Boolean(status.running)
-  } catch {
-    serviceRunning = false
+async function copyLanAddress() {
+  const address = lanAddress()
+  if (!address) {
+    await dialog.showMessageBox({
+      type: 'warning',
+      title: '复制局域网地址',
+      message: '没有找到可用的局域网地址',
+      detail: '请确认本机已连接到局域网（或手动查一下本机 IP）。',
+    })
+    return
   }
-  if (tray) tray.setToolTip(`画境 · 服务${serviceRunning ? '运行中' : '已停止'}`)
-  if (app.isReady()) {
-    Menu.setApplicationMenu(buildMenu())
-    if (tray) tray.setContextMenu(buildTrayMenu())
-  }
+  clipboard.writeText(address)
+  await dialog.showMessageBox({
+    type: 'info',
+    title: '局域网地址已复制',
+    message: address,
+    detail: '同一局域网内的其他设备用它打开同一套工作台。',
+  })
 }
 
 function showAdminKey() {
@@ -244,8 +159,13 @@ function showAdminKey() {
     type: 'info',
     title: '管理密钥',
     message: '首次使用时用它创建管理员账号',
-    detail: `密钥已复制到剪贴板：${key}\n\n在控制台登录页的「初始化画境」里粘贴即可。\n配置文件：${join(DATA, 'config.env')}`,
+    detail: `密钥已复制到剪贴板：${key}\n\n在登录页的初始化向导里粘贴即可。\n配置文件：${join(DATA, 'config.env')}`,
   })
+}
+
+/* ===== 菜单 / 托盘 ===== */
+function serviceStatusLabel() {
+  return serviceRunning ? '运行中' : '已停止'
 }
 
 function buildMenu() {
@@ -253,23 +173,27 @@ function buildMenu() {
     {
       label: '画境',
       submenu: [
-        { label: '在浏览器打开客户端', accelerator: 'CmdOrCtrl+1', click: openClientInBrowser },
+        { label: '显示主窗口', accelerator: 'CmdOrCtrl+1', click: showMainWindow },
+        { label: '在浏览器打开客户端', click: openClientInBrowser },
+        { label: '复制局域网地址', click: copyLanAddress },
         { type: 'separator' },
         { label: '打开数据目录', click: () => shell.openPath(DATA) },
         { label: '打开日志目录', click: () => shell.openPath(LOG_DIR) },
         { label: '复制管理密钥', click: showAdminKey },
         { type: 'separator' },
-        { label: '退出', accelerator: 'CmdOrCtrl+Q', click: () => { quitting = true; app.quit() } },
+        { label: '检查更新…', click: () => { void checkUpdates() } },
+        { type: 'separator' },
+        { label: '退出', accelerator: 'CmdOrCtrl+Q', click: () => { void quitApp() } },
       ],
     },
     {
       label: '服务',
       submenu: [
-        { label: `状态：${serviceRunning ? '运行中' : '已停止'}`, enabled: false },
+        { label: `状态：${serviceStatusLabel()}`, enabled: false },
         { type: 'separator' },
-        { label: '启动服务', enabled: !serviceRunning, click: () => panelAction('启动服务', 'api/start') },
-        { label: '停止服务', enabled: serviceRunning, click: () => panelAction('停止服务', 'api/stop') },
-        { label: '重启服务', click: () => panelAction('重启服务', 'api/restart') },
+        { label: '启动服务', enabled: !serviceRunning, click: () => { void runServiceAction('启动服务', startServer) } },
+        { label: '停止服务', enabled: serviceRunning, click: () => { void runServiceAction('停止服务', stopServer) } },
+        { label: '重启服务', click: () => { void runServiceAction('重启服务', restartServer) } },
       ],
     },
     {
@@ -288,51 +212,221 @@ function buildMenu() {
 
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
-    { label: '显示控制台', click: showMainWindow },
+    { label: '显示主窗口', click: showMainWindow },
     { label: '在浏览器打开客户端', click: openClientInBrowser },
+    { label: '复制局域网地址', click: copyLanAddress },
     { type: 'separator' },
-    { label: `状态：${serviceRunning ? '运行中' : '已停止'}`, enabled: false },
-    { label: '启动服务', enabled: !serviceRunning, click: () => panelAction('启动服务', 'api/start') },
-    { label: '停止服务', enabled: serviceRunning, click: () => panelAction('停止服务', 'api/stop') },
-    { label: '重启服务', click: () => panelAction('重启服务', 'api/restart') },
+    { label: `状态：${serviceStatusLabel()}`, enabled: false },
+    { label: '启动服务', enabled: !serviceRunning, click: () => { void runServiceAction('启动服务', startServer) } },
+    { label: '停止服务', enabled: serviceRunning, click: () => { void runServiceAction('停止服务', stopServer) } },
+    { label: '重启服务', click: () => { void runServiceAction('重启服务', restartServer) } },
     { type: 'separator' },
+    { label: '检查更新…', click: () => { void checkUpdates() } },
     { label: '打开数据目录', click: () => shell.openPath(DATA) },
     { type: 'separator' },
-    { label: '退出', click: () => { quitting = true; app.quit() } },
+    { label: '退出', click: () => { void quitApp() } },
   ])
+}
+
+function refreshMenus() {
+  Menu.setApplicationMenu(buildMenu())
+  if (tray) tray.setContextMenu(buildTrayMenu())
+}
+
+function trayTooltip(text) {
+  tray?.setToolTip(text)
 }
 
 function createTray() {
   const image = iconPath() ? nativeImage.createFromPath(iconPath()) : nativeImage.createEmpty()
   tray = new Tray(image)
-  tray.setToolTip('画境 · 服务控制台')
+  trayTooltip(`画境 · 服务${serviceStatusLabel()}`)
   tray.setContextMenu(buildTrayMenu())
   tray.on('double-click', showMainWindow)
 }
 
-/* ===== 退出：先让控制台停服务，再兜底强杀 ===== */
-async function waitPanelExit(timeoutMs) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    if (!panelChild) return true
-    await delay(200)
-  }
-  return !panelChild
+/** 读一次服务实况再刷新菜单：子进程可能自己退出，光看内存里的标记不准 */
+async function refreshServiceState() {
+  const running = await waitForServer(800)
+  if (running === serviceRunning) return
+  serviceRunning = running
+  trayTooltip(`画境 · 服务${serviceStatusLabel()}`)
+  refreshMenus()
 }
 
-async function shutdownAndQuit() {
+async function runServiceAction(label, action) {
+  const wasRunning = serviceRunning
+  try {
+    const result = await action()
+    // stopServer 用布尔值报告结果：false 表示端口还在监听
+    if (result === false) throw new Error('服务没有停下，端口仍在监听，请查看日志')
+    await refreshServiceState()
+    log(`${label}完成，服务${serviceStatusLabel()}`)
+    // 窗口在服务停着的时候打开会停在错误页，服务起来后补一次导航
+    if (!wasRunning && serviceRunning && mainWindow) mainWindow.loadURL(CLIENT_URL)
+  } catch (error) {
+    log(`${label}失败：${error.message}`)
+    await refreshServiceState()
+    await dialog.showMessageBox({
+      type: 'error',
+      title: label,
+      message: error.message,
+      detail: `日志：${MAIN_LOG}`,
+    })
+  }
+}
+
+/* ===== 检查更新 ===== */
+function trimNotes(notes) {
+  const text = String(notes || '').trim()
+  return text.length > 1200 ? `${text.slice(0, 1200)}…` : text
+}
+
+function publishedLabel(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-CN')
+}
+
+async function checkUpdates() {
+  if (updateBusy) return
+  updateBusy = true
+  trayTooltip('画境 · 正在检查更新…')
+
+  try {
+    const info = await checkForUpdate()
+
+    if (info.error) {
+      const buttons = info.pageUrl ? ['前往发布页', '关闭'] : ['关闭']
+      const choice = dialog.showMessageBoxSync({
+        type: 'warning',
+        title: '检查更新失败',
+        message: info.error,
+        detail: `当前版本 ${info.currentVersion || app.getVersion()}`,
+        buttons,
+        defaultId: 0,
+        cancelId: buttons.length - 1,
+      })
+      if (info.pageUrl && choice === 0) await shell.openExternal(info.pageUrl)
+      return
+    }
+
+    if (info.disabled) {
+      await dialog.showMessageBox({
+        type: 'info',
+        title: '检查更新',
+        message: '未配置更新来源，暂时无法检查新版本',
+        detail: `当前版本 ${info.currentVersion || app.getVersion()}`,
+      })
+      return
+    }
+
+    if (!info.hasUpdate) {
+      await dialog.showMessageBox({
+        type: 'info',
+        title: '检查更新',
+        message: `已是最新版本 ${info.currentVersion || app.getVersion()}`,
+      })
+      return
+    }
+
+    const detail = [
+      `当前版本：${info.currentVersion || app.getVersion()}`,
+      info.publishedAt ? `发布时间：${publishedLabel(info.publishedAt)}` : '',
+      info.releaseNotes ? `\n${trimNotes(info.releaseNotes)}` : '',
+    ].filter(Boolean).join('\n')
+
+    const choice = dialog.showMessageBoxSync({
+      type: 'info',
+      title: '发现新版本',
+      message: `发现新版本 ${info.latestVersion || ''}`.trim(),
+      detail,
+      buttons: ['下载安装包', '前往发布页', '稍后'],
+      defaultId: 0,
+      cancelId: 2,
+    })
+
+    if (choice === 1) {
+      if (info.pageUrl) await shell.openExternal(info.pageUrl)
+      return
+    }
+    if (choice !== 0) return
+
+    if (!info.downloadUrl) {
+      const fallback = dialog.showMessageBoxSync({
+        type: 'info',
+        title: '暂无安装包',
+        message: '这次更新没有提供安装包下载地址',
+        detail: '可以去发布页手动下载。',
+        buttons: info.pageUrl ? ['前往发布页', '关闭'] : ['关闭'],
+        defaultId: 0,
+        cancelId: info.pageUrl ? 1 : 0,
+      })
+      if (info.pageUrl && fallback === 0) await shell.openExternal(info.pageUrl)
+      return
+    }
+
+    trayTooltip('画境 · 正在下载更新…')
+    let lastTick = 0
+    let file = ''
+    try {
+      file = await downloadInstaller({
+        url: info.downloadUrl,
+        name: info.downloadName,
+        onProgress: (received, total) => {
+          const now = Date.now()
+          if (now - lastTick < 500) return
+          lastTick = now
+          trayTooltip(total
+            ? `画境 · 下载更新 ${Math.round((received / total) * 100)}%`
+            : `画境 · 已下载 ${(received / 1024 / 1024).toFixed(1)} MB`)
+        },
+      })
+    } catch (error) {
+      log(`下载安装包失败：${error.message}`)
+      await dialog.showMessageBox({
+        type: 'error',
+        title: '下载失败',
+        message: error.message,
+        detail: info.pageUrl ? `也可以去发布页手动下载：${info.pageUrl}` : '',
+      })
+      return
+    } finally {
+      trayTooltip(`画境 · 服务${serviceStatusLabel()}`)
+    }
+
+    const install = await dialog.showMessageBox({
+      type: 'info',
+      title: '下载完成',
+      message: '安装包已下载',
+      detail: `${file}\n\n安装会关闭画境，装完需要手动重新打开。`,
+      buttons: ['立即安装', '稍后'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    if (install.response !== 0) return
+
+    try {
+      await launchInstaller(file)
+    } catch (error) {
+      log(`打开安装包失败：${error.message}`)
+      await dialog.showMessageBox({ type: 'error', title: '无法安装', message: error.message })
+      return
+    }
+    await quitApp()
+  } finally {
+    updateBusy = false
+    trayTooltip(`画境 · 服务${serviceStatusLabel()}`)
+  }
+}
+
+/* ===== 退出：先让服务把数据写完，再退进程 ===== */
+async function quitApp() {
   quitting = true
   try {
-    await fetch(`${PANEL_URL}api/panel/shutdown`, { method: 'POST', signal: AbortSignal.timeout(3000) })
-    log('已请求控制台停止服务')
+    await stopServer()
   } catch (error) {
-    log(`请求控制台退出失败：${error.message}`)
-  }
-
-  const exited = await waitPanelExit(8000)
-  if (!exited && panelChild?.pid) {
-    log(`控制台未按时退出，强制结束 pid=${panelChild.pid}`)
-    try { spawnSync('taskkill', ['/pid', String(panelChild.pid), '/T', '/F'], { windowsHide: true }) } catch {}
+    log(`停止服务失败：${error.message}`)
   }
   log('桌面端退出')
   app.exit(0)
@@ -342,19 +436,9 @@ async function shutdownAndQuit() {
 async function bootstrap() {
   log(`启动：packaged=${app.isPackaged} root=${ROOT} data=${DATA}`)
 
-  if (await probe(PANEL_URL)) {
-    dialog.showErrorBox(
-      '控制台端口被占用',
-      `端口 ${PANEL_PORT} 已经有程序在监听。\n\n可能你已经用 npm run panel 起了一个控制台，请先关掉再打开桌面端。`,
-    )
-    app.exit(1)
-    return
-  }
-
-  startPanel()
-
   try {
-    await startBackend()
+    const result = await startServer()
+    log(result.adopted ? '已接管正在运行的主服务' : `主服务已启动 pid=${serverState().pid}`)
   } catch (error) {
     log(`启动失败：${error.message}`)
     const choice = dialog.showMessageBoxSync({
@@ -371,36 +455,28 @@ async function bootstrap() {
     return
   }
 
+  // 首次使用：账号库还是空的，主窗口直接停在初始化向导，并亮出管理密钥
+  const needsSetup = await authNeedsSetup()
+  createMainWindow(needsSetup ? CLIENT_LOGIN_URL : CLIENT_URL)
+
   await refreshServiceState()
   createTray()
-
-  // 首次使用：账号库还是空的，控制台登录不了。直接把「初始化画境」页打开并亮出管理密钥。
-  let needsSetup = false
-  try {
-    const status = await fetch(`${SERVER_URL}api/auth/status`, { signal: AbortSignal.timeout(2000) })
-    needsSetup = Boolean((await status.json())?.needsSetup)
-  } catch {}
+  refreshMenus()
 
   if (needsSetup) {
-    log('账号库为空：用浏览器打开初始化向导')
-    await openClientInBrowser()
+    log('账号库为空：在登录页走初始化向导')
     showAdminKey()
-  } else {
-    createMainWindow()
   }
 
-  // 冒烟自检：HUAJING_DESKTOP_SMOKE_ACTION=start|stop|restart 时走一遍菜单动作并记日志
+  // 冒烟自检：HUAJING_DESKTOP_SMOKE_ACTION=start|stop|restart 时走一遍对应的原生动作
   const smokeAction = process.env.HUAJING_DESKTOP_SMOKE_ACTION
   if (smokeAction) {
-    const path = { start: 'api/start', stop: 'api/stop', restart: 'api/restart' }[smokeAction]
-    if (path) {
+    const actions = { start: startServer, stop: stopServer, restart: restartServer }
+    const action = actions[smokeAction]
+    if (action) {
       try {
-        const response = await fetch(`${PANEL_URL}${path}`, {
-          method: 'POST',
-          headers: { 'x-desktop-token': SHUTDOWN_TOKEN },
-          signal: AbortSignal.timeout(30000),
-        })
-        log(`冒烟动作 ${smokeAction}: ${response.status} ${await response.text().catch(() => '')}`)
+        await action()
+        log(`冒烟动作 ${smokeAction}: 完成 running=${serverState().running}`)
       } catch (error) {
         log(`冒烟动作 ${smokeAction} 失败: ${error.message}`)
       }
@@ -414,7 +490,7 @@ async function bootstrap() {
   const smokeMs = Number(process.env.HUAJING_DESKTOP_SMOKE || 0)
   if (smokeMs > 0) {
     log(`冒烟模式：${smokeMs}ms 后自动退出`)
-    setTimeout(() => { void shutdownAndQuit() }, smokeMs)
+    setTimeout(() => { void quitApp() }, smokeMs)
   }
 }
 
@@ -438,7 +514,7 @@ if (!gotLock) {
   app.on('before-quit', event => {
     if (quitting) return
     event.preventDefault()
-    void shutdownAndQuit()
+    void quitApp()
   })
 
   process.on('uncaughtException', error => {

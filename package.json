@@ -1,13 +1,12 @@
 {
   "name": "huajing-image-web",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "description": "画境生图：前后端分离的单张工作台与资产批量工作台",
   "main": "desktop/main.mjs",
   "scripts": {
     "install:all": "npm --prefix server install && npm --prefix web install",
-    "panel": "node scripts/control-panel.mjs",
     "dev": "node scripts/dev.mjs",
     "dev:server": "npm --prefix server run dev",
     "dev:web": "npm --prefix web run dev",
@@ -60,10 +59,6 @@
       {
         "from": "web/dist",
         "to": "app-server/web/dist"
-      },
-      {
-        "from": "scripts/control-panel.mjs",
-        "to": "app-server/scripts/control-panel.mjs"
       }
     ],
     "win": {

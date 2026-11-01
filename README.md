@@ -19,15 +19,19 @@ huajing-image-web/
 │   │   │   ├── admin.ts       账号管理、生成统计
 │   │   │   ├── projects.ts    项目增删改查（按账号隔离）
 │   │   │   ├── styles.ts      风格库读写（按账号隔离）
-│   │   │   └── history.ts     当前账号的生成记录
+│   │   │   ├── history.ts     当前账号的生成记录
+│   │   │   ├── update.ts      GET /api/update/status（本机请求免登录）
+│   │   │   └── upstream.ts    管理员读写上游地址、测试连通性
 │   │   ├── services/
-│   │   │   ├── magpie.js      调上游 Magpie 生图接口
+│   │   │   ├── magpie.ts      调上游 Magpie 生图接口
 │   │   │   ├── imaging.ts     图片格式探测、像素尺寸读取
 │   │   │   ├── storage.ts     存储抽象（本地盘，日后可换对象存储）
 │   │   │   ├── user-store.ts  账号库
 │   │   │   ├── usage-store.ts 生图统计与生成记录（含提示词、耗时、图片路径）
 │   │   │   ├── project-store.ts 项目库（项目归属 ownerId）
-│   │   │   └── style-library.ts 风格库（每账号一份）
+│   │   │   ├── style-library.ts 风格库（每账号一份）
+│   │   │   ├── settings-store.ts 运行期设置（上游地址）落盘 settings.json
+│   │   │   └── update-checker.ts 版本检查：GitHub Releases / 自定义 JSON，带缓存
 │   │   └── lib/
 │   │       ├── errors.ts      统一错误码
 │   │       ├── serial-gate.ts 生图闸门（并发数可配置）
@@ -55,14 +59,19 @@ huajing-image-web/
 │   │   └── admin/             管理页 CSS + JS（令牌取自 ui/）
 │   ├── vite.config.ts
 │   └── package.json
+├── desktop/                   Electron 外壳：只管窗口与主服务进程
+│   ├── main.mjs               窗口、菜单 / 托盘、单实例、优雅退出
+│   ├── server.mjs             启停 server/dist/index.js（ELECTRON_RUN_AS_NODE=1），8787 探测与接管
+│   ├── updater.mjs            检查更新、下载安装包到 <数据目录>/updates/
+│   ├── config.mjs             读写 <数据目录>/config.env，把配置注入子进程
+│   └── paths.mjs              安装目录 / 数据目录 / 日志目录
 ├── scripts/dev.mjs            一条命令同时起前后端
-├── scripts/control-panel.mjs  服务控制台（启停 / 监控 / 账号审核 / 日志，127.0.0.1:8790）
 ├── users.json                 账号库
 ├── projects.json              项目库（每个项目带 ownerId，按账号隔离）
 ├── usage.json                 生图统计与生成记录
 ├── styles/                    风格库目录（每个账号一份 <userId>.json）
 ├── logs/                      后端运行日志（按天 YYYY-MM-DD.log）
-├── data/                      监控数据（traffic.json 流量、rate-limit.json 限流、quotas.json 额度、concurrency.json 并发上限、feedback.json 意见反馈）
+├── data/                      运行数据（traffic.json 流量、rate-limit.json 限流、quotas.json 额度、concurrency.json 并发上限、feedback.json 意见反馈、settings.json 上游地址、sessions.json 会话）
 └── generated/                 生成的图片（按资产类型分文件夹）
     ├── 角色/                   角色资产图，文件名为资产名
     ├── 场景/                   场景资产图
@@ -81,34 +90,36 @@ npm run desktop:dev    # 开发模式直接跑起来
 npm run desktop:build  # 出安装包 + 便携版，产物在 release/
 ```
 
-- **形态**：Electron 外壳，**只包服务端**——主窗口就是控制台页面（启停、运行时间、
-  流量、限流、日志、账号审核）。**客户端（8787 的工作台）不放进桌面端**，仍然在浏览器里用；
-  菜单/托盘里的「在浏览器打开客户端」会用系统默认浏览器打开，局域网其他设备照旧访问
-  控制台里显示的那个局域网地址。关窗收进托盘、服务继续跑，托盘「退出」才停服务
-- **桌面端的启停不需要登录**：菜单/托盘里的启动、停止、重启由主进程带着
-  `x-desktop-token`（每次启动随机生成、只注入给控制台子进程）直接调用，
-  不依赖控制台网页里的管理员会话；菜单里会显示「状态：运行中/已停止」，
-  已在运行时「启动服务」自动置灰。网页版控制台（浏览器打开 8790）的按钮
-  仍然要求先登录管理员——两条路径互不影响
-- **不依赖用户装 Node**：控制台与主服务都由 Electron 自带的 Node 以
-  `ELECTRON_RUN_AS_NODE=1` 启动；打包产物里 `resources/app-server/` 放着
-  `server/dist`、`server/node_modules`（仅运行期依赖）、`web/dist` 与
-  `scripts/control-panel.mjs`
+- **形态**：Electron 外壳，**主窗口就是客户端**——直接加载
+  `http://127.0.0.1:8787/batch.html`（账号库还没初始化时先加载 `login.html`）。
+  页面里的外链交给系统默认浏览器，应用内导航只放行同源地址
+- **启停不依赖网页登录**：主进程用 `desktop/server.mjs` 自己拉起
+  `server/dist/index.js`（`ELECTRON_RUN_AS_NODE=1`），启动、停止、重启都在菜单 / 托盘里；
+  菜单第一项只读显示「状态：运行中 / 已停止」，已在运行时「启动服务」自动置灰
+- **菜单 / 托盘**：服务状态（只读）、启动服务、停止服务、重启服务、显示主窗口、
+  在浏览器打开客户端、复制局域网地址、打开数据目录、打开日志目录、复制管理密钥、
+  检查更新…、退出。关窗只收进托盘、服务继续跑，托盘「退出」才停服务
+- **不依赖用户装 Node**：主服务由 Electron 自带的 Node 启动；打包产物里
+  `resources/app-server/` 放着 `server/dist`、`server/node_modules`（仅运行期依赖）与 `web/dist`
 - **数据目录（绝不写安装目录）**：
   - 安装版：`%APPDATA%\huajing\`（`config.env`、`users.json`、`usage.json`、
-    `projects.json`、`styles/`、`generated/`、`data/`、`logs/`）
+    `projects.json`、`styles/`、`generated/`、`data/`、`logs/`、`updates/`）
   - 便携版：exe 同目录的 `huajing-data\`，可随 U 盘搬走
-- **首次使用**：数据目录为空时，桌面端会用**浏览器**打开 `/login.html` 的「初始化画境」
-  页面，同时弹出管理密钥对话框（也已复制到剪贴板），粘贴后创建第一个管理员。
-  之后菜单/托盘里的「复制管理密钥」随时可以再取
+- **首次使用**：数据目录为空时，主窗口直接停在登录页的「初始化画境」，
+  同时弹出管理密钥对话框（也已复制到剪贴板），粘贴后创建第一个管理员，不再另开浏览器。
+  之后菜单里的「复制管理密钥」随时可以再取
   （密钥保存在 `config.env` 的 `ADMIN_SETUP_KEY`，建好管理员后服务端会忽略它）
-- **配置**：改 `config.env`（`PORT`、`PANEL_PORT`、`MAGPIE_BASE_URL`、
-  `SESSION_SECRET`、`IMAGE_CONCURRENCY` 等）后重启应用生效；桌面端不读 `server/.env`
-- **端口占用**：启动时若 8790 已被别的控制台占用会直接弹窗说明并退出，
-  不会再拉一份服务起来
-- **退出是优雅的**：桌面端先调 `POST /api/panel/shutdown`，控制台再用
-  `SHUTDOWN_TOKEN` 调主服务的 `POST /api/shutdown`，补写流量数据、关掉日志流后才退出；
-  超时未退才 `taskkill` 兜底
+- **配置**：改 `config.env`（`PORT`、`HOST`、`MAGPIE_BASE_URL`、`SESSION_SECRET`、
+  `IMAGE_CONCURRENCY` 等）后重启应用生效；桌面端不读 `server/.env`。
+  上游地址、限流、并发这些运行期设置在**后台管理页**里改，不必动 `config.env`
+- **端口占用只剩 8787**：启动前先探测 8787——如果是本应用的服务在跑，直接接管，
+  不再拉起第二份；如果被别的程序占用，弹窗说明后退出
+- **退出是优雅的**：先 `POST /api/shutdown`（请求头 `x-shutdown-token`，每次启动随机生成、
+  只注入给主服务），等服务把流量数据补写、日志流关掉、端口释放；超时未退才 `taskkill` 兜底
+- **检查更新**：菜单「检查更新…」向本机 `/api/update/status?force=1` 拿版本信息，
+  发现新版本时给三个按钮「下载安装包 / 前往发布页 / 稍后」；下载走流式，
+  落到 `<数据目录>/updates/`（先写 `.part` 再改名，中断不会留下半截安装包），
+  完成后询问是否立即安装
 - 生成的 exe 未做代码签名，首次运行可能被 SmartScreen/杀软提示，属正常现象
 
 #### 打不开安装包构建时（本机环境相关）
@@ -132,112 +143,43 @@ npm run desktop:build  # 出安装包 + 便携版，产物在 release/
 `HUAJING_DESKTOP_SMOKE=<毫秒>` 让应用启动后自动走一遍退出流程（可配
 `HUAJING_DESKTOP_SMOKE_ACTION=start|stop|restart` 顺带验证服务控制）。
 
-### 服务控制台（推荐）
+### 后台管理页
 
-```powershell
-npm run panel
-```
+启动、停止、重启只有桌面端菜单一条路径；网页里不再有启停入口。
+打开 **http://127.0.0.1:8787/admin.html**（管理员登录后访问，管理员登录成功会自动跳到这里；
+客户端右上角头像菜单里也有一项「后台管理」，用新标签打开）。页面现在管：
 
-打开 **http://127.0.0.1:8790/** 即可看到服务控制台（仅本机可访问），提供：
+- **待审核账号**：客户端登录页提交的申请在这里排队，带用户名、显示名、申请时间。
+  点「通过」后账号**立刻可登录**（`pending` 置否），点「拒绝」删掉该条记录。
+  队列只在有申请时出现
+- **账号管理**：新建账号、改显示名 / 密码、停用 / 启用、删除，
+  以及**每账号每日额度**（0 = 不限额；超额请求直接 429，不调用上游）
+- **限流与并发**：请求限流的开关 + 窗口秒数 + 每窗口最大请求数（超额 429），
+  生图并发上限 1–8。改完**即时生效**，分别落盘到 `data/rate-limit.json`、
+  `data/concurrency.json`，重启后沿用
+- **上游设置**：Magpie 地址（默认 `http://127.0.0.1:3425`）与「测试连通」——
+  后者探一次该地址的 `/v1/models`，有 HTTP 响应就算可达（401 也算）。保存写进
+  `data/settings.json`（桌面端为 `<数据目录>\data\settings.json`），**即时生效、不用重启**
+  （生图与配置接口每次请求现取）。只接受 http/https、不能带账号密码，
+  非法地址返回 400 `UPSTREAM_INVALID`；这里保存的值优先于 `MAGPIE_BASE_URL` 环境变量
+- **用户反馈**：未处理数量角标、全部 / 未处理 / 已处理筛选；点开看完整内容，
+  操作列在「标记已处理 / 标记未处理」之间切换，处理结果同步到客户端的状态列表
+- **生图统计**：累计生成、参与账号、占用空间、累计 token、平均每张 token；
+  下面是账号 token 排行（张数 / 累计 token / 均值每张 / 占比 / 占用空间 / 最近生成）、
+  按画幅的 token 均值、最近生成记录。均值只统计有 token 数据的记录，
+  旧记录（没有 token 字段）计入张数但不拉低均值
+- **生图趋势**：今天（按小时）/ 七天 / 一个月 / 三个月 / 六个月（按天）切换，
+  折线或柱状；悬停某个时间点显示「总张数 · 总 token」与按账号拆分的明细
+- **服务流量**：总请求、发出 / 接收流量、按客户端 IP 的明细
+  （`data/traffic.json`，重启不丢）
 
-- **控制台登录（必需）**：打开控制台先登录管理员账号，未登录时除登录框外
-  全部功能（服务控制、日志、账号、统计、趋势、流量、限流）都不显示也不可用；
-  登录凭证由主服务校验，会话记在控制台进程内。登录页是双列布局：左侧品牌说明 +
-  实时服务状态/客户端地址，右侧表单（密码可显隐、错误内联提示、提交中禁用防重复）
-- **唯一例外**：主服务未运行时，页面会给出「启动服务」引导按钮，
-  否则没有可校验的账号体系、会把自己锁死；服务一旦运行即要求登录
-- **启动 / 停止 / 重启服务** 按钮（主服务 = 客户端后端，端口 8787）
-- **运行时间** 与进程状态
-- **账号管理**：新建账号、改显示名/密码、停用/启用、删除（原后台管理页内容）；
-  **每账号可单独设置每日生图额度**（0 = 不限额），超额请求直接返回 429 且不调用上游
-- **待审核申请**：客户端登录页提交的申请在这里排队，带用户名、显示名、申请时间，
-  点「通过」账号立刻可登录、点「拒绝」删掉这条记录。队列只在有申请时出现，
-  每 10 秒刷新一次（页面切到后台就暂停），刷新只在新申请到达时重绘表格，
-  不会把正要点的按钮换掉
-- **生图统计**：累计生成、参与账号、占用空间、**累计 token**、**平均每张 token**；
-  下方三张表依次是「账号 token 排行」（带 `#` 名次列，按累计 token 降序，
-  列出张数 / 累计 token / 均值每张 / 占比 / 占用空间 / 最近生成）、
-  「按画幅的 token 均值」（画幅 / 张数 / 累计 token / 均值每张 / 占比）、
-  「最近 50 条生成明细」（每条也列出该次生图的 token）。
-  均值只统计有 token 数据的记录，旧记录（没有 token 字段）计入张数但不拉低均值，
-  接口同时返回 `avgTokens`、`ratioStats[]`，账号项带 `tokenCount` 与 `avgTokens`
-- **账号管理**：账号表新增「token 消耗」列（与生图数同源，统计就绪后自动刷新）
-- **生图趋势**：分段胶囊切换 今天（按小时）/ 七天 / 一个月 / 三个月 / 六个月，
-  右侧图标可切折线与柱状；曲线用单调三次插值（限幅防过冲），配渐变面积、
-  虚线网格与整齐刻度（步长取 1/2/5×10ⁿ），数据点悬停才浮出；
-  暗色模式下网格与分段底色自动转浅色
-- **趋势悬停浮层**：鼠标停在某个时间点的整列上，弹出该时间段的「总张数 · 总 token」
-  以及**按账号拆分**的明细（每个账号多少张、消耗多少 token）；接口
-  `GET /api/admin/stats/trend` 的每个 bucket 现在带 `tokens` 与 `users[]`
-  （`tokensInput + tokensOutput`，旧记录无 token 字段按 0 计）
-- **流量监控**：总请求、发出/接收流量、按客户端 IP 的明细（数据落在 `data/traffic.json`，重启不丢）
-- **客户端限流**：开关 + 滑动窗口配置（如 60 秒内最多 60 个请求），超额返回 429；
-  配置保存在 `data/rate-limit.json`，服务重启后仍生效
-- **生图并发**：运行时调整同时打向上游的请求上限（1–8），保存后**立即生效、无需重启**；
-  区块里显示当前上限、生成中与等待数。配置存在 `data/concurrency.json`，
-  优先级高于 `IMAGE_CONCURRENCY` 环境变量，服务重启后沿用
-- **上游 Magpie 地址**：服务控制区下方可直接改上游地址（默认 `http://127.0.0.1:3425`）。
-  「测试连通」会立刻去探该地址的 `/v1/models`（有 HTTP 响应就算可达，401 也算），
-  「保存并重启」把值写进 `<数据目录>/data/settings.json` 并重启主服务生效。
-  只接受 http/https、不接受地址里带账号密码；控制台保存的值优先于环境变量与默认值。
-  注意：重启会使控制台的登录会话失效，保存后需要重新登录
-- **运行日志**：按天写入 `logs/YYYY-MM-DD.log`，控制台里可直接翻看
-
-#### 控制台视觉规范
-
-控制台是 `Operate` 类界面（任务优先），视觉按「精确与克制」处理，令牌集中在
-`scripts/control-panel.mjs` 的 `:root` 里：
-
-- **层次**：卡片只声明一层边界（1px 发丝线），不再叠加投影；内部层次靠 1%~3% 明度差
-  （`--surface` / `--surface-sunken` / `--hair`）区分，不使用纯黑
-- **指标**：标签 + 数值组成的一行 `.metrics`，用细线分隔，不再套独立卡片
-- **图标**：统一为内联 SVG（同一线宽），不使用 emoji 或 Unicode 字符充当图标
-- **浏览器表面**：选区、光标、滚动条、占位符、焦点环都从调色板取色
-- **对比度**：正文 13.8:1，次要文字亮色 5.56:1 / 暗色 5.08:1（均 ≥ 4.5）
-- **暗色**：`prefers-color-scheme: dark` 下整体字重调细一档（正文 300）抵消光晕
-- **布局**：宽屏（≥1200px）时「运行日志」位于「服务控制」右侧（栏宽 290–330px）、
-  两块等高对齐，账号管理及其后板块通栏；日志在窄栏内软换行，不出现横向滚动条
-- **日志交互**：鼠标在日志窗口上时滚轮只滚动日志内容（`overscroll-behavior: contain`
-  + wheel 拦截），不会带动整页；「跳至最新」是日志窗口底部居中的半透明玻璃浮层，
-  仅在内容未处于最新一条时浮现，点击后回落到底并自动隐藏
-  （按下态单独声明 `transform: translate(-50%, 1px)`，否则会被全局 `button:active`
-  的 `translateY` 覆盖、导致按钮左右跳动）
-- **跳转按钮**：细描边幽灵（唯一风格）——只留一圈描边，按钮范围内是
-  `backdrop-filter: blur(14px)` 的雾面玻璃，**被它盖住的日志文字会明显模糊**，
-  叠加冷白径向薄雾与内外微光（`0 0 18px` 外发光 + `inset 0 0 16px` 内微光、
-  文字 `text-shadow: 0 0 10px`）形成「文字被雾气压住并透出弱光」的观感；
-  仅在内容未处于最新一条时出现，点击回落到底后自动隐藏
-- **日志自动刷新**：每 3 秒一次，但只在页面可见、且查看的是「今天」时轮询；
-  先请求 `/api/logs?meta=1`（只取文件大小与 mtime）判断是否有新内容，变了才拉正文，
-  正文没变则不重绘；贴底时跟随最新，上滚时保持阅读位置并显示「跳至最新」；
-  工具栏有开关，关闭后完全停止轮询（偏好记在 localStorage）
-- **滚动条**：日志窗口的滚动条平时隐藏，鼠标移入日志区才浮现为浅色滑块
-- **响应式**：1440 / 390 两档无横向溢出；宽表格在自身容器内横向滚动
-- **运行时间**：前端本地 250ms 平滑走时，3 秒一次的轮询只做校准（偏差 >1.5 秒才对齐），
-  数据源优先取主服务进程的真实 uptime，因此控制台重启后不会从 0 重算
-- **数据自动刷新**：客户端那边生完图，控制台不用手动刷新也会跟上——服务状态/运行时间/
-  流量/限流走 3 秒轮询；**生图统计（累计、账号排行、按画幅均值、最近明细）、账号表
-  （生图数 / token / 今日已用额度）、生图趋势**每 5 秒刷新一次，待审核队列 10 秒一次，
-  日志 3 秒一次。所有轮询都只在「已登录 + 页面可见 + 服务在运行」时进行（切到后台自动停），
-  且每个区块先比对内容签名，**数据没变就不重绘**，不会闪烁、也不会把正要点的按钮换掉
-
-旧的 `启动后端.bat` / `停止服务.bat` 已移除。手动方式：
-
-```powershell
-npm run build          # 构建前端
-npm run build:server   # 编译后端
-npm start              # 直接启动主服务（不经过控制台）
-npm run dev            # 开发模式，热重载
-```
-
-启动器会读取 `server/.env`（若存在），其中的 `PORT`、`MAGPIE_BASE_URL` 等配置优先于默认值。
-桌面端不读 `server/.env`，改 `<数据目录>/config.env`。
+运行日志按天写入 `logs/YYYY-MM-DD.log`，用桌面端菜单的「打开日志目录」查看。
 
 ### 手动启动
 
 ```powershell
-npm run install:all
-npm run dev
+npm run install:all   # 首次：装根目录、web/、server/ 的依赖
+npm run dev           # 开发模式，热重载
 ```
 
 - 前端：http://127.0.0.1:5173
@@ -246,9 +188,15 @@ npm run dev
 生产构建（前端产物由后端直接托管）：
 
 ```powershell
-npm run build
-npm start
+npm run build          # 构建前端
+npm run build:server   # 编译后端
+npm start              # 直接启动主服务
 ```
+
+启动器会读取 `server/.env`（若存在），其中的 `PORT`、`MAGPIE_BASE_URL` 等配置优先于默认值。
+桌面端不读 `server/.env`，改 `<数据目录>/config.env`。
+
+旧的 `启动后端.bat` / `停止服务.bat` 已移除；启动、停止、重启在桌面端菜单里做。
 
 ## 接口契约
 
@@ -267,6 +215,9 @@ POST /api/reference-images
 
 GET    /api/config      画面比例、原生尺寸、提示词上限、默认值
 GET  /api/health      后端与上游 Magpie 的连通状态
+POST /api/shutdown    优雅退出：补写流量、关日志流后退出
+                      需请求头 x-shutdown-token（桌面端每次启动注入随机值；
+                      服务端未配置令牌时不注册此接口）
 GET  /api/queue       生图闸门状态：{ busy, active, limit, waiting }
 GET  /api/files/*     生成图片（支持 类别/文件名 与旧版 UUID 两种形式）
 GET  /api/history     当前账号的生成记录（提示词、耗时、画幅、像素、图片地址、token 用量）
@@ -312,15 +263,21 @@ POST   /api/feedback     提交意见反馈 { category: bug|suggestion|other, co
 GET    /api/feedback/mine?limit=20  本人最近反馈（按时间倒序，登录即可）
 GET    /api/admin/feedback?status=all|new|resolved&limit=200  反馈列表 + counts  管理员
 PATCH  /api/admin/feedback/:id  标记处理状态 { status: new|resolved }  管理员
-GET    /api/upstream     控制台的 Magpie 地址设置与当前连通性（控制台管理员）
-PUT    /api/upstream     保存 Magpie 地址 { baseUrl } 并重启主服务（控制台管理员）
-POST   /api/upstream/test  按传入地址探一次连通性，不保存（控制台管理员）
+GET    /api/admin/upstream   上游地址与来源（后台设置 / 环境变量）  管理员
+PUT    /api/admin/upstream   保存上游地址 { baseUrl }，立即生效、不用重启  管理员
+                              只接受 http/https、不带账号密码；非法返回 400 UPSTREAM_INVALID
+POST   /api/admin/upstream/test  按传入地址探一次连通性，不保存  管理员
+GET    /api/update/status   版本检查（?force=1 绕过缓存）
+                            本机回环请求免登录，局域网其他设备需登录
+                            返回 currentVersion / latestVersion / hasUpdate / releaseNotes /
+                            pageUrl / downloadUrl / downloadName / publishedAt / checkedAt /
+                            source(github|custom|none) / disabled / error
 GET    /api/admin/stats/trend?range=today|7d|30d|90d|180d
                           生图趋势折线图数据  管理员
                           （today 按小时分桶，其余按天分桶，取自本地 usage.json）
 ```
 
-错误码：`INVALID_PROMPT`、`PROMPT_TOO_LONG`、`RATIO_INVALID`、`FEEDBACK_INVALID`、`AUTH_REQUIRED`、`AUTH_INVALID`、`AUTH_FORBIDDEN`、`UPSTREAM_UNREACHABLE`、`UPSTREAM_TIMEOUT`、`UPSTREAM_ERROR`、`UPSTREAM_BAD_RESPONSE`、`IMAGE_INVALID`、`IMAGE_UNSUPPORTED`、`INTERNAL_ERROR`。
+错误码：`INVALID_PROMPT`、`PROMPT_TOO_LONG`、`RATIO_INVALID`、`FEEDBACK_INVALID`、`AUTH_REQUIRED`、`AUTH_INVALID`、`AUTH_FORBIDDEN`、`AUTH_PENDING`、`UPSTREAM_UNREACHABLE`、`UPSTREAM_TIMEOUT`、`UPSTREAM_ERROR`、`UPSTREAM_BAD_RESPONSE`、`UPSTREAM_INVALID`、`IMAGE_INVALID`、`IMAGE_UNSUPPORTED`、`CONCURRENCY_INVALID`、`RATE_LIMITED`、`QUOTA_EXCEEDED`、`INTERNAL_ERROR`。
 
 `imageUrl` 是后端绝对地址（依据 `PUBLIC_BASE_URL` 或请求 Host 推断），因此前端部署在任何端口都能正确取图。
 
@@ -421,7 +378,7 @@ ADMIN_SETUP_KEY=换成你自己的长随机串
 - 客户端可以**自助申请**账号，但注册不由申请人自己完成：
   `POST /api/auth/register` 只写入一条 `pending` 记录，登录接口对这类账号一律返回
   403 `AUTH_PENDING`（密码正确才告知「等待审核」，密码错误仍按「用户名或密码不正确」处理，
-  不泄露账号状态）。管理员在服务端控制台「待审核申请」里点「通过」之后，
+  不泄露账号状态）。管理员在后台管理页「待审核账号」里点「通过」之后，
   `pending` 置为 false，账号才算真正注册成功、才能登录；点「拒绝」会删除这条记录。
 - 审核期间账号不出现在账号列表、额度表和统计里（它们只认已通过审核的账号）。
 - 密码用 `scrypt` 加随机盐哈希存储，文件里没有明文。
@@ -488,12 +445,12 @@ generated/    图片文件
 
 ## 生图并发闸门
 
-打向上游的生图请求有全局上限（默认 5，范围 1–8），可在**服务端控制台 → 生图并发**里运行时调整：
+打向上游的生图请求有全局上限（默认 5，范围 1–8），可在**后台管理页 → 限流与并发 → 生图并发**里运行时调整：
 保存后立即生效，写入 `data/concurrency.json`，服务重启后沿用。批量页的「并行数」不会超过它。
 
 - 前端默认并行 5（实测上游约 5 个并发槽），可在批量页 1–8 之间调整；调到 1 即逐张生成。
 - 上限对所有标签页、所有账号合计生效，避免多端同时刷上游触发风控。
-- 优先级：`data/concurrency.json`（控制台）> `IMAGE_CONCURRENCY` 环境变量 > 默认 5。
+- 优先级：`data/concurrency.json`（后台设置）> `IMAGE_CONCURRENCY` 环境变量 > 默认 5。
 - 每日额度按「今日已用 + 在途」判断，并行时不会超发。
 - `/api/queue` 可查看 `{ busy, active, limit, waiting }`。
 
@@ -534,6 +491,10 @@ generated/    图片文件
   用最大化编辑器修改后同样会立即写入，不会因为刷新丢字。
 - **改自己的名称**：头像菜单 →「修改名称」可以改自己的**显示名**（登录用的用户名不变）。
   名称在账号库里唯一，重名会被拒绝并给出提示；最多 24 个字，改完头像首字与菜单里的名字立即更新。
+- **关于画境 / 检查更新**：头像菜单 →「关于画境 v1.0.2」显示当前版本，打开时自动检查一次，
+  也可点「重新检查」；有新版本时列出更新说明，并给「下载安装包 / 前往发布页」
+  （没有直链就只去发布页）。启动 6 秒后还会静默查一次，有更新时头像出现红点、
+  菜单项显示「有新版本 vX」；同一标签页 2 小时内不重复检查。桌面端菜单里也有「检查更新…」
 
 #### 意见反馈
 
@@ -586,7 +547,7 @@ generated/    图片文件
 
 #### 客户端视觉规范
 
-与服务器控制台共用一套思路（任务优先、精确克制）。令牌统一在 `web/src/ui/tokens.css`（三页共用，暗色只在那里改值），控件在 `web/src/ui/components.css`，工作台样式按职责拆在 `web/src/batch/*.css`：
+与后台管理页、登录页共用一套思路（任务优先、精确克制）。令牌统一在 `web/src/ui/tokens.css`（三页共用，暗色只在那里改值），控件在 `web/src/ui/components.css`，工作台样式按职责拆在 `web/src/batch/*.css`：
 
 - **视觉令牌**：保留暖纸色、墨绿与陶土橙品牌色，统一 `--surface-raised/subtle`、边框、圆角与控件高度；外壳只留一层轻边界和淡投影，内部工作区用细线与低明度差分层，不叠卡片阴影。字号只用 12/13/14/16/20/28 六档，间距为 4 的倍数
 - **页面外壳不做入场淡入**：`opacity: 0` 起始的容器动画在窗口被遮挡、最小化或截图取景时会停在首帧，整页看起来是空的；微动效只留在弹层、缩略图与状态胶囊上
@@ -597,7 +558,7 @@ generated/    图片文件
 - **弹层与风格页**：风格类型切换、列表和编辑器复用同一套表面与控件；资产弹窗、项目抽屉、提示词编辑器和生成记录统一圆角、间距、关闭按钮及滚动行为
 - **提示词悬浮按钮**：只在鼠标进入输入框右上角热区（右 150px × 上 56px）时浮现，
   不再一进输入框就出现；键盘 Tab 聚焦按钮时同样显示
-- **滚轮不外溢**：生成记录面板与日志窗口的滚动区都设了 `overscroll-behavior: contain`，
+- **滚轮不外溢**：生成记录面板的滚动区设了 `overscroll-behavior: contain`，
   再用「原生优先」的滚轮守卫兜底：方向与速度全部交给浏览器原生滚动，
   只在**已经到顶/到底还继续往外滚**时 `preventDefault`，所以不会带动后面的页面，
   也不会和系统里的反向滚动设置打架（早前版本手动 `scrollTop += delta`，
@@ -612,9 +573,9 @@ generated/    图片文件
   标题下的说明会显示当前批量比例；点「应用到所选」会同时套用比例与风格。
 - **风格库存放在后端** `styles.json`（可用 `STYLE_LIBRARY_PATH` 改路径），
   因此换浏览器、换机器打开同一地址都能读到同一份风格；`localStorage` 仅作为离线兜底。
-- 批量生成默认并行 5；在工具栏把**并行数**调到 1–8（不超过控制台的全局上限）即可改变，
+- 批量生成默认并行 5；在工具栏把**并行数**调到 1–8（不超过后台设置的全局上限）即可改变，
   前端用同样多的 worker 分发任务，服务端闸门按当前上限放行。并行时队列面板会同时显示多张进度。
-  控制台调整上限后，刷新批量页即可看到新的可选值。
+  在后台管理页调整上限后，刷新批量页即可看到新的可选值。
 - **每条资产有独立的进度条**。状态列显示该条资产自己的进度与阶段
   （正在理解画面 → 搭建构图 → 细化光影 → 完成渲染 → 接收图像 → 即将完成），
   排队中的资产显示队列位置，等待时进度条为空但可见。上游生图没有进度回调，
@@ -627,9 +588,9 @@ generated/    图片文件
 ```text
 HOST / PORT                后端监听地址与端口（局域网访问设 HOST=0.0.0.0）
 PUBLIC_BASE_URL            对外地址；留空按请求 Host 推断
-MAGPIE_BASE_URL            上游 Magpie 网关，默认 http://127.0.0.1:3425
+MAGPIE_BASE_URL            上游 Magpie 网关，默认 http://127.0.0.1:3425（后台保存过 settings.json 后以文件为准）
 MAGPIE_IMAGE_MODEL         生图模型，默认 codex/gpt-image-2
-IMAGE_CONCURRENCY          同时打向上游的生图请求上限，默认 5（1–8）；控制台保存过 data/concurrency.json 后以文件为准
+IMAGE_CONCURRENCY          同时打向上游的生图请求上限，默认 5（1–8）；后台保存过 data/concurrency.json 后以文件为准
 IMAGE_TIMEOUT_MS           单次生成超时，默认 300000
 MAX_PROMPT_LENGTH          提示词上限，默认 12000
 STORAGE_DIR                图片存储目录，默认项目根 generated/
@@ -638,9 +599,21 @@ USER_DATABASE_PATH        账号库文件，默认项目根 users.json
 USAGE_DATABASE_PATH       生图统计文件，默认项目根 usage.json
 PROJECT_DATABASE_PATH     项目库文件，默认项目根 projects.json
 SESSION_SECRET            会话签名密钥，留空则每次启动随机生成（会话令牌已落盘，不影响登录状态）
+SHUTDOWN_TOKEN            优雅退出令牌，留空则不注册 POST /api/shutdown（桌面端每次启动注入随机值）
 ADMIN_SETUP_KEY           引导创建首个管理员的管理密钥，留空则禁用引导
 CORS_ORIGINS              允许的前端来源（已改为自动放行回环与私有网段，此项保留兼容）
+
+APP_VERSION               当前版本号；桌面端注入 app.getVersion()，留空则读 server/package.json
+UPDATE_REPO               更新检查的 GitHub 仓库（owner/repo），默认 ikun1946/huajing-image-web
+UPDATE_FEED_URL           自定义更新源 JSON 地址；非空时优先于 GitHub，
+                          格式 { version, notes?, downloadUrl?, pageUrl?, publishedAt? }
+UPDATE_TOKEN              访问 GitHub 的令牌；公开仓库留空即可，私有仓库或触发限流时再填
+UPDATE_CHECK_DISABLED     设为 1 则完全不联网查版本，默认关闭（离线环境用）
 ```
+
+更新检查的默认行为：源为 `https://api.github.com/repos/<UPDATE_REPO>/releases/latest`，
+资产优先取名字含 `Setup` 的 exe，其次 `portable`；成功结果缓存 10 分钟、失败 60 秒，
+同一时刻只发一个请求、8 秒超时；失败不抛错，只在返回里带中文 `error` 文案。
 
 ## 依赖
 

@@ -14,6 +14,7 @@ export type ApiErrorCode =
   | 'UPSTREAM_TIMEOUT'
   | 'UPSTREAM_ERROR'
   | 'UPSTREAM_BAD_RESPONSE'
+  | 'UPSTREAM_INVALID'
   | 'IMAGE_INVALID'
   | 'IMAGE_UNSUPPORTED'
   | 'IMAGE_REFERENCE_MISSING'
@@ -49,6 +50,8 @@ function defaultStatusFor(code: ApiErrorCode): number {
       return 403
     case 'REFERENCE_TOO_LARGE':
       return 413
+    case 'UPSTREAM_INVALID':
+      return 400
     default:
       return 400
   }

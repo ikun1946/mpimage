@@ -8,6 +8,7 @@ import { requestImage, requestImageEdit, type ReferenceImage } from '../services
 import { detectImageType, readImageSize } from '../services/imaging.js'
 import { REFERENCE_CATEGORY, type ImageStorage } from '../services/storage.js'
 import type { QuotaStore } from '../services/quota-store.js'
+import type { SettingsStore } from '../services/settings-store.js'
 import type { UsageStore } from '../services/usage-store.js'
 import { requireAuth } from './auth.js'
 
@@ -50,7 +51,13 @@ interface GenerateBody {
 
 export function registerImageRoutes(
   app: FastifyInstance,
-  deps: { storage: ImageStorage; gate: SerialGate; usage: UsageStore; quotas: QuotaStore },
+  deps: {
+    storage: ImageStorage
+    gate: SerialGate
+    usage: UsageStore
+    quotas: QuotaStore
+    settings: SettingsStore
+  },
 ): void {
   /**
    * 生图任务表（内存）。作用：页面刷新会中断浏览器请求，但服务端仍在生成；
@@ -178,21 +185,19 @@ export function registerImageRoutes(
     try {
     const generated = await deps.gate.run(async () => {
       const reference = await loadReference(referencePath, deps.storage)
+      // 每次生图都重读上游地址：后台改完立即生效，无需重启服务
+      const upstreamOptions = {
+        baseUrl: await deps.settings.getBaseUrl(),
+        model: config.imageModel,
+        timeoutMs: config.requestTimeoutMs,
+      }
       const upstream = reference
         ? await requestImageEdit(
-          {
-            baseUrl: config.magpieBaseUrl,
-            model: config.imageModel,
-            timeoutMs: config.requestTimeoutMs,
-          },
+          upstreamOptions,
           { prompt, ratioHint: ratio.promptHint, image: reference },
         )
         : await requestImage(
-          {
-            baseUrl: config.magpieBaseUrl,
-            model: config.imageModel,
-            timeoutMs: config.requestTimeoutMs,
-          },
+          upstreamOptions,
           { prompt, ratioHint: ratio.promptHint },
         )
 

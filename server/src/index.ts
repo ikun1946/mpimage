@@ -28,9 +28,13 @@ import { TrafficStore } from './services/traffic-store.js'
 import { registerMetaRoutes } from './routes/meta.js'
 import { registerProjectRoutes } from './routes/projects.js'
 import { registerStyleRoutes } from './routes/styles.js'
+import { registerUpstreamRoutes } from './routes/upstream.js'
+import { registerUpdateRoutes } from './routes/update.js'
 import { ProjectStore } from './services/project-store.js'
 import { LocalFileStorage } from './services/storage.js'
+import { SettingsStore } from './services/settings-store.js'
 import { StyleLibraryStore } from './services/style-library.js'
+import { UpdateChecker } from './services/update-checker.js'
 import { UsageStore } from './services/usage-store.js'
 import { UserStore } from './services/user-store.js'
 
@@ -167,6 +171,12 @@ const concurrency = new ConcurrencyStore(dataDir, config.imageConcurrency)
 await concurrency.init()
 const gate = new SerialGate(concurrency.get())
 
+// 后台保存的上游地址（settings.json）优先于 MAGPIE_BASE_URL，改完即时生效
+const settings = new SettingsStore(dataDir)
+await settings.init()
+// 版本检查：进程内缓存，桌面端轮询也不会反复打发布源
+const updateChecker = new UpdateChecker()
+
 // 流量统计、每客户端限流与进程启动时刻（控制台监控用）
 const traffic = new TrafficStore(dataDir)
 const rateLimiter = new RateLimiter(dataDir)
@@ -198,7 +208,7 @@ app.addHook('onResponse', async (request, reply) => {
 // 流量数据定期落盘，进程退出时也会补写
 setInterval(() => { traffic.flushIfDirty().catch(() => {}) }, 10_000)
 
-/* 优雅退出：桌面端/控制台会发 SIGTERM 或 POST /api/panel/shutdown，
+/* 优雅退出：桌面端会发 SIGTERM 或带令牌的 POST /api/shutdown，
    这里统一成一次收尾——补写流量数据 → 关闭 Fastify（触发 onClose 关日志流）→ 退出。
    只注册一次，重复信号直接忽略，避免重复收尾把日志截断。 */
 let shuttingDown = false
@@ -236,10 +246,10 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => { void shutdown(signal) })
 }
 
-registerMetaRoutes(app, { concurrency: () => gate.limitCount })
+registerMetaRoutes(app, { concurrency: () => gate.limitCount, settings })
 registerAuthRoutes(app, { users, sessions })
 registerAdminRoutes(app, { users, usage, quotas })
-registerImageRoutes(app, { storage, gate, usage, quotas })
+registerImageRoutes(app, { storage, gate, usage, quotas, settings })
 registerFileRoutes(app, { storage })
 registerUploadRoutes(app, { storage })
 registerStyleRoutes(app, { library: styleLibrary })
@@ -247,6 +257,8 @@ registerProjectRoutes(app, { projects })
 registerHistoryRoutes(app, { usage, quotas })
 registerMonitorRoutes(app, { traffic, rateLimiter, processStartedAt, gate, concurrency })
 registerFeedbackRoutes(app, { feedback })
+registerUpstreamRoutes(app, { settings })
+registerUpdateRoutes(app, { checker: updateChecker })
 
 /* 优雅退出入口：只在注入了 SHUTDOWN_TOKEN 时开放，且必须带同一个 token 头。
    桌面端和控制台用它在退出前让服务补写数据、关掉日志流——Windows 上
@@ -334,8 +346,8 @@ app.addHook('onClose', async () => {
 
 await app.listen({ host: config.host, port: config.port })
 
-app.log.info(`Magpie 图片 API: ${config.magpieBaseUrl}/v1/images/generations`)
-app.log.info(`模型: ${config.imageModel}`)
+app.log.info(`Magpie 图片 API: ${await settings.getBaseUrl()}/v1/images/generations`)
+app.log.info(`模型: ${settings.getModel()}`)
 app.log.info(`存储目录: ${storageDirectory}`)
 app.log.info(`风格库目录: ${styleLibraryRoot}`)
 app.log.info(`账号库文件: ${userDatabasePath}`)

@@ -68,6 +68,26 @@
               </svg>
               <span>意见反馈</span>
             </button>
+            <a class="history-entry" id="admin-link" href="/admin.html" target="_blank" rel="noopener" role="menuitem" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 6h16"></path>
+                <path d="M4 12h16"></path>
+                <path d="M4 18h16"></path>
+                <circle cx="9" cy="6" r="2"></circle>
+                <circle cx="15" cy="12" r="2"></circle>
+                <circle cx="8" cy="18" r="2"></circle>
+              </svg>
+              <span>后台管理</span>
+            </a>
+            <button class="history-entry" id="about-button" type="button" role="menuitem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 11v5"></path>
+                <path d="M12 8h.01"></path>
+              </svg>
+              <span id="about-menu-label">关于画境</span>
+              <span class="menu-version" id="about-menu-version" aria-hidden="true"></span>
+            </button>
             <button class="logout-button" id="logout-button" type="button" role="menuitem">退出登录</button>
           </div>
         </div>
@@ -461,6 +481,33 @@
             </div>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="about-modal" role="dialog" aria-modal="true" aria-labelledby="about-title">
+    <div class="modal-sheet narrow">
+      <header class="modal-head">
+        <div>
+          <p class="modal-kicker">版本</p>
+          <h3 id="about-title">关于画境</h3>
+        </div>
+        <button class="button secondary modal-close" id="about-close" type="button">关闭</button>
+      </header>
+      <div class="modal-body narrow-body">
+        <div class="about-panel">
+          <p class="about-version">当前版本 <strong id="about-current">-</strong></p>
+          <p class="about-status" id="about-status" role="status">正在检查更新…</p>
+          <div class="about-notes-wrap" id="about-notes-wrap" hidden>
+            <p class="about-notes-title">更新内容</p>
+            <div class="about-notes" id="about-notes" tabindex="0" aria-label="更新内容"></div>
+          </div>
+          <p class="about-msg" id="about-msg" role="alert"></p>
+          <div class="modal-actions">
+            <a class="button primary" id="about-download" href="#" target="_blank" rel="noreferrer" hidden>下载安装包</a>
+            <button class="button secondary" id="about-recheck" type="button">重新检查</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
