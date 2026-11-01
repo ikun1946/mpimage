@@ -1,6 +1,6 @@
 {
   "name": "huajing-image-server",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "type": "module",
   "description": "画境生图后端：Fastify API，代理 Magpie 生图并按比例裁切",

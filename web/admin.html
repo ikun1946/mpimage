@@ -28,246 +28,268 @@
       </div>
     </header>
 
+    <div class="section-nav" role="tablist" aria-label="后台分组">
+      <button class="section-tab" id="tab-accounts" type="button" role="tab" aria-selected="true" aria-controls="panel-accounts" tabindex="0">
+        账号<span class="tab-badge" id="nav-registration-badge" hidden></span>
+      </button>
+      <button class="section-tab" id="tab-config" type="button" role="tab" aria-selected="false" aria-controls="panel-config" tabindex="-1">运行配置</button>
+      <button class="section-tab" id="tab-feedback" type="button" role="tab" aria-selected="false" aria-controls="panel-feedback" tabindex="-1">反馈</button>
+      <button class="section-tab" id="tab-data" type="button" role="tab" aria-selected="false" aria-controls="panel-data" tabindex="-1">数据</button>
+    </div>
+
     <main class="admin-main">
-      <section class="admin-section" id="section-registrations">
-        <div class="section-head">
-          <h2>待审核账号</h2>
-          <span class="badge" id="registration-count">待审 0</span>
-        </div>
-        <p class="section-note">客户端提交的账号申请需要在这里通过后才能登录；拒绝会删除该申请。</p>
-        <p class="form-msg" id="registration-msg" role="status"></p>
-        <div class="admin-table-shell">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>用户名</th>
-                <th>昵称</th>
-                <th>申请时间</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="registrations-body"></tbody>
-          </table>
-        </div>
+      <section class="admin-panel" id="panel-accounts" role="tabpanel" aria-labelledby="tab-accounts">
+        <section class="admin-section" id="section-registrations">
+          <div class="section-head">
+            <h2>待审核账号</h2>
+            <span class="badge" id="registration-count">待审 0</span>
+          </div>
+          <p class="section-note">客户端提交的账号申请需要在这里通过后才能登录；拒绝会删除该申请。</p>
+          <p class="form-msg" id="registration-msg" role="status"></p>
+          <div class="admin-table-shell" id="registrations-table">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>用户名</th>
+                  <th>昵称</th>
+                  <th>申请时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="registrations-body"></tbody>
+            </table>
+          </div>
+          <p class="empty-hint" id="registrations-empty" hidden>没有待审核的申请</p>
+        </section>
+
+        <section class="admin-section" id="section-accounts">
+          <div class="section-head">
+            <h2>账号管理</h2>
+            <button class="button primary" id="new-user-button" type="button">＋ 新建账号</button>
+          </div>
+          <p class="section-note">客户端不提供注册入口，所有账号在此创建。</p>
+          <div class="admin-table-shell">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>用户名</th>
+                  <th>显示名</th>
+                  <th>角色</th>
+                  <th>状态</th>
+                  <th>生图数</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="users-body"></tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
-      <section class="admin-section" id="section-accounts">
-        <div class="section-head">
-          <h2>账号管理</h2>
-          <button class="button primary" id="new-user-button" type="button">＋ 新建账号</button>
-        </div>
-        <p class="section-note">客户端不提供注册入口，所有账号在此创建。</p>
-        <div class="admin-table-shell">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>用户名</th>
-                <th>显示名</th>
-                <th>角色</th>
-                <th>状态</th>
-                <th>生图数</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="users-body"></tbody>
-          </table>
-        </div>
-      </section>
+      <section class="admin-panel" id="panel-config" role="tabpanel" aria-labelledby="tab-config" hidden>
+        <section class="admin-section" id="section-limits">
+          <div class="section-head">
+            <h2>限流与并发</h2>
+          </div>
+          <p class="section-note">保存后即时生效；限流关闭时不再对任何客户端返回 429。</p>
+          <div class="settings-grid">
+            <form class="settings-card" id="rate-limit-form">
+              <h3 class="sub-head settings-title">请求限流</h3>
+              <label class="check-row">
+                <input type="checkbox" id="rate-limit-enabled">
+                <span>启用限流</span>
+              </label>
+              <p class="settings-hint" id="rate-limit-state">读取中…</p>
+              <div class="settings-fields">
+                <label class="settings-field">
+                  <span>窗口秒数</span>
+                  <input class="input" id="rate-limit-window" type="number" min="1" max="3600" step="1" inputmode="numeric">
+                </label>
+                <label class="settings-field">
+                  <span>每窗口最大请求数</span>
+                  <input class="input" id="rate-limit-max" type="number" min="1" max="100000" step="1" inputmode="numeric">
+                </label>
+              </div>
+              <div class="settings-actions">
+                <button class="button primary" id="rate-limit-save" type="submit">保存</button>
+                <span class="form-msg" id="rate-limit-msg" role="status"></span>
+              </div>
+            </form>
 
-      <section class="admin-section" id="section-limits">
-        <div class="section-head">
-          <h2>限流与并发</h2>
-        </div>
-        <p class="section-note">保存后即时生效；限流关闭时不再对任何客户端返回 429。</p>
-        <div class="settings-grid">
-          <form class="settings-card" id="rate-limit-form">
-            <h3 class="sub-head settings-title">请求限流</h3>
-            <label class="check-row">
-              <input type="checkbox" id="rate-limit-enabled">
-              <span>启用限流</span>
+            <form class="settings-card" id="concurrency-form">
+              <h3 class="sub-head settings-title">生图并发</h3>
+              <div class="settings-fields">
+                <label class="settings-field">
+                  <span>并发上限（1–8）</span>
+                  <input class="input" id="concurrency-limit" type="number" min="1" max="8" step="1" inputmode="numeric">
+                </label>
+              </div>
+              <p class="settings-hint" id="concurrency-state">读取中…</p>
+              <div class="settings-actions">
+                <button class="button primary" id="concurrency-save" type="submit">保存</button>
+                <span class="form-msg" id="concurrency-msg" role="status"></span>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="admin-section" id="section-upstream">
+          <div class="section-head">
+            <h2>上游设置</h2>
+            <span class="status-tag" id="upstream-source">读取中…</span>
+          </div>
+          <p class="section-note">生图请求实际发往的上游地址；保存后即时生效，无需重启服务。</p>
+          <form class="settings-card" id="upstream-form">
+            <label class="settings-field">
+              <span>上游地址</span>
+              <input class="input" id="upstream-base-url" type="text" inputmode="url" autocomplete="off" placeholder="https://api.example.com">
             </label>
-            <p class="settings-hint" id="rate-limit-state">读取中…</p>
-            <div class="settings-fields">
-              <label class="settings-field">
-                <span>窗口秒数</span>
-                <input class="input" id="rate-limit-window" type="number" min="1" max="3600" step="1" inputmode="numeric">
-              </label>
-              <label class="settings-field">
-                <span>每窗口最大请求数</span>
-                <input class="input" id="rate-limit-max" type="number" min="1" max="100000" step="1" inputmode="numeric">
-              </label>
-            </div>
+            <p class="settings-hint">当前模型：<strong id="upstream-model">—</strong></p>
             <div class="settings-actions">
-              <button class="button primary" id="rate-limit-save" type="submit">保存</button>
-              <span class="form-msg" id="rate-limit-msg" role="status"></span>
+              <button class="button primary" id="upstream-save" type="submit">保存</button>
+              <button class="button ghost" id="upstream-test" type="button">测试连通</button>
+              <span class="form-msg" id="upstream-msg" role="status"></span>
             </div>
           </form>
-
-          <form class="settings-card" id="concurrency-form">
-            <h3 class="sub-head settings-title">生图并发</h3>
-            <div class="settings-fields">
-              <label class="settings-field">
-                <span>并发上限（1–8）</span>
-                <input class="input" id="concurrency-limit" type="number" min="1" max="8" step="1" inputmode="numeric">
-              </label>
-            </div>
-            <p class="settings-hint" id="concurrency-state">读取中…</p>
-            <div class="settings-actions">
-              <button class="button primary" id="concurrency-save" type="submit">保存</button>
-              <span class="form-msg" id="concurrency-msg" role="status"></span>
-            </div>
-          </form>
-        </div>
+        </section>
       </section>
 
-      <section class="admin-section" id="section-upstream">
-        <div class="section-head">
-          <h2>上游设置</h2>
-          <span class="status-tag" id="upstream-source">读取中…</span>
-        </div>
-        <p class="section-note">生图请求实际发往的上游地址；保存后即时生效，无需重启服务。</p>
-        <form class="settings-card" id="upstream-form">
-          <label class="settings-field">
-            <span>上游地址</span>
-            <input class="input" id="upstream-base-url" type="text" inputmode="url" autocomplete="off" placeholder="https://api.example.com">
-          </label>
-          <p class="settings-hint">当前模型：<strong id="upstream-model">—</strong></p>
-          <div class="settings-actions">
-            <button class="button primary" id="upstream-save" type="submit">保存</button>
-            <button class="button ghost" id="upstream-test" type="button">测试连通</button>
-            <span class="form-msg" id="upstream-msg" role="status"></span>
-          </div>
-        </form>
-      </section>
-
-      <section class="admin-section" id="section-feedback">
-        <div class="section-head">
-          <h2>用户反馈</h2>
-          <div class="feedback-tools">
-            <span class="badge" id="feedback-pending">未处理 0</span>
-            <div class="trend-tabs" id="feedback-filter" role="tablist" aria-label="反馈筛选">
-              <button class="trend-tab active" data-status="all" type="button">全部</button>
-              <button class="trend-tab" data-status="new" type="button">未处理</button>
-              <button class="trend-tab" data-status="resolved" type="button">已处理</button>
+      <section class="admin-panel" id="panel-feedback" role="tabpanel" aria-labelledby="tab-feedback" hidden>
+        <section class="admin-section" id="section-feedback">
+          <div class="section-head">
+            <h2>用户反馈</h2>
+            <div class="feedback-tools">
+              <span class="badge" id="feedback-pending">未处理 0</span>
+              <div class="trend-tabs" id="feedback-filter" role="tablist" aria-label="反馈筛选">
+                <button class="trend-tab active" data-status="all" type="button">全部</button>
+                <button class="trend-tab" data-status="new" type="button">未处理</button>
+                <button class="trend-tab" data-status="resolved" type="button">已处理</button>
+              </div>
             </div>
           </div>
-        </div>
-        <p class="section-note">客户端提交的意见按时间倒序；内容过长时点一下即可展开整条。</p>
-        <div class="admin-table-shell">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>账号</th>
-                <th>类型</th>
-                <th>内容</th>
-                <th>页面</th>
-                <th>状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="feedback-body"></tbody>
-          </table>
-        </div>
+          <p class="section-note">客户端提交的意见按时间倒序；内容过长时点一下即可展开整条。</p>
+          <div class="admin-table-shell">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>账号</th>
+                  <th>类型</th>
+                  <th>内容</th>
+                  <th>页面</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="feedback-body"></tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
-      <section class="admin-section" id="section-stats">
-        <div class="section-head">
-          <h2>生图统计</h2>
-          <button class="button ghost" id="refresh-button" type="button">刷新</button>
-        </div>
+      <section class="admin-panel" id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden>
+        <section class="admin-section" id="section-stats">
+          <div class="section-head">
+            <h2>生图统计</h2>
+            <button class="button ghost" id="refresh-button" type="button">刷新</button>
+          </div>
 
-        <div class="stat-cards">
-          <div class="stat-card">
-            <span class="stat-label">累计生成</span>
-            <strong class="stat-value" id="stat-total">0</strong>
-            <span class="stat-unit">张</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">参与账号</span>
-            <strong class="stat-value" id="stat-accounts">0</strong>
-            <span class="stat-unit">个</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">占用空间</span>
-            <strong class="stat-value" id="stat-bytes">0</strong>
-            <span class="stat-unit">MB</span>
-          </div>
-        </div>
-
-        <h3 class="sub-head">服务流量</h3>
-        <div class="stat-cards" id="traffic-cards">
-          <div class="stat-card">
-            <span class="stat-label">请求数</span>
-            <strong class="stat-value" id="traffic-requests">—</strong>
-            <span class="stat-unit">次</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">流量</span>
-            <strong class="stat-value" id="traffic-bytes">—</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">运行时间</span>
-            <strong class="stat-value is-text" id="traffic-uptime">—</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">限流状态</span>
-            <strong class="stat-value is-text" id="traffic-rate">—</strong>
-          </div>
-        </div>
-        <p class="form-msg" id="traffic-msg" role="status"></p>
-
-        <h3 class="sub-head">生图趋势</h3>
-        <div class="trend-card">
-          <div class="trend-head">
-            <div class="trend-tabs" id="trend-tabs" role="tablist" aria-label="统计范围">
-              <button class="trend-tab" data-range="today" type="button">今天</button>
-              <button class="trend-tab active" data-range="7d" type="button">七天</button>
-              <button class="trend-tab" data-range="30d" type="button">一个月</button>
-              <button class="trend-tab" data-range="90d" type="button">三个月</button>
-              <button class="trend-tab" data-range="180d" type="button">六个月</button>
+          <div class="stat-cards">
+            <div class="stat-card">
+              <span class="stat-label">累计生成</span>
+              <strong class="stat-value" id="stat-total">0</strong>
+              <span class="stat-unit">张</span>
             </div>
-            <span class="trend-total" id="trend-total"></span>
+            <div class="stat-card">
+              <span class="stat-label">参与账号</span>
+              <strong class="stat-value" id="stat-accounts">0</strong>
+              <span class="stat-unit">个</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">占用空间</span>
+              <strong class="stat-value" id="stat-bytes">0</strong>
+              <span class="stat-unit">MB</span>
+            </div>
           </div>
-          <div class="trend-chart-wrap">
-            <svg id="trend-chart" class="trend-chart" preserveAspectRatio="none" aria-label="生图趋势折线图"></svg>
-            <div class="trend-empty" id="trend-empty" hidden>该时间范围内还没有生成记录</div>
+
+          <h3 class="sub-head">服务流量</h3>
+          <div class="stat-cards" id="traffic-cards">
+            <div class="stat-card">
+              <span class="stat-label">请求数</span>
+              <strong class="stat-value" id="traffic-requests">—</strong>
+              <span class="stat-unit">次</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">流量</span>
+              <strong class="stat-value" id="traffic-bytes">—</strong>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">运行时间</span>
+              <strong class="stat-value is-text" id="traffic-uptime">—</strong>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">限流状态</span>
+              <strong class="stat-value is-text" id="traffic-rate">—</strong>
+            </div>
           </div>
-        </div>
+          <p class="form-msg" id="traffic-msg" role="status"></p>
 
-        <h3 class="sub-head">按账号细分</h3>
-        <div class="admin-table-shell">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>账号</th>
-                <th>生成张数</th>
-                <th>占用空间</th>
-                <th>最近生成</th>
-                <th>占比</th>
-              </tr>
-            </thead>
-            <tbody id="stats-body"></tbody>
-          </table>
-        </div>
+          <h3 class="sub-head">生图趋势</h3>
+          <div class="trend-card">
+            <div class="trend-head">
+              <div class="trend-tabs" id="trend-tabs" role="tablist" aria-label="统计范围">
+                <button class="trend-tab" data-range="today" type="button">今天</button>
+                <button class="trend-tab active" data-range="7d" type="button">七天</button>
+                <button class="trend-tab" data-range="30d" type="button">一个月</button>
+                <button class="trend-tab" data-range="90d" type="button">三个月</button>
+                <button class="trend-tab" data-range="180d" type="button">六个月</button>
+              </div>
+              <span class="trend-total" id="trend-total"></span>
+            </div>
+            <div class="trend-chart-wrap">
+              <svg id="trend-chart" class="trend-chart" preserveAspectRatio="none" aria-label="生图趋势折线图"></svg>
+              <div class="trend-empty" id="trend-empty" hidden>该时间范围内还没有生成记录</div>
+            </div>
+          </div>
 
-        <h3 class="sub-head">最近生成记录</h3>
-        <div class="admin-table-shell">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>账号</th>
-                <th>类型</th>
-                <th>名称</th>
-                <th>画幅</th>
-                <th>尺寸</th>
-                <th>大小</th>
-              </tr>
-            </thead>
-            <tbody id="recent-body"></tbody>
-          </table>
-        </div>
+          <details class="fold">
+            <summary>按账号细分<span class="fold-count" id="stats-fold-count">（—）</span></summary>
+            <div class="admin-table-shell">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>账号</th>
+                    <th>生成张数</th>
+                    <th>占用空间</th>
+                    <th>最近生成</th>
+                    <th>占比</th>
+                  </tr>
+                </thead>
+                <tbody id="stats-body"></tbody>
+              </table>
+            </div>
+          </details>
+
+          <details class="fold">
+            <summary>最近生成记录<span class="fold-count" id="recent-fold-count">（—）</span></summary>
+            <div class="admin-table-shell">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>账号</th>
+                    <th>类型</th>
+                    <th>名称</th>
+                    <th>画幅</th>
+                    <th>尺寸</th>
+                    <th>大小</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-body"></tbody>
+              </table>
+            </div>
+          </details>
+        </section>
       </section>
     </main>
   </div>

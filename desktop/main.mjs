@@ -1,7 +1,8 @@
-import { app, BrowserWindow, Menu, Tray, clipboard, dialog, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, Menu, Tray, clipboard, dialog, ipcMain, nativeImage, shell } from 'electron'
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs'
+import { open, readdir, stat } from 'node:fs/promises'
 import os from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { appRoot, dataRoot } from './paths.mjs'
 import { loadConfig } from './config.mjs'
 import { initServer, restartServer, serverState, startServer, stopServer, waitForServer } from './server.mjs'
@@ -12,6 +13,7 @@ const ROOT = appRoot()
 const DATA = dataRoot()
 const LOG_DIR = join(DATA, 'logs')
 const MAIN_LOG = join(LOG_DIR, 'desktop.log')
+const LOG_READ_LIMIT = 256 * 1024
 
 // userData 指到固定的 huajing 目录，不随 productName 变化
 app.setPath('userData', DATA)
@@ -110,6 +112,88 @@ function showMainWindow() {
   mainWindow.focus()
 }
 
+/* ===== 运行日志窗口：直接读 LOG_DIR 下的 .log，不经服务端 ===== */
+let logWindow = null
+
+function resolveLogFile(name) {
+  if (typeof name !== 'string' || !name) return ''
+  if (name !== basename(name) || name.includes('..') || /[/\\]/.test(name)) return ''
+  if (!name.endsWith('.log')) return ''
+  return join(LOG_DIR, name)
+}
+
+ipcMain.handle('logs:list', async () => {
+  let names = []
+  try { names = await readdir(LOG_DIR) } catch { return [] }
+  const files = []
+  for (const name of names) {
+    if (!name.endsWith('.log')) continue
+    try {
+      const info = await stat(join(LOG_DIR, name))
+      if (info.isFile()) files.push({ name, size: info.size, mtime: info.mtimeMs })
+    } catch {}
+  }
+  // 最近写入的在前：日期文件和 desktop.log 混在一起排，页面再自己优先挑日期文件
+  return files.sort((a, b) => (Number(b.mtime) || 0) - (Number(a.mtime) || 0))
+})
+
+ipcMain.handle('logs:read', async (_event, name, offset) => {
+  const file = resolveLogFile(name)
+  if (!file) return { chunk: '', offset: 0, size: 0 }
+
+  let handle
+  try {
+    handle = await open(file, 'r')
+  } catch {
+    return { chunk: '', offset: 0, size: 0 }
+  }
+
+  try {
+    const info = await handle.stat()
+    const start = Math.min(Math.max(Number(offset) || 0, 0), info.size)
+    const length = Math.min(LOG_READ_LIMIT, info.size - start)
+    if (length <= 0) return { chunk: '', offset: start, size: info.size }
+    // 按窗口读，字节原样交给渲染层：多字节字符要靠 TextDecoder 跨块拼接，主进程先截断就会变成乱码
+    const buffer = Buffer.allocUnsafe(length)
+    const { bytesRead } = await handle.read(buffer, 0, length, start)
+    return { chunk: buffer.subarray(0, bytesRead), offset: start + bytesRead, size: info.size }
+  } catch {
+    return { chunk: '', offset: 0, size: 0 }
+  } finally {
+    await handle.close().catch(() => {})
+  }
+})
+
+ipcMain.handle('logs:open-dir', () => shell.openPath(LOG_DIR))
+
+function openLogWindow() {
+  if (logWindow) {
+    if (logWindow.isMinimized()) logWindow.restore()
+    logWindow.show()
+    logWindow.focus()
+    return
+  }
+
+  logWindow = new BrowserWindow({
+    width: 860,
+    height: 640,
+    minWidth: 640,
+    minHeight: 420,
+    title: '画境 · 运行日志',
+    backgroundColor: '#f4f0e6',
+    icon: iconPath(),
+    webPreferences: {
+      preload: join(app.getAppPath(), 'desktop', 'logs-preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  })
+
+  logWindow.loadFile(join(app.getAppPath(), 'desktop', 'logs.html'))
+  logWindow.on('closed', () => { logWindow = null })
+}
+
 async function openClientInBrowser() {
   try {
     // 账号库为空时先给初始化页，否则直接进工作台
@@ -178,6 +262,7 @@ function buildMenu() {
         { label: '复制局域网地址', click: copyLanAddress },
         { type: 'separator' },
         { label: '打开数据目录', click: () => shell.openPath(DATA) },
+        { label: '运行日志…', click: openLogWindow },
         { label: '打开日志目录', click: () => shell.openPath(LOG_DIR) },
         { label: '复制管理密钥', click: showAdminKey },
         { type: 'separator' },
@@ -222,6 +307,7 @@ function buildTrayMenu() {
     { label: '重启服务', click: () => { void runServiceAction('重启服务', restartServer) } },
     { type: 'separator' },
     { label: '检查更新…', click: () => { void checkUpdates() } },
+    { label: '运行日志…', click: openLogWindow },
     { label: '打开数据目录', click: () => shell.openPath(DATA) },
     { type: 'separator' },
     { label: '退出', click: () => { void quitApp() } },

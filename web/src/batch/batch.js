@@ -56,6 +56,7 @@ import { setupAvatarMenu } from '../lib/avatar-menu.js'
 import { HISTORY_LIMIT, assetFilename, assetHistory, primaryEntry, primaryFilename, primaryImageOf } from '../lib/format.js'
 import { activateOverlay } from '../lib/overlay.js'
 import { ratioOptions } from '../lib/ratio.js'
+import { setupTablist } from '../lib/tabs.js'
 
     /* ===== 状态与存储 ===== */
 
@@ -1352,26 +1353,6 @@ import { ratioOptions } from '../lib/ratio.js'
       persistSoon()
       renderTabs()
       renderActivePanel()
-    }
-
-    /** 页签键盘导航：←→ 循环、Home/End 到首尾；聚焦与切换同步，读屏能跟上 */
-    function handleTablistKeydown(event) {
-      const tab = event.target.closest('[role="tab"]')
-      if (!tab) return
-      const tabs = [...event.currentTarget.querySelectorAll('[role="tab"]')].filter(item => !item.disabled)
-      const index = tabs.indexOf(tab)
-      if (index === -1) return
-
-      let next = null
-      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = tabs[(index + 1) % tabs.length]
-      else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = tabs[(index - 1 + tabs.length) % tabs.length]
-      else if (event.key === 'Home') next = tabs[0]
-      else if (event.key === 'End') next = tabs[tabs.length - 1]
-      if (!next) return
-
-      event.preventDefault()
-      next.focus()
-      switchTab(next.dataset.tab)
     }
 
     function renderStylePage() {
@@ -3156,9 +3137,13 @@ import { ratioOptions } from '../lib/ratio.js'
       document.addEventListener('change', handleChange)
       document.addEventListener('input', handleInput)
 
-      // 页签组：方向键 / Home / End 切换，和鼠标点击走同一个 switchTab
-      document.querySelectorAll('[role="tablist"]').forEach(list => {
-        list.addEventListener('keydown', handleTablistKeydown)
+      // 页签组：方向键 / Home / End 切换，和鼠标点击走同一个 switchTab；
+      // 点击仍由上面的 data-tab 分发处理，这里只管键盘，避免重复 switchTab
+      setupTablist(document.querySelector('.tabs'), {
+        onChange: switchTab,
+        initialId: state.activeTab,
+        hash: false,
+        click: false,
       })
 
       dom.headerImport.addEventListener('click', openFilePicker)

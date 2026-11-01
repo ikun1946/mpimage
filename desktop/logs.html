@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'" />
+<title>画境 · 运行日志</title>
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #f3f1eb;
+    --surface: #fcfbf7;
+    --surface-raised: #ffffff;
+    --surface-subtle: #f5f3ed;
+    --ink: #202722;
+    --ink-soft: #59645c;
+    --ink-faint: #6e776f;
+    --line: rgba(32, 39, 34, 0.14);
+    --line-soft: rgba(32, 39, 34, 0.08);
+    --line-strong: rgba(32, 39, 34, 0.24);
+    --moss: #365445;
+    --moss-dark: #35503c;
+    --moss-tint: rgba(54, 84, 69, 0.12);
+    --on-moss: #fffdf8;
+    --gold: #a78243;
+    --danger: #a74331;
+    --radius-sm: 10px;
+    --radius-md: 12px;
+    --shadow-soft: 0 4px 16px rgba(40, 43, 36, 0.045);
+    --font-body: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    --font-mono: "Cascadia Mono", "Consolas", "Sarasa Mono SC", "Microsoft YaHei", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --paper: #151915;
+      --surface: #1c211d;
+      --surface-raised: #242a25;
+      --surface-subtle: #202520;
+      --ink: #e8e6df;
+      --ink-soft: #adb5ab;
+      --ink-faint: #939c91;
+      --line: rgba(232, 230, 223, 0.14);
+      --line-soft: rgba(232, 230, 223, 0.08);
+      --line-strong: rgba(232, 230, 223, 0.26);
+      --moss: #8aaa8f;
+      --moss-dark: #6f8f74;
+      --moss-tint: rgba(138, 170, 143, 0.14);
+      --on-moss: #12180f;
+      --gold: #c9a468;
+      --danger: #cf8574;
+      --shadow-soft: 0 6px 20px rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 13px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .bar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .bar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-soft);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .field.grow {
+    flex: 1 1 220px;
+    min-width: 180px;
+  }
+
+  .field.grow input {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  select,
+  input[type="search"] {
+    min-height: 34px;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-raised);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 120ms cubic-bezier(0.2, 0.75, 0.2, 1), box-shadow 120ms cubic-bezier(0.2, 0.75, 0.2, 1);
+  }
+
+  select {
+    max-width: 240px;
+  }
+
+  select:focus,
+  input[type="search"]:focus {
+    border-color: var(--moss);
+    box-shadow: 0 0 0 3px var(--moss-tint);
+  }
+
+  select:disabled {
+    opacity: 0.6;
+  }
+
+  input[type="search"]::placeholder {
+    color: var(--ink-faint);
+  }
+
+  .button {
+    min-height: 34px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-raised);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 120ms cubic-bezier(0.2, 0.75, 0.2, 1), border-color 120ms cubic-bezier(0.2, 0.75, 0.2, 1),
+      color 120ms cubic-bezier(0.2, 0.75, 0.2, 1);
+  }
+
+  .button:hover:not(:disabled) {
+    border-color: var(--line-strong);
+  }
+
+  .button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .button.primary {
+    border-color: transparent;
+    background: var(--moss);
+    color: var(--on-moss);
+  }
+
+  .button.primary:hover:not(:disabled) {
+    background: var(--moss-dark);
+  }
+
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 2px;
+    color: var(--ink-soft);
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .switch input {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--moss);
+    cursor: pointer;
+  }
+
+  .meta {
+    color: var(--ink-faint);
+    font-size: 12px;
+  }
+
+  .meta-status {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  #status {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #counter {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .meta-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  @media (max-width: 640px) {
+    .field.grow {
+      flex-basis: 100%;
+    }
+
+    .meta-actions {
+      flex-wrap: wrap;
+    }
+  }
+
+  .view {
+    position: relative;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--surface);
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .lines {
+    padding: 8px 0 16px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+
+  .line {
+    padding: 1px 16px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--ink);
+  }
+
+  .line:hover {
+    background: var(--surface-subtle);
+  }
+
+  .line.warn {
+    color: var(--gold);
+  }
+
+  .line.error {
+    color: var(--danger);
+  }
+
+  .line.debug {
+    color: var(--ink-faint);
+  }
+
+  .empty {
+    margin: 0;
+    padding: 48px 16px;
+    color: var(--ink-faint);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .empty[hidden] {
+    display: none;
+  }
+
+  .view::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .view::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--line-strong);
+    background-clip: padding-box;
+  }
+
+  .view::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-faint);
+    background-clip: padding-box;
+  }
+</style>
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-row">
+      <label class="field">
+        <span>文件</span>
+        <select id="file-select" aria-label="日志文件"></select>
+      </label>
+      <label class="switch">
+        <input type="checkbox" id="follow" checked />
+        <span>跟随最新</span>
+      </label>
+      <button type="button" id="pause" class="button">暂停</button>
+      <label class="switch">
+        <input type="checkbox" id="warn-only" />
+        <span>只看警告与错误</span>
+      </label>
+      <label class="field grow">
+        <span>过滤</span>
+        <input id="filter" type="search" placeholder="输入关键字，只筛显示不动缓冲" />
+      </label>
+    </div>
+    <div class="bar-row meta">
+      <span class="meta-status">
+        <span id="status">正在读取…</span>
+        <span id="counter"></span>
+      </span>
+      <div class="meta-actions">
+        <button type="button" id="clear" class="button">清空视图</button>
+        <button type="button" id="copy" class="button">复制当前内容</button>
+        <button type="button" id="open-dir" class="button primary">打开日志目录</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="view" class="view" role="log" aria-live="polite">
+    <div id="lines" class="lines"></div>
+    <p id="empty" class="empty" hidden></p>
+  </main>
+
+<script>
+  const POLL_MS = 1200
+  const LIST_MS = 10000
+  const MAX_LINES = 2000
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}\.log$/
+  const PREFIX_RE = /^\s*\[[^\]]*\]\s*/
+  const SOURCE_RE = /^\[(?:server|server:err|panel|panel:err)\]\s*/
+
+  const api = window.logsApi
+  const els = {
+    files: document.getElementById('file-select'),
+    follow: document.getElementById('follow'),
+    pause: document.getElementById('pause'),
+    warnOnly: document.getElementById('warn-only'),
+    filter: document.getElementById('filter'),
+    clear: document.getElementById('clear'),
+    copy: document.getElementById('copy'),
+    openDir: document.getElementById('open-dir'),
+    lines: document.getElementById('lines'),
+    empty: document.getElementById('empty'),
+    status: document.getElementById('status'),
+    counter: document.getElementById('counter'),
+    view: document.getElementById('view'),
+  }
+
+  const state = {
+    files: [],
+    file: '',
+    offset: 0,
+    size: 0,
+    lines: [],
+    pending: '',
+    decoder: new TextDecoder('utf-8'),
+    paused: false,
+    follow: true,
+    warnOnly: false,
+    filter: '',
+    cleared: false,
+    dirty: false,
+    reading: false,
+    listedAt: 0,
+    status: '',
+  }
+
+  function escapeHtml(value) {
+    return value.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch])
+  }
+
+  function bytesText(size) {
+    if (!size) return '0 B'
+    if (size < 1024) return `${size} B`
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+    return `${(size / 1024 / 1024).toFixed(1)} MB`
+  }
+
+  function clockText(value) {
+    if (!value) return ''
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? '' : date.toTimeString().slice(0, 8)
+  }
+
+  function stripPrefix(raw) {
+    let rest = raw.replace(PREFIX_RE, '')
+    if (SOURCE_RE.test(rest)) rest = rest.replace(SOURCE_RE, '')
+    return rest
+  }
+
+  function makeEntry(raw) {
+    const body = stripPrefix(raw)
+    if (body.startsWith('{')) {
+      try {
+        const data = JSON.parse(body)
+        const level = Number(data.level)
+        const tone = Number.isFinite(level) ? level : 30
+        const message = typeof data.msg === 'string' ? data.msg : typeof data.message === 'string' ? data.message : ''
+        if (message) {
+          const time = clockText(data.time)
+          return { level: tone, text: [time, message].filter(Boolean).join('  ') }
+        }
+        // 解析得出来但没有消息体，就别把整段 JSON 铺满屏幕
+        return { level: tone, text: raw }
+      } catch {}
+    }
+    return { level: 30, text: raw }
+  }
+
+  function pushLine(raw) {
+    const text = raw.endsWith('\r') ? raw.slice(0, -1) : raw
+    state.lines.push(makeEntry(text))
+    if (state.lines.length > MAX_LINES) state.lines.splice(0, state.lines.length - MAX_LINES)
+    state.cleared = false
+    state.dirty = true
+  }
+
+  function feed(text) {
+    state.pending += text
+    const cut = state.pending.lastIndexOf('\n')
+    if (cut < 0) {
+      if (state.pending.length > 65536) {
+        pushLine(state.pending)
+        state.pending = ''
+      }
+      return
+    }
+    const block = state.pending.slice(0, cut)
+    state.pending = state.pending.slice(cut + 1)
+    for (const raw of block.split('\n')) pushLine(raw)
+  }
+
+  function renderEmpty(count) {
+    let message = ''
+    if (!state.files.length || !state.file) message = '还没有日志文件'
+    else if (!count) message = state.lines.length || state.cleared ? '' : '这个文件是空的'
+    els.empty.textContent = message
+    els.empty.hidden = !message
+  }
+
+  function renderLines() {
+    const keyword = state.filter.trim().toLowerCase()
+    const visible = state.lines.filter(line => {
+      if (state.warnOnly && !(line.level >= 40)) return false
+      if (keyword && !line.text.toLowerCase().includes(keyword)) return false
+      return true
+    })
+    els.lines.innerHTML = visible
+      .map(line => {
+        const tone = line.level >= 50 ? 'error' : line.level >= 40 ? 'warn' : line.level >= 30 ? 'info' : 'debug'
+        return `<div class="line ${tone}">${escapeHtml(line.text)}</div>`
+      })
+      .join('')
+    els.counter.textContent = countText(visible.length)
+    renderEmpty(visible.length)
+    if (state.follow && state.file) els.view.scrollTop = els.view.scrollHeight
+  }
+
+  function countText(visible) {
+    if (!state.file) return ''
+    const keyword = state.filter.trim()
+    if (state.warnOnly) {
+      const extra = keyword ? '，含关键字' : ''
+      return `筛出 ${visible} / ${state.lines.length} 行（仅警告与错误${extra}）`
+    }
+    if (keyword) return `筛出 ${visible} / ${state.lines.length} 行`
+    return `已读 ${state.lines.length} 行`
+  }
+
+  function renderStatus() {
+    if (state.status) {
+      els.status.textContent = state.status
+      return
+    }
+    if (state.paused) {
+      els.status.textContent = '已暂停，点「继续」接着读'
+      return
+    }
+    if (!state.file) {
+      els.status.textContent = api ? '等待日志文件' : '日志接口不可用：请在画境桌面端里打开这个窗口'
+      return
+    }
+    els.status.textContent = `${state.file} · ${state.offset >= state.size ? '已读完' : '读取中'} · ${bytesText(state.size)}`
+  }
+
+  function renderFiles() {
+    if (!state.files.length) {
+      els.files.innerHTML = '<option value="">没有日志文件</option>'
+      els.files.disabled = true
+      return
+    }
+    els.files.disabled = false
+    els.files.innerHTML = state.files
+      .map(file => `<option value="${escapeHtml(file.name)}">${escapeHtml(file.name)}</option>`)
+      .join('')
+    els.files.value = state.file
+  }
+
+  async function readMore() {
+    if (!api || state.reading || !state.file) return
+    state.reading = true
+    try {
+      for (let step = 0; step < 32; step += 1) {
+        const result = await api.readFrom(state.file, state.offset)
+        if (!result) break
+        const chunk = result.chunk
+        if (chunk instanceof Uint8Array) {
+          if (chunk.byteLength) feed(state.decoder.decode(chunk, { stream: true }))
+        } else if (typeof chunk === 'string' && chunk) {
+          feed(chunk)
+        }
+        const size = Number(result.size) || 0
+        const next = Number(result.offset) || 0
+        const advanced = next > state.offset
+        state.size = size
+        state.offset = next
+        if (!advanced || state.offset >= size) break
+      }
+      state.status = ''
+    } catch (error) {
+      state.status = `读取失败：${error?.message || error}`
+    } finally {
+      state.reading = false
+      if (state.dirty) {
+        state.dirty = false
+        renderLines()
+      }
+      renderStatus()
+    }
+  }
+
+  async function switchTo(name) {
+    if (!name || name === state.file) return
+    state.file = name
+    state.offset = 0
+    state.size = 0
+    state.lines = []
+    state.pending = ''
+    state.decoder = new TextDecoder('utf-8')
+    state.cleared = false
+    state.status = ''
+    els.files.value = name
+    renderLines()
+    renderStatus()
+    await readMore()
+  }
+
+  function newestDatedName() {
+    // 文件名就是日期，直接按名字取最大的那个：mtime 可能被复制/迁移改乱，名字不会
+    let newest = ''
+    for (const file of state.files) {
+      if (!DATE_RE.test(file.name)) continue
+      if (file.name > newest) newest = file.name
+    }
+    return newest
+  }
+
+  async function refreshList(force) {
+    if (!api) return
+    if (!force && Date.now() - state.listedAt < LIST_MS) return
+    state.listedAt = Date.now()
+    let files = []
+    try {
+      files = await api.listFiles()
+    } catch (error) {
+      state.status = `读取日志列表失败：${error?.message || error}`
+      renderStatus()
+      return
+    }
+    state.files = Array.isArray(files) ? files : []
+
+    const names = state.files.map(file => file.name)
+    if (state.file && !names.includes(state.file)) {
+      state.file = ''
+      state.offset = 0
+      state.size = 0
+      state.lines = []
+      state.pending = ''
+      state.cleared = false
+      state.dirty = true
+    }
+
+    const newest = newestDatedName()
+    renderFiles()
+    if (!state.file) {
+      const start = newest || state.files[0]?.name || ''
+      if (start) {
+        await switchTo(start)
+        return
+      }
+    } else if (state.follow && DATE_RE.test(state.file) && newest && newest !== state.file) {
+      // 跟随只在出现更新的日期文件时换；desktop.log 的 mtime 变化不触发
+      await switchTo(newest)
+      return
+    }
+    if (state.dirty) {
+      state.dirty = false
+      renderLines()
+    }
+    renderStatus()
+  }
+
+  async function poll() {
+    if (!api || state.paused) return
+    await refreshList(false)
+    await readMore()
+  }
+
+  function legacyCopy(text) {
+    const area = document.createElement('textarea')
+    area.value = text
+    area.setAttribute('readonly', '')
+    area.style.position = 'fixed'
+    area.style.top = '-1000px'
+    document.body.appendChild(area)
+    area.select()
+    let ok = false
+    try {
+      ok = document.execCommand('copy')
+    } catch {
+      ok = false
+    }
+    area.remove()
+    return ok
+  }
+
+  function flash(label) {
+    els.copy.textContent = label
+    els.copy.disabled = true
+    setTimeout(() => {
+      els.copy.textContent = '复制当前内容'
+      els.copy.disabled = false
+    }, 1200)
+  }
+
+  els.files.addEventListener('change', () => {
+    void switchTo(els.files.value)
+  })
+
+  els.follow.addEventListener('change', () => {
+    state.follow = els.follow.checked
+    if (state.follow) {
+      state.listedAt = 0
+      void poll()
+    }
+  })
+
+  els.pause.addEventListener('click', () => {
+    state.paused = !state.paused
+    els.pause.textContent = state.paused ? '继续' : '暂停'
+    els.pause.classList.toggle('primary', state.paused)
+    renderStatus()
+    if (!state.paused) void poll()
+  })
+
+  els.filter.addEventListener('input', () => {
+    state.filter = els.filter.value
+    renderLines()
+  })
+
+  els.warnOnly.addEventListener('change', () => {
+    state.warnOnly = els.warnOnly.checked
+    renderLines()
+  })
+
+  els.clear.addEventListener('click', () => {
+    state.lines = []
+    state.cleared = true
+    els.lines.innerHTML = ''
+    els.counter.textContent = ''
+    renderEmpty(0)
+  })
+
+  els.copy.addEventListener('click', async () => {
+    const text = Array.from(els.lines.children)
+      .map(node => node.textContent)
+      .join('\n')
+    if (!text) {
+      flash('没有可复制的内容')
+      return
+    }
+    let ok = false
+    try {
+      await navigator.clipboard.writeText(text)
+      ok = true
+    } catch {
+      ok = legacyCopy(text)
+    }
+    flash(ok ? '已复制' : '复制失败')
+  })
+
+  els.openDir.addEventListener('click', () => {
+    if (api) void api.openDir()
+  })
+
+  renderStatus()
+  if (api) {
+    void refreshList(true)
+    setInterval(() => {
+      void poll()
+    }, POLL_MS)
+  }
+</script>
+</body>
+</html>

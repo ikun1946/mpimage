@@ -24,6 +24,7 @@ import {
 import { escapeHtml, formatDateTime } from '../lib/dom.js'
 import { setupAvatarMenu } from '../lib/avatar-menu.js'
 import { activateOverlay } from '../lib/overlay.js'
+import { setupTablist } from '../lib/tabs.js'
 
 setupAvatarMenu()
 
@@ -39,12 +40,17 @@ const dom = {
   usersBody: document.querySelector('#users-body'),
   statsBody: document.querySelector('#stats-body'),
   recentBody: document.querySelector('#recent-body'),
+  statsFoldCount: document.querySelector('#stats-fold-count'),
+  recentFoldCount: document.querySelector('#recent-fold-count'),
   statTotal: document.querySelector('#stat-total'),
   statAccounts: document.querySelector('#stat-accounts'),
   statBytes: document.querySelector('#stat-bytes'),
   registrationCount: document.querySelector('#registration-count'),
   registrationMsg: document.querySelector('#registration-msg'),
   registrationsBody: document.querySelector('#registrations-body'),
+  registrationsTable: document.querySelector('#registrations-table'),
+  registrationsEmpty: document.querySelector('#registrations-empty'),
+  navRegistrationBadge: document.querySelector('#nav-registration-badge'),
   rateLimitForm: document.querySelector('#rate-limit-form'),
   rateLimitEnabled: document.querySelector('#rate-limit-enabled'),
   rateLimitWindow: document.querySelector('#rate-limit-window'),
@@ -86,6 +92,13 @@ let currentUser = null
 let editingId = ''
 let stats = null
 let modalOverlay = null
+
+setupTablist(document.querySelector('.section-nav'), {
+  onChange: id => {
+    // 面板刚取消 hidden，这时量到的才是真实宽度；隐藏期间 clientWidth 会落回 600 兜底
+    if (id === 'data') redrawTrend()
+  },
+})
 
 init()
 
@@ -323,6 +336,10 @@ async function loadStats() {
         .join('')
     }
 
+    // 折叠块的条数写在 summary 上，收起时也知道里面有多少
+    dom.statsFoldCount.textContent = `（${accounts.length} 个账号）`
+    dom.recentFoldCount.textContent = `（${recent.length} 条）`
+
     await renderTrend()
   } catch (error) {
     if (error.status === 401 || error.status === 403) {
@@ -455,16 +472,26 @@ async function loadRegistrations() {
     }
     dom.registrationCount.textContent = '待审 —'
     dom.registrationCount.classList.remove('has-pending')
-    dom.registrationsBody.innerHTML = `<tr class="empty-row"><td colspan="4">读取失败：${escapeHtml(error.message)}</td></tr>`
+    dom.navRegistrationBadge.hidden = true
+    dom.registrationsTable.hidden = true
+    dom.registrationsEmpty.hidden = false
+    dom.registrationsEmpty.textContent = `读取失败：${error.message}`
   }
 }
 
 function renderRegistrations(items) {
-  dom.registrationCount.textContent = `待审 ${items.length}`
-  dom.registrationCount.classList.toggle('has-pending', items.length > 0)
+  const count = items.length
+  dom.registrationCount.textContent = `待审 ${count}`
+  dom.registrationCount.classList.toggle('has-pending', count > 0)
+  dom.navRegistrationBadge.textContent = String(count)
+  dom.navRegistrationBadge.hidden = count === 0
+  // 0 条时不摆空表头，整段压成一行提示
+  dom.registrationsTable.hidden = count === 0
+  dom.registrationsEmpty.hidden = count > 0
+  dom.registrationsEmpty.textContent = '没有待审核的申请'
 
-  if (!items.length) {
-    dom.registrationsBody.innerHTML = '<tr class="empty-row"><td colspan="4">没有待审核的申请</td></tr>'
+  if (!count) {
+    dom.registrationsBody.innerHTML = ''
     return
   }
 
@@ -872,9 +899,13 @@ function drawTrendChart(buckets) {
   `
 }
 
-window.addEventListener('resize', debounce(() => {
-  if (trendDom.chart?.innerHTML) renderTrend()
-}, 200))
+window.addEventListener('resize', debounce(redrawTrend, 200))
+
+/** 切组或窗口变化后重画折线；面板隐藏时 clientWidth 为 0，这时重绘只会拿到兜底宽度 */
+function redrawTrend() {
+  if (!trendDom.chart?.innerHTML || !trendDom.chart.clientWidth) return
+  renderTrend()
+}
 
 function debounce(fn, wait) {
   let timer = 0

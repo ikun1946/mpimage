@@ -50,8 +50,111 @@
 
 .admin-main {
   display: grid;
-  gap: var(--space-6);
-  margin-top: var(--space-6);
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+/* 分组后一屏只显示一组，组内各段比原来更紧凑 */
+.admin-panel {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* 面板用 display:grid 布局，[hidden] 的默认值会被它压掉，这里显式兜底 */
+[role='tabpanel'][hidden] {
+  display: none !important;
+}
+
+/* ---------- 分组页签 ---------- */
+
+/* sticky 后滚动时盖住正文，底色必须不透明 */
+.section-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  margin-top: var(--space-5);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--paper);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.section-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.section-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  padding: 5px var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.section-tab:hover {
+  background: var(--surface-subtle);
+  color: var(--ink);
+}
+
+.section-tab[aria-selected='true'] {
+  border-color: var(--moss);
+  background: var(--moss);
+  color: var(--on-moss);
+}
+
+.tab-badge {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--gold);
+  color: var(--on-moss);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* ---------- 折叠块（长表默认收起） ---------- */
+
+.fold {
+  margin-top: var(--space-4);
+}
+
+.fold > summary {
+  padding: var(--space-1) 0;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.fold > summary:hover {
+  color: var(--ink);
+}
+
+.fold[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
+.fold-count {
+  margin-left: var(--space-1);
 }
 
 .admin-section {
@@ -60,6 +163,17 @@
   background: var(--surface);
   padding: var(--space-5) var(--space-6) var(--space-6);
   box-shadow: var(--shadow);
+}
+
+/* 待审为空时整段压成一行提示，不摆空表头 */
+.empty-hint {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-4);
+  border: 1px dashed var(--line-soft);
+  border-radius: var(--radius-md);
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+  text-align: center;
 }
 
 .section-head {
