@@ -163,8 +163,8 @@ import { setupTablist } from '../lib/tabs.js'
       // 自由创作的画面比例与提示词草稿，刷新后保持
       freeRatio: '1:1',
       freePrompt: '',
-      // 自由创作的参考图：只存相对路径与可预览地址，快照里不塞 base64
-      freeReference: null,
+      // 自由创作的参考图（可多张）：只存相对路径与可预览地址，快照里不塞 base64
+      freeReferences: [],
       freeRefUploading: false,
       styleType: 'role',
       styleEditingId: '',
@@ -261,12 +261,7 @@ import { setupTablist } from '../lib/tabs.js'
       freePromptMaximize: document.querySelector('#free-prompt-maximize'),
       freePromptCopy: document.querySelector('#free-prompt-copy'),
       freePromptShell: document.querySelector('#free-prompt-shell'),
-      freeRef: document.querySelector('#free-ref'),
-      freeRefThumb: document.querySelector('#free-ref-thumb'),
-      freeRefImg: document.querySelector('#free-ref-img'),
-      freeRefName: document.querySelector('#free-ref-name'),
-      freeRefReplace: document.querySelector('#free-ref-replace'),
-      freeRefRemove: document.querySelector('#free-ref-remove'),
+      freeRefStack: document.querySelector('#free-ref-stack'),
       freeRefFile: document.querySelector('#free-ref-file'),
       freeRefBusy: document.querySelector('#free-ref-busy'),
     }
@@ -311,14 +306,18 @@ import { setupTablist } from '../lib/tabs.js'
         if (typeof saved.freePrompt === 'string') {
           state.freePrompt = saved.freePrompt
         }
-        // 参考图同样恢复：只认 path + url，坏的直接忽略
-        if (saved.freeReference && typeof saved.freeReference.path === 'string' && saved.freeReference.path) {
-          state.freeReference = {
-            path: saved.freeReference.path,
-            url: typeof saved.freeReference.url === 'string' ? saved.freeReference.url : '',
-            name: typeof saved.freeReference.name === 'string' ? saved.freeReference.name : '',
-          }
-        }
+        // 参考图同样恢复：只认 path + url，坏的直接忽略；老快照里的单张也接进来
+        const savedRefs = Array.isArray(saved.freeReferences)
+          ? saved.freeReferences
+          : (saved.freeReference ? [saved.freeReference] : [])
+        state.freeReferences = savedRefs
+          .filter(ref => ref && typeof ref.path === 'string' && ref.path)
+          .slice(0, 6)
+          .map(ref => ({
+            path: ref.path,
+            url: typeof ref.url === 'string' ? ref.url : '',
+            name: typeof ref.name === 'string' ? ref.name : '',
+          }))
         if (typeof saved.freeImageUrl === 'string') {
           state.freeImageUrl = saved.freeImageUrl
         }
@@ -518,9 +517,7 @@ import { setupTablist } from '../lib/tabs.js'
           concurrencyCustom: state.concurrencyCustom,
           freeRatio: state.freeRatio,
           freePrompt: state.freePrompt,
-          freeReference: state.freeReference
-            ? { path: state.freeReference.path, url: state.freeReference.url, name: state.freeReference.name }
-            : null,
+          freeReferences: state.freeReferences.map(ref => ({ path: ref.path, url: ref.url, name: ref.name })),
           freeImageUrl: state.freeImageUrl,
           freeImageExtension: state.freeImageExtension,
           page: { ...state.page },
@@ -2628,23 +2625,94 @@ import { setupTablist } from '../lib/tabs.js'
       }).join('')
     }
 
-    function openLightbox(url, label) {
-      dom.lightboxImage.src = url
-      dom.lightboxImage.alt = `${label}大图`
+    let lightboxSource = null
+    let lightboxCloseTimer = 0
+
+    /** 把目标矩形换算成「图片从那里长出来」的 transform */
+    function lightboxOriginTransform(target) {
+      const image = dom.lightboxImage
+      const to = image.getBoundingClientRect()
+      if (!target || !to.width || !to.height || !target.width) return ''
+      const scale = Math.max(target.width / to.width, target.height / to.height)
+      const dx = (target.left + target.width / 2) - (to.left + to.width / 2)
+      const dy = (target.top + target.height / 2) - (to.top + to.height / 2)
+      return `translate(${dx}px, ${dy}px) scale(${scale})`
+    }
+
+    /**
+     * 大图预览。传 sourceEl 时做「从那张图长到全屏」的动画，
+     * 关闭时再缩回它的位置；不传就是原来的直接显示（点击历史图、资产图等）。
+     */
+    async function openLightbox(url, label, sourceEl = null) {
+      window.clearTimeout(lightboxCloseTimer)
+      lightboxSource = sourceEl || null
+      const image = dom.lightboxImage
+
+      image.style.transition = 'none'
+      image.style.transform = 'none'
+      image.style.opacity = '1'
+      image.src = url
+      image.alt = `${label}大图`
+      dom.lightbox.classList.remove('is-closing')
       dom.lightbox.classList.add('visible')
+
       if (!lightboxOverlayHandle) {
         lightboxOverlayHandle = activateOverlay(dom.lightbox, {
           onRequestClose: closeLightbox,
           initialFocus: dom.lightboxClose,
         })
       }
+
+      if (!lightboxSource) return
+
+      image.style.opacity = '0'
+      try {
+        await image.decode()
+      } catch {}
+      const from = lightboxSource.getBoundingClientRect()
+      const start = lightboxOriginTransform(from)
+      if (start) {
+        image.style.transform = start
+        image.getBoundingClientRect()
+      }
+      requestAnimationFrame(() => {
+        image.style.transition = 'transform 340ms cubic-bezier(.22, 1.08, .32, 1), opacity 180ms ease'
+        image.style.transform = 'translate(0, 0) scale(1)'
+        image.style.opacity = '1'
+      })
     }
 
     function closeLightbox() {
       lightboxOverlayHandle?.release()
       lightboxOverlayHandle = null
-      dom.lightbox.classList.remove('visible')
-      dom.lightboxImage.src = ''
+      window.clearTimeout(lightboxCloseTimer)
+
+      const image = dom.lightboxImage
+      const alive = lightboxSource && lightboxSource.isConnected
+      if (!alive) {
+        dom.lightbox.classList.remove('visible', 'is-closing')
+        image.style.transition = 'none'
+        image.style.transform = 'none'
+        image.style.opacity = '1'
+        image.src = ''
+        lightboxSource = null
+        return
+      }
+
+      const back = lightboxOriginTransform(lightboxSource.getBoundingClientRect())
+      image.style.transition = 'transform 280ms cubic-bezier(.4, 0, .6, .35), opacity 200ms ease'
+      image.style.transform = back || 'scale(.94)'
+      image.style.opacity = '0'
+      dom.lightbox.classList.add('is-closing')
+
+      lightboxCloseTimer = window.setTimeout(() => {
+        dom.lightbox.classList.remove('visible', 'is-closing')
+        image.style.transition = 'none'
+        image.style.transform = 'none'
+        image.style.opacity = '1'
+        image.src = ''
+        lightboxSource = null
+      }, 300)
     }
 
     function openRenameDialog() {
@@ -2964,40 +3032,59 @@ import { setupTablist } from '../lib/tabs.js'
       dom.freeSubmit.textContent = '生成图像'
     }
 
-    /* ===== 自由创作的参考图：粘贴 / 拖入即可，不占按钮位 ===== */
+    /* ===== 自由创作的参考图：可多张，粘贴 / 拖入追加，不占按钮位 ===== */
 
-    /** 参考图在页面里能用的地址：优先服务端返回的，退回按相对路径拼 */
+    const FREE_REF_LIMIT = 6
+    /** 依次倾斜，避免排开时角度一样显得死板 */
+    const FREE_REF_TILTS = ['-7deg', '4deg', '-3deg', '6deg', '-4deg', '3deg']
+
     function freeReferenceUrl(ref) {
       if (!ref || !ref.path) return ''
       return ref.url || referenceUrl(ref.path)
     }
 
-    function renderFreeReference() {
-      if (!dom.freeRef || !dom.freePromptShell) return
-      const ref = state.freeReference
-      const hasRef = Boolean(ref && ref.path)
+    /** 渲染参考图条：每张一个可点、可删、可抬起的卡片 */
+    function renderFreeReferences() {
+      const stack = dom.freeRefStack
+      if (!stack) return
+      const refs = state.freeReferences
+      const hasRef = refs.length > 0
 
-      dom.freePromptShell.classList.toggle('has-ref', hasRef)
-      dom.freeRef.hidden = !hasRef || state.freeRefUploading
+      if (dom.freeForm) dom.freeForm.classList.toggle('has-ref', hasRef)
+      stack.hidden = !hasRef
       if (dom.freeRefBusy) dom.freeRefBusy.hidden = !state.freeRefUploading
 
-      const busy = state.freeBusy || state.processing || state.freeRefUploading
-      if (dom.freeRefReplace) dom.freeRefReplace.disabled = busy
-      if (dom.freeRefRemove) dom.freeRefRemove.disabled = busy
+      stack.innerHTML = refs
+        .map((ref, index) => {
+          const tilt = FREE_REF_TILTS[index % FREE_REF_TILTS.length]
+          const url = freeReferenceUrl(ref)
+          const label = escapeAttr(ref.name || `参考图 ${index + 1}`)
+          return `<div class="free-ref" style="--tilt:${tilt}" data-ref-index="${index}">
+            <div class="free-ref-corner" aria-hidden="true"></div>
+            <div class="free-ref-frame"><img src="${escapeAttr(url)}" alt="${label}" loading="lazy"></div>
+            <button class="free-ref-delete" type="button" data-ref-delete="${index}" aria-label="删除参考图 ${index + 1}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </div>`
+        })
+        .join('')
 
-      if (!hasRef) return
-      const url = freeReferenceUrl(ref)
-      if (dom.freeRefImg && dom.freeRefImg.getAttribute('src') !== url) {
-        dom.freeRefImg.src = url
-      }
-      if (dom.freeRefName) dom.freeRefName.textContent = ref.name || '已添加'
+      // 生成中不能让删图把状态改乱
+      const busy = state.freeBusy || state.processing || state.freeRefUploading
+      stack.querySelectorAll('.free-ref-delete').forEach(button => {
+        button.disabled = busy
+      })
     }
 
-    /** 校验 → dataURL → 上传 → 写回 state；失败只提示，不动原有参考图 */
+    /** 校验 → dataURL → 上传 → 追加到 state；失败只提示，不动已有的图 */
     async function attachFreeReference(file) {
       if (!file) return
       if (state.freeBusy) {
-        showToast('正在生成中，稍后再换参考图', true)
+        showToast('正在生成中，稍后再加参考图', true)
+        return
+      }
+      if (state.freeReferences.length >= FREE_REF_LIMIT) {
+        showToast(`参考图最多 ${FREE_REF_LIMIT} 张`, true)
         return
       }
       if (!/^image\/(png|jpeg|webp)$/i.test(file.type)) {
@@ -3005,37 +3092,38 @@ import { setupTablist } from '../lib/tabs.js'
         return
       }
       if (file.size > 8 * 1024 * 1024) {
-        showToast('参考图不能超过 8 MB', true)
+        showToast('单张参考图不能超过 8 MB', true)
         return
       }
       if (state.freeRefUploading) return
 
       state.freeRefUploading = true
-      renderFreeReference()
+      renderFreeReferences()
       try {
         const dataUrl = await readFileAsDataUrl(file)
         const result = await uploadReferenceImage({ name: '自由创作', dataUrl })
         if (!result?.path) throw new Error('上传接口没有返回图片路径')
-        state.freeReference = {
+        state.freeReferences.push({
           path: result.path,
           url: result.url || '',
-          name: file.name || '参考图',
-        }
+          name: file.name || `参考图 ${state.freeReferences.length + 1}`,
+        })
         persistSoon()
-        showToast('参考图已添加，生成时会以它为参考')
+        showToast(`参考图已添加（${state.freeReferences.length} 张）`)
       } catch (error) {
         showToast(error.message || '参考图上传失败', true)
       } finally {
         state.freeRefUploading = false
-        renderFreeReference()
+        renderFreeReferences()
       }
     }
 
-    function clearFreeReference() {
-      if (!state.freeReference) return
-      state.freeReference = null
+    function removeFreeReference(index) {
+      if (state.freeBusy) return
+      if (!Number.isInteger(index) || !state.freeReferences[index]) return
+      state.freeReferences.splice(index, 1)
       persistSoon()
-      renderFreeReference()
+      renderFreeReferences()
       showToast('参考图已移除')
     }
 
@@ -3059,12 +3147,58 @@ import { setupTablist } from '../lib/tabs.js'
       return null
     }
 
+    /**
+     * 悬停抬起：每张图有一根「竖直柱」热区，从抬起后的顶端一直到文本框边线往里 6px。
+     * 柱子把图片与文本框之间的空隙也包进来，鼠标停在那块空隙里图片不会缩回去。
+     */
+    function wireFreeRefHover(shell) {
+      const RAISE_Y = 84
+      const RAISE_S = 1.3
+      const BAND_TOP = RAISE_Y + 96 * RAISE_S
+
+      shell.addEventListener('mousemove', event => {
+        const stack = shell.querySelector('.free-ref-stack')
+        if (!stack || stack.hidden) return
+        const cards = [...stack.querySelectorAll('.free-ref')]
+        if (!cards.length) return
+
+        const stackRect = stack.getBoundingClientRect()
+        const shellTop = shell.getBoundingClientRect().top
+        const y = event.clientY - shellTop
+        const inBand = y >= -(BAND_TOP + 24) && y <= 6
+
+        let picked = null
+        if (inBand) {
+          let best = Infinity
+          for (const card of cards) {
+            const left = stackRect.left + card.offsetLeft
+            const width = card.offsetWidth
+            const slack = card.classList.contains('is-raised') ? 30 : 20
+            const spare = (width * RAISE_S - width) / 2
+            if (event.clientX < left - spare - slack) continue
+            if (event.clientX > left + width + spare + slack) continue
+            const distance = Math.abs(left + width / 2 - event.clientX)
+            if (distance < best) {
+              best = distance
+              picked = card
+            }
+          }
+        }
+
+        for (const card of cards) card.classList.toggle('is-raised', card === picked)
+      })
+
+      shell.addEventListener('mouseleave', () => {
+        shell.querySelectorAll('.free-ref.is-raised').forEach(card => card.classList.remove('is-raised'))
+      })
+    }
+
     async function generateFreeImage(event) {
       event.preventDefault()
-      const reference = state.freeReference
+      const references = state.freeReferences
       const typed = dom.freePrompt.value.trim()
       // 只给参考图也能生成：补一句默认描述（服务端仍然要求非空提示词）
-      const prompt = typed || (reference ? '以参考图为基础生成画面，保持参考图的主体与构图' : '')
+      const prompt = typed || (references.length ? '以参考图为基础生成画面，保持参考图的主体与构图' : '')
       if (!prompt) {
         dom.freePrompt.focus()
         dom.freeStatus.textContent = '请先写下画面描述，或粘贴一张参考图'
@@ -3081,7 +3215,7 @@ import { setupTablist } from '../lib/tabs.js'
       dom.freeSubmit.disabled = true
       dom.freeSubmit.textContent = '正在生成…'
       dom.freeStatus.textContent = 'Magpie 正在绘制'
-      renderFreeReference()
+      renderFreeReferences()
       startFreeProgress()
 
       const jobId = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now())
@@ -3095,7 +3229,7 @@ import { setupTablist } from '../lib/tabs.js'
           name: `自由创作-${timestamp()}`,
           source: 'free',
           jobId,
-          referencePath: reference?.path || undefined,
+          referencePaths: references.length ? references.map(ref => ref.path) : undefined,
         })
         if (!result?.imageUrl) throw new Error('接口没有返回图片地址')
         clearPendingJob()
@@ -3122,7 +3256,7 @@ import { setupTablist } from '../lib/tabs.js'
         dom.freePrompt.disabled = false
         dom.freeSubmit.disabled = false
         dom.freeSubmit.textContent = '生成图像'
-        renderFreeReference()
+        renderFreeReferences()
       }
     }
 
@@ -3138,7 +3272,7 @@ import { setupTablist } from '../lib/tabs.js'
         dom.freeDownload.disabled = false
         dom.freeMaximize.disabled = false
       }
-      renderFreeReference()
+      renderFreeReferences()
     }
 
     function startFreeProgress() {
@@ -3389,7 +3523,7 @@ import { setupTablist } from '../lib/tabs.js'
 
       dom.freePromptMaximize.addEventListener('click', () => openFreePromptEditor())
 
-      /* ===== 自由创作参考图：粘贴 / 拖入即可添加或替换，不占按钮位 ===== */
+      /* ===== 自由创作参考图：粘贴 / 拖入追加（可多张），点图看大图，右上角删除 ===== */
       const freeShell = dom.freePromptShell
       if (freeShell) {
         const hasFiles = event =>
@@ -3424,23 +3558,28 @@ import { setupTablist } from '../lib/tabs.js'
           else showToast('参考图仅支持 PNG / JPEG / WebP', true)
         })
 
-        dom.freeRefThumb.addEventListener('click', () => {
-          const url = freeReferenceUrl(state.freeReference)
-          if (url) openLightbox(url, '自由创作参考图')
+        // 卡片是动态渲染的，统一用委托：右上角删除 / 点图看大图
+        dom.freeRefStack.addEventListener('click', event => {
+          const remove = event.target.closest('[data-ref-delete]')
+          if (remove) {
+            event.stopPropagation()
+            removeFreeReference(Number(remove.dataset.refDelete))
+            return
+          }
+          const card = event.target.closest('.free-ref')
+          if (!card) return
+          const index = Number(card.dataset.refIndex)
+          const ref = state.freeReferences[index]
+          const url = freeReferenceUrl(ref)
+          if (url) openLightbox(url, ref?.name || '参考图', card)
         })
 
-        dom.freeRefReplace.addEventListener('click', () => {
-          if (!dom.freeRefFile) return
-          dom.freeRefFile.value = ''
-          dom.freeRefFile.click()
-        })
+        wireFreeRefHover(freeShell)
 
         dom.freeRefFile.addEventListener('change', () => {
           const file = dom.freeRefFile.files && dom.freeRefFile.files[0]
           if (file) void attachFreeReference(file)
         })
-
-        dom.freeRefRemove.addEventListener('click', clearFreeReference)
       }
 
       /* 悬浮工具只在输入框右上角热区出现：热区 = 右侧 150px、顶部 56px */

@@ -40,9 +40,25 @@
   line-height: 1.8;
 }
 
-/* 有参考图时上抬内边距：缩略图悬浮在文本框上沿，不压住第一行文字 */
-.free-form .prompt-shell.has-ref .textarea {
-  padding-top: 96px;
+/* ===== 参考图：多张沿文本框上边线排开、各自倾斜，一半在线上一半被文本框盖住 ===== */
+
+/* 有参考图时：标题行收起、表单顶部留出抬升空间 */
+.free-form.has-ref {
+  padding-top: 58px;
+}
+
+.free-form.has-ref .label-row {
+  opacity: 0;
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* 文本框压在参考图上面，图片下半截自然被挡住 */
+.free-form .prompt-shell .textarea {
+  position: relative;
+  z-index: 1;
+  background: var(--surface-raised);
 }
 
 .free-form .prompt-shell.is-dragover .textarea {
@@ -50,101 +66,109 @@
   background: var(--surface-raised);
 }
 
-/* ===== 参考图：悬浮在文本框上沿（不占按钮位，靠粘贴 / 拖入 / 替换） ===== */
+.free-ref-stack {
+  position: absolute;
+  top: -48px;
+  left: 20px;
+  z-index: 0;
+  display: flex;
+  gap: 12px;
+}
 
 .free-ref {
-  position: absolute;
-  top: -18px;
-  left: 14px;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px 6px 6px;
-  border: 1px solid var(--line-soft);
-  border-radius: 14px;
-  background: var(--surface-raised);
-  box-shadow: var(--shadow);
-}
-
-.free-ref-thumb {
-  width: 60px;
-  height: 60px;
-  padding: 0;
-  border: 1px solid var(--line-soft);
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--surface-subtle);
+  position: relative;
+  width: 76px;
+  height: 96px;
   cursor: zoom-in;
+  transform: rotate(var(--tilt, -7deg));
+  transform-origin: 50% 50%;
+  transition: transform 200ms var(--ease, ease);
 }
 
-.free-ref-thumb img {
+/* 鼠标停在这张图的热区（含图片与文本框之间的空隙）时整张抬起来 */
+.free-ref.is-raised {
+  transform: rotate(var(--tilt, -7deg)) translateY(-84px) scale(1.3);
+}
+
+.free-ref-frame {
+  width: 100%;
+  height: 100%;
+  border: 3px solid var(--surface-raised);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-raised);
+  box-shadow: 0 8px 18px rgba(32, 39, 34, 0.18);
+  transition: box-shadow 200ms var(--ease, ease);
+}
+
+.free-ref.is-raised .free-ref-frame {
+  box-shadow: 0 18px 34px rgba(20, 26, 22, 0.28);
+}
+
+.free-ref-frame img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.free-ref-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.free-ref-title {
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.free-ref-name {
-  max-width: 140px;
-  overflow: hidden;
-  color: var(--ink-faint);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.free-ref-actions {
-  display: flex;
-  gap: 4px;
-  margin-left: 4px;
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease);
-}
-
-.free-ref:hover .free-ref-actions,
-.free-ref:focus-within .free-ref-actions {
-  opacity: 1;
-}
-
-.free-ref-action {
-  padding: 4px 8px;
-  border: 1px solid var(--line-soft);
-  border-radius: 999px;
+/* 右上角热区：只有鼠标进到这一小块，删除按钮才浮现 */
+.free-ref-corner {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  z-index: 1;
+  width: 38px;
+  height: 38px;
   background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
-  font-size: 11px;
+}
+
+.free-ref-delete {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  z-index: 2;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.26);
+  -webkit-backdrop-filter: blur(10px) saturate(1.6);
+  backdrop-filter: blur(10px) saturate(1.6);
+  box-shadow: 0 2px 8px rgba(20, 26, 22, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  color: #fdfdfb;
   cursor: pointer;
+  opacity: 0;
+  transform: scale(0.82);
+  pointer-events: none;
+  transition: opacity 150ms var(--ease, ease), transform 150ms var(--ease, ease), background 150ms var(--ease, ease);
 }
 
-.free-ref-action:hover:not(:disabled) {
-  border-color: var(--line-strong);
-  color: var(--ink);
+.free-ref-delete svg {
+  width: 11px;
+  height: 11px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
 }
 
-.free-ref-action:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.free-ref:has(.free-ref-corner:hover) .free-ref-delete,
+.free-ref:has(.free-ref-delete:hover) .free-ref-delete,
+.free-ref:has(.free-ref-delete:focus-visible) .free-ref-delete {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.free-ref-delete:hover {
+  background: rgba(255, 255, 255, 0.42);
 }
 
 .free-ref-busy {
   position: absolute;
   top: -18px;
-  left: 14px;
+  left: 20px;
   z-index: 3;
   display: flex;
   align-items: center;
@@ -173,7 +197,25 @@
   }
 }
 
+@media (max-width: 720px) {
+  .free-ref {
+    width: 62px;
+    height: 78px;
+  }
+
+  .free-ref-stack {
+    gap: 8px;
+    left: 14px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .free-ref,
+  .free-ref-frame,
+  .free-ref-delete {
+    transition-duration: 1ms;
+  }
+
   .free-ref-spinner {
     animation-duration: 2s;
   }

@@ -199,19 +199,7 @@
                 placeholder="输入画面、人物、场景、光影与材质描述……（可直接粘贴或拖入参考图）"
                 required
               ></textarea>
-              <div class="free-ref" id="free-ref" hidden>
-                <button class="free-ref-thumb" id="free-ref-thumb" type="button" aria-label="查看参考图大图">
-                  <img id="free-ref-img" alt="自由创作参考图" />
-                </button>
-                <div class="free-ref-meta">
-                  <span class="free-ref-title">参考图</span>
-                  <span class="free-ref-name" id="free-ref-name"></span>
-                </div>
-                <div class="free-ref-actions">
-                  <button class="free-ref-action" id="free-ref-replace" type="button">替换</button>
-                  <button class="free-ref-action" id="free-ref-remove" type="button">移除</button>
-                </div>
-              </div>
+              <div class="free-ref-stack" id="free-ref-stack" hidden></div>
               <div class="free-ref-busy" id="free-ref-busy" hidden>
                 <span class="free-ref-spinner" aria-hidden="true"></span>
                 <span>参考图上传中…</span>

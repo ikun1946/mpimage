@@ -53,23 +53,26 @@ export async function requestImage(
 }
 
 /**
- * 图生图（面部参考）：把参考图作为 image 字段传给 /v1/images/edits。
+ * 图生图（面部参考 / 多图参考）：把参考图作为 image 字段传给 /v1/images/edits。
+ * 多张图沿用 OpenAI 风格的同名重复字段，按传入顺序逐张 append。
  * 和纯文本生成共用响应解析、超时与错误翻译。
  */
 export async function requestImageEdit(
   options: MagpieOptions,
-  params: { prompt: string; ratioHint: string; image: ReferenceImage },
+  params: { prompt: string; ratioHint: string; images: ReferenceImage[] },
 ): Promise<MagpieImageResult> {
   const prompt = `${params.prompt}\n\n${params.ratioHint}`
   const form = new FormData()
   form.append('model', options.model)
   form.append('prompt', prompt)
   form.append('n', '1')
-  form.append(
-    'image',
-    new Blob([new Uint8Array(params.image.buffer)], { type: params.image.mimeType }),
-    params.image.filename || 'reference.png',
-  )
+  for (const image of params.images) {
+    form.append(
+      'image',
+      new Blob([new Uint8Array(image.buffer)], { type: image.mimeType }),
+      image.filename || 'reference.png',
+    )
+  }
 
   return callImageEndpoint(
     options,

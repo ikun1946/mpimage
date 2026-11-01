@@ -14,6 +14,9 @@ import { requireAuth } from './auth.js'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+/** 一次生图最多直传上游几张参考图 */
+const MAX_REFERENCE_IMAGES = 6
+
 /** 生图任务状态：刷新页面后可用 jobId 重新接回结果 */
 interface GenerationJob {
   userId: string
@@ -47,6 +50,8 @@ interface GenerateBody {
   jobId?: unknown
   /** 角色面部参考图：存储目录里的相对路径，必须以「参考图/」开头 */
   referencePath?: unknown
+  /** 自由创作的多张参考图：同上规则的路径数组，会与 referencePath 合并 */
+  referencePaths?: unknown
 }
 
 export function registerImageRoutes(
@@ -141,15 +146,36 @@ export function registerImageRoutes(
       throw new ApiError('RATIO_INVALID', '请选择有效的图片比例')
     }
 
-    // 面部参考图：只接受上传接口产出的「参考图/」路径，防止拿任意文件当输入
-    const referencePath = typeof body.referencePath === 'string' ? body.referencePath.trim() : ''
-    if (
-      referencePath &&
-      (!referencePath.startsWith(`${REFERENCE_CATEGORY}/`) ||
-        referencePath.length > 300 ||
-        referencePath.includes('..'))
-    ) {
-      throw new ApiError('REFERENCE_INVALID', '参考图地址无效', 400)
+    // 参考图：只接受上传接口产出的「参考图/」路径，防止拿任意文件当输入。
+    // 单张 referencePath 是角色资产等老调用；referencePaths 是自由创作的多图直传，
+    // 两者合并去重后一起送上游，顺序为「先 referencePath，再 referencePaths」。
+    if (body.referencePaths !== undefined && !Array.isArray(body.referencePaths)) {
+      throw new ApiError('REFERENCE_INVALID', '参考图参数格式无效', 400)
+    }
+
+    const requestedPaths: string[] = []
+    if (typeof body.referencePath === 'string') requestedPaths.push(body.referencePath.trim())
+    if (Array.isArray(body.referencePaths)) {
+      for (const item of body.referencePaths) {
+        if (typeof item !== 'string') {
+          throw new ApiError('REFERENCE_INVALID', '参考图地址无效', 400)
+        }
+        requestedPaths.push(item.trim())
+      }
+    }
+
+    const referencePaths = [...new Set(requestedPaths.filter(Boolean))]
+    if (referencePaths.length > MAX_REFERENCE_IMAGES) {
+      throw new ApiError('REFERENCE_INVALID', `参考图最多 ${MAX_REFERENCE_IMAGES} 张`, 400)
+    }
+    for (const path of referencePaths) {
+      if (
+        !path.startsWith(`${REFERENCE_CATEGORY}/`) ||
+        path.length > 300 ||
+        path.includes('..')
+      ) {
+        throw new ApiError('REFERENCE_INVALID', '参考图地址无效', 400)
+      }
     }
 
     // 任务 id：客户端可预先提供（刷新后靠它回来取结果），否则服务端生成
@@ -184,17 +210,21 @@ export function registerImageRoutes(
     const startedAt = Date.now()
     try {
     const generated = await deps.gate.run(async () => {
-      const reference = await loadReference(referencePath, deps.storage)
+      const references: ReferenceImage[] = []
+      for (const path of referencePaths) {
+        const reference = await loadReference(path, deps.storage)
+        if (reference) references.push(reference)
+      }
       // 每次生图都重读上游地址：后台改完立即生效，无需重启服务
       const upstreamOptions = {
         baseUrl: await deps.settings.getBaseUrl(),
         model: config.imageModel,
         timeoutMs: config.requestTimeoutMs,
       }
-      const upstream = reference
+      const upstream = references.length
         ? await requestImageEdit(
           upstreamOptions,
-          { prompt, ratioHint: ratio.promptHint, image: reference },
+          { prompt, ratioHint: ratio.promptHint, images: references },
         )
         : await requestImage(
           upstreamOptions,

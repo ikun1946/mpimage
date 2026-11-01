@@ -13,7 +13,14 @@
 }
 
 .modal.visible,
+.lightbox.is-closing {
+  animation: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
 .lightbox.visible {
+
   display: grid;
   place-items: center;
   animation: fade-in 180ms ease both;
