@@ -3148,13 +3148,81 @@ import { setupTablist } from '../lib/tabs.js'
     }
 
     /**
-     * 悬停抬起：每张图有一根「竖直柱」热区，从抬起后的顶端一直到文本框边线往里 6px。
+     * 悬停抬起：每张图有一根「竖直柱」热区，从抬起后的顶端一直到文本框边线往里 8px。
      * 柱子把图片与文本框之间的空隙也包进来，鼠标停在那块空隙里图片不会缩回去。
+     *
+     * 归属按「看得见的范围」判定，而不是「布局盒中心谁近」：抬起的那张放大 1.3 后很宽，
+     * 它右上角的删除按钮已经越过与右邻居的中间线，按中心选就会把归属让给邻居，
+     * 表现为鼠标一凑近按钮，当前这张缩回、旁边那张放大，来回抖。所以：
+     * 已抬起的那张优先（迟滞），并且它的右边界要额外盖住删除按钮；
+     * 删除按钮的浮现也改由几何判定，不再依赖会跟着抬起跑掉的 CSS :hover。
      */
     function wireFreeRefHover(shell) {
-      const RAISE_Y = 84
-      const RAISE_S = 1.3
-      const BAND_TOP = RAISE_Y + 96 * RAISE_S
+      const RAISE_Y = 84 // 与 free.css 里 .free-ref.is-raised 的 translateY 一致
+      const RAISE_S = 1.3 // 与 free.css 里的 scale 一致
+      const TILT_SKEW = 6 // 倾斜 ±7deg 时卡片角点横向外扩的上限
+      const EDGE_GRACE = 8 // 判定边缘的宽容，避免刚好擦边就抖
+      const BUTTON_REACH = 20 // 抬起后删除按钮伸出卡片右侧的距离（含倾斜带来的偏移）
+      const CORNER_SIZE = 54 // 右上角删除热区（按抬起后的目标位置算，不跟动画中间态）
+      const HIDE_DELAY = 160 // 删除按钮收回的延迟，划过时不会闪一下
+
+      let deleteTimer = 0
+
+      function clearDeleteTimer() {
+        if (!deleteTimer) return
+        clearTimeout(deleteTimer)
+        deleteTimer = 0
+      }
+
+      function resetCards(cards) {
+        clearDeleteTimer()
+        for (const card of cards) {
+          if (card.classList.contains('is-raised')) card.classList.remove('is-raised')
+          if (card.classList.contains('is-delete-open')) card.classList.remove('is-delete-open')
+        }
+      }
+
+      /** 卡片几何：布局盒换算成视口坐标，再附上倾斜与缩放后的可见范围 */
+      function measure(stack) {
+        const stackRect = stack.getBoundingClientRect()
+        const stackTop = stack.offsetTop // 相对文本框顶边，CSS 里是负的
+        return [...stack.querySelectorAll('.free-ref')].map(card => {
+          const width = card.offsetWidth
+          const height = card.offsetHeight
+          const left = stackRect.left + card.offsetLeft
+          const centerX = left + width / 2
+          const centerY = stackTop + card.offsetTop + height / 2
+          const spare = (width * RAISE_S - width) / 2
+          const wide = spare + TILT_SKEW + EDGE_GRACE
+          // 抬起后的样子：顶边、右边界，以及长在右上角的删除热区
+          const raisedTop = centerY - RAISE_Y - (height * RAISE_S) / 2
+          const raisedRight = centerX + (width * RAISE_S) / 2
+          return {
+            card,
+            centerX,
+            raised: card.classList.contains('is-raised'),
+            wideLeft: left - wide,
+            wideRight: left + width + wide,
+            // 已经抬起的那张只留倾斜余量，别把右邻居的一大截也扣在自己名下
+            stickyLeft: left - spare - TILT_SKEW,
+            stickyRight: left + width + spare + TILT_SKEW,
+            cornerLeft: raisedRight + BUTTON_REACH - CORNER_SIZE,
+            cornerRight: raisedRight + BUTTON_REACH,
+            cornerTop: raisedTop - BUTTON_REACH,
+            cornerBottom: raisedTop - BUTTON_REACH + CORNER_SIZE
+          }
+        })
+      }
+
+      /** 抬起后卡片右上角那一块：删除按钮就长在这里 */
+      function inCorner(item, x, y) {
+        return (
+          x >= item.cornerLeft - EDGE_GRACE &&
+          x <= item.cornerRight + EDGE_GRACE &&
+          y >= item.cornerTop - EDGE_GRACE &&
+          y <= item.cornerBottom + EDGE_GRACE
+        )
+      }
 
       shell.addEventListener('mousemove', event => {
         const stack = shell.querySelector('.free-ref-stack')
@@ -3162,34 +3230,84 @@ import { setupTablist } from '../lib/tabs.js'
         const cards = [...stack.querySelectorAll('.free-ref')]
         if (!cards.length) return
 
-        const stackRect = stack.getBoundingClientRect()
-        const shellTop = shell.getBoundingClientRect().top
-        const y = event.clientY - shellTop
-        const inBand = y >= -(BAND_TOP + 24) && y <= 6
+        const shellRect = shell.getBoundingClientRect()
+        const items = measure(stack)
+        const x = event.clientX
+        const y = event.clientY - shellRect.top
+        const bandTop = Math.min(...items.map(item => item.cornerTop)) - EDGE_GRACE
 
+        if (y < bandTop || y > EDGE_GRACE) {
+          resetCards(cards)
+          return
+        }
+
+        // 归属分四步，前几步都是迟滞，鼠标往按钮上走时不会被右邻居抢走：
+        //   1. 鼠标比所有卡片底座都高（图片与抬起位置之间那段空隙）→ 继续用已抬起的那张；
+        //   2. 还在已抬起那张的可见范围里 → 继续用它；
+        //   3. 停在它抬起后的右上角删除按钮那片 → 继续用它；
+        //   4. 以上都不成立才按「谁近」换人。
         let picked = null
-        if (inBand) {
+        if (y < stack.offsetTop) {
+          const raised = items.find(
+            item => item.raised && x >= item.wideLeft && x <= item.cornerRight + EDGE_GRACE
+          )
+          picked = raised?.card || null
+        }
+        if (!picked) {
+          const sticky = items.find(item => item.raised && x >= item.stickyLeft && x <= item.stickyRight)
+          const cornerHold = sticky ? null : items.find(item => item.raised && inCorner(item, x, y))
+          picked = (sticky || cornerHold)?.card || null
+        }
+        if (!picked) {
           let best = Infinity
-          for (const card of cards) {
-            const left = stackRect.left + card.offsetLeft
-            const width = card.offsetWidth
-            const slack = card.classList.contains('is-raised') ? 30 : 20
-            const spare = (width * RAISE_S - width) / 2
-            if (event.clientX < left - spare - slack) continue
-            if (event.clientX > left + width + spare + slack) continue
-            const distance = Math.abs(left + width / 2 - event.clientX)
+          for (const item of items) {
+            if (x < item.wideLeft || x > item.wideRight) continue
+            const distance = Math.abs(item.centerX - x)
             if (distance < best) {
               best = distance
-              picked = card
+              picked = item.card
             }
           }
         }
 
-        for (const card of cards) card.classList.toggle('is-raised', card === picked)
+        for (const item of items) {
+          const shouldRaise = item.card === picked
+          if (item.card.classList.contains('is-raised') !== shouldRaise) {
+            item.card.classList.toggle('is-raised', shouldRaise)
+          }
+        }
+
+        // 鼠标进了抬起后那张卡的右上角方块才浮现删除按钮
+        const focused = picked ? items.find(item => item.card === picked) : null
+        if (focused && inCorner(focused, x, y)) {
+          clearDeleteTimer()
+          for (const item of items) {
+            if (item.card !== picked && item.card.classList.contains('is-delete-open')) {
+              item.card.classList.remove('is-delete-open')
+            }
+          }
+          if (!picked.classList.contains('is-delete-open')) picked.classList.add('is-delete-open')
+          return
+        }
+
+        // 除此之外：其他卡片的按钮立刻收回，当前这张稍等一下再收，避免边角擦过就消失
+        const open = items.filter(item => item.card.classList.contains('is-delete-open'))
+        const keep = picked ? open.find(item => item.card === picked) : null
+        for (const item of open) {
+          if (!keep || item.card !== keep.card) item.card.classList.remove('is-delete-open')
+        }
+        if (!keep) {
+          clearDeleteTimer()
+        } else if (!deleteTimer) {
+          deleteTimer = setTimeout(() => {
+            deleteTimer = 0
+            keep.card.classList.remove('is-delete-open')
+          }, HIDE_DELAY)
+        }
       })
 
       shell.addEventListener('mouseleave', () => {
-        shell.querySelectorAll('.free-ref.is-raised').forEach(card => card.classList.remove('is-raised'))
+        resetCards([...shell.querySelectorAll('.free-ref')])
       })
     }
 

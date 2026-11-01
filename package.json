@@ -1,6 +1,6 @@
 {
-  "name": "huajing-image-web",
-  "version": "1.0.7",
+  "name": "mpimage",
+  "version": "1.0.8",
   "private": true,
   "type": "module",
   "description": "画境生图：前后端分离的单张工作台与资产批量工作台",

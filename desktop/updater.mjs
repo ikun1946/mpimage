@@ -556,7 +556,7 @@ export async function downloadInstaller({ url, name, onProgress, signal } = {}) 
   const headers = {
     // GitHub 的 asset 接口要 octet-stream 才回二进制，否则给的是 JSON 元数据
     accept: 'application/octet-stream',
-    'user-agent': `huajing-desktop/${app.getVersion()}`,
+    'user-agent': `mpimage-desktop/${app.getVersion()}`,
   }
 
   let handle = null
