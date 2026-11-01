@@ -143,8 +143,7 @@ loginForm.addEventListener('submit', async event => {
   try {
     const result = await login(username, password)
     if (!result?.user) throw new Error('登录失败，请重试')
-    // 管理员进后台页，普通用户进工作台
-    window.location.replace(result.user.role === 'admin' ? '/admin.html' : '/batch.html')
+    window.location.replace('/batch.html')
   } catch (error) {
     setMessage(loginError, error.message || '登录失败，请重试')
     loginSubmit.disabled = false
@@ -256,7 +255,7 @@ setupForm.addEventListener('submit', async event => {
       body: JSON.stringify({ setupKey, username, displayName, password }),
     })
     await login(username, password)
-    window.location.replace('/admin.html')
+    window.location.replace('/batch.html')
   } catch (error) {
     setMessage(setupError, error.message || '创建失败')
     setupSubmit.disabled = false

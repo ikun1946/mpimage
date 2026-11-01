@@ -205,6 +205,49 @@ export function registerAuthRoutes(
   })
 }
 
+/** 回环地址：桌面控制台和服务端在同一台机器上，这三种写法都是本机 */
+const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
+/** 只在缓存“谁是管理员”，有效期 5 秒，避免每个请求都扫一遍账号库 */
+const DESKTOP_ADMIN_TTL_MS = 5000
+let desktopAdminPick: { userId: string; at: number } | null = null
+
+/**
+ * 桌面控制台的免登录身份：令牌只在「回环连接 + 头部令牌完全匹配」时生效，
+ * 其余情况一律返回 undefined，让调用方回退到原来的 cookie 会话逻辑。
+ * 账号库还没初始化（没有可用管理员）时同样返回 undefined，接口照常 401/403。
+ */
+async function resolveDesktopAuth(
+  request: FastifyRequest,
+  users: UserStore,
+): Promise<AuthContext | undefined> {
+  if (!config.desktopToken) return undefined
+  if (!LOOPBACK_IPS.has(request.ip)) return undefined
+  const token = request.headers['x-desktop-token']
+  if (typeof token !== 'string' || token !== config.desktopToken) return undefined
+
+  if (!desktopAdminPick || Date.now() - desktopAdminPick.at > DESKTOP_ADMIN_TTL_MS) {
+    const admins = await users.list()
+    const admin = admins.find(user => user.role === 'admin' && !user.disabled && !user.pending)
+    // 未找到时不缓存，账号库刚初始化就能立刻认出来
+    desktopAdminPick = admin ? { userId: admin.id, at: Date.now() } : null
+  }
+  if (!desktopAdminPick) return undefined
+
+  // 缓存的只是 ID，账号本身每次都重新取：停用或删除后立刻失效，不用等缓存过期
+  const user = await users.findById(desktopAdminPick.userId)
+  if (!user || user.disabled || user.pending || user.role !== 'admin') {
+    desktopAdminPick = null
+    return undefined
+  }
+
+  return {
+    userId: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    role: user.role,
+  }
+}
+
 function readSessionToken(request: FastifyRequest): string | undefined {
   const header = request.headers.authorization
   if (typeof header === 'string' && header.startsWith('Bearer ')) {
@@ -219,6 +262,10 @@ export async function resolveAuth(
   request: FastifyRequest,
   deps: { users: UserStore; sessions: SessionStore },
 ): Promise<AuthContext | undefined> {
+  // 桌面控制台优先：本机令牌命中就按管理员接入，没命中则完整回退到 cookie 会话
+  const desktopAuth = await resolveDesktopAuth(request, deps.users)
+  if (desktopAuth) return desktopAuth
+
   const token = readSessionToken(request)
   const session = deps.sessions.get(token)
   if (!session) return undefined

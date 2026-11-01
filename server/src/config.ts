@@ -129,6 +129,12 @@ export const config = {
   adminSetupKey: process.env.ADMIN_SETUP_KEY || '',
   /** 优雅退出令牌；留空则关闭 /api/shutdown 接口（桌面端/控制台会注入随机值） */
   shutdownToken: process.env.SHUTDOWN_TOKEN || '',
+  /**
+   * 桌面控制台的免登录令牌。桌面端每次启动随机生成、只注入给本机子进程，
+   * 控制台窗口没有浏览器会话，靠它直接以管理员身份调管理接口。
+   * 留空即完全关闭这条通道，只保留 cookie 登录。
+   */
+  desktopToken: process.env.DESKTOP_TOKEN || '',
   /** 当前应用版本；桌面端安装包里会注入，留空时从 server/package.json 读取 */
   appVersion: process.env.APP_VERSION || '',
   /** 更新检查的 GitHub 仓库（owner/repo） */

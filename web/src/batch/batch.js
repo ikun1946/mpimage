@@ -3611,10 +3611,6 @@ import { setupTablist } from '../lib/tabs.js'
         const source = user.displayName || user.username || '境'
         letter.textContent = Array.from(source)[0] || '境'
       }
-
-      // 后台入口只有管理员看得到；非管理员留着也打不开，只是干扰
-      const adminLink = document.querySelector('#admin-link')
-      if (adminLink) adminLink.hidden = user.role !== 'admin'
     }
 
     /* 启动顺序很重要：必须**先确认当前是谁**，再读本地快照并渲染。
@@ -3970,11 +3966,6 @@ import { setupTablist } from '../lib/tabs.js'
       event.stopPropagation()
       avatarMenu.close()
       openAboutModal()
-    })
-
-    document.querySelector('#admin-link')?.addEventListener('click', () => {
-      // 新标签由链接自己开（target=_blank + rel=noopener），这里只收起菜单
-      avatarMenu.close()
     })
 
     document.querySelector('#about-close')?.addEventListener('click', closeAboutModal)

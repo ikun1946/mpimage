@@ -5,7 +5,7 @@ import os from 'node:os'
 import { basename, join } from 'node:path'
 import { appRoot, dataRoot } from './paths.mjs'
 import { loadConfig } from './config.mjs'
-import { initServer, restartServer, serverState, startServer, stopServer, waitForServer } from './server.mjs'
+import { desktopToken, initServer, restartServer, serverState, startServer, stopServer, waitForServer } from './server.mjs'
 import { checkForUpdate, downloadInstaller, launchInstaller } from './updater.mjs'
 
 /* ===== 基础路径：数据一律写在数据根，绝不碰安装目录 ===== */
@@ -56,30 +56,31 @@ async function authNeedsSetup() {
   }
 }
 
-/* ===== 窗口：主窗口就是客户端，浏览器只作为「分享给局域网」的替代入口 ===== */
-function isSameOrigin(url) {
-  try {
-    return new URL(url).origin === SERVER_ORIGIN
-  } catch {
-    return false
-  }
-}
-
-function createMainWindow(targetUrl = CLIENT_URL) {
+/* ===== 主窗口：桌面控制台（本地页面）。客户端只在浏览器里用 ===== */
+function createMainWindow() {
   mainWindow = new BrowserWindow({
-    width: 1320,
-    height: 900,
-    minWidth: 960,
-    minHeight: 640,
-    title: '画境',
+    width: 900,
+    height: 680,
+    minWidth: 760,
+    minHeight: 560,
+    title: '画境 · 服务控制台',
     backgroundColor: '#f4f0e6',
     icon: iconPath(),
     show: false,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+    webPreferences: {
+      preload: join(app.getAppPath(), 'desktop', 'panel-preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
   })
 
-  mainWindow.loadURL(targetUrl)
+  mainWindow.loadFile(join(app.getAppPath(), 'desktop', 'panel.html'))
   mainWindow.once('ready-to-show', () => mainWindow.show())
+  mainWindow.webContents.on('did-finish-load', () => {
+    void pushPanelState(true)
+    startPanelTimer()
+  })
   mainWindow.on('close', event => {
     if (!quitting) {
       event.preventDefault()
@@ -88,15 +89,12 @@ function createMainWindow(targetUrl = CLIENT_URL) {
   })
   mainWindow.on('closed', () => { mainWindow = null })
 
-  // 页面里的外链（比如「新窗口 ↗」）交给系统浏览器，不在应用内开
+  // 控制台是本地页面：页面里的外链一律交给系统浏览器，应用内不做任何导航
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
-
-  // 只放行主服务同源内的跳转（登录页 → 工作台），别处一律走系统浏览器
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (isSameOrigin(url)) return
     event.preventDefault()
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
   })
@@ -110,6 +108,143 @@ function showMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore()
   mainWindow.show()
   mainWindow.focus()
+}
+
+/* ===== 控制台：状态推送 + 管理接口代理 ===== */
+let panelTimer = null
+let panelPushing = false
+let panelBusy = false
+
+function startPanelTimer() {
+  if (panelTimer) return
+  panelTimer = setInterval(() => { void pushPanelState() }, 2000)
+}
+
+/** 管理接口一律由主进程代发，凭据（desktop token）不进渲染进程 */
+ipcMain.handle('panel:api', async (_event, path, init = {}) => {
+  if (typeof path !== 'string' || !path.startsWith('/api/')) {
+    return { status: 0, ok: false, data: null, error: '接口路径无效' }
+  }
+  const method = String(init?.method || 'GET').toUpperCase()
+  const headers = { 'x-desktop-token': desktopToken(), accept: 'application/json' }
+  let body
+  if (init?.body !== undefined && method !== 'GET' && method !== 'HEAD') {
+    headers['content-type'] = 'application/json'
+    body = JSON.stringify(init.body)
+  }
+  try {
+    // 这是本机回环请求：用 Node 自带的 fetch 直连，别走 net.fetch——
+    // 系统代理可能把 127.0.0.1 也代理出去，反而连不上
+    const response = await fetch(`${SERVER_ORIGIN}${path}`, {
+      method,
+      headers,
+      body,
+      signal: AbortSignal.timeout(20000),
+    })
+    const text = await response.text()
+    let data = null
+    try { data = text ? JSON.parse(text) : null } catch { data = null }
+    return {
+      status: response.status,
+      ok: response.ok,
+      data,
+      error: response.ok ? null : (data?.error || `HTTP ${response.status}`),
+    }
+  } catch (error) {
+    return { status: 0, ok: false, data: null, error: error.message || '请求失败' }
+  }
+})
+
+async function runPanelServiceAction(label, action) {
+  if (panelBusy) return { ok: false, message: '上一个操作还没结束' }
+  panelBusy = true
+  try {
+    const result = await action()
+    // stopServer 用布尔值报告结果：false 表示端口还在监听
+    if (result === false) throw new Error('服务没有停下，端口仍在监听，请查看日志')
+    await refreshServiceState()
+    await pushPanelState(true)
+    log(`${label}完成，服务${serviceStatusLabel()}`)
+    return { ok: true, message: `${label}完成` }
+  } catch (error) {
+    log(`${label}失败：${error.message}`)
+    await pushPanelState(true)
+    return { ok: false, message: error.message || `${label}失败` }
+  } finally {
+    panelBusy = false
+  }
+}
+
+ipcMain.handle('panel:action', async (_event, name) => {
+  switch (name) {
+    case 'start':
+      return runPanelServiceAction('启动服务', startServer)
+    case 'stop':
+      return runPanelServiceAction('停止服务', stopServer)
+    case 'restart':
+      return runPanelServiceAction('重启服务', restartServer)
+    case 'open-client':
+      await openClientInBrowser()
+      return { ok: true, message: '' }
+    case 'copy-lan': {
+      const address = lanAddress() || CLIENT_URL
+      clipboard.writeText(address)
+      return { ok: true, message: `已复制客户端地址：${address}` }
+    }
+    case 'copy-key': {
+      const key = config.ADMIN_SETUP_KEY || ''
+      clipboard.writeText(key)
+      return { ok: true, message: key ? '管理密钥已复制' : '配置里没有管理密钥' }
+    }
+    case 'open-data':
+      await shell.openPath(DATA)
+      return { ok: true, message: '' }
+    case 'open-logs':
+      await shell.openPath(LOG_DIR)
+      return { ok: true, message: '' }
+    case 'open-log-window':
+      openLogWindow()
+      return { ok: true, message: '' }
+    case 'check-update':
+      void checkUpdates()
+      return { ok: true, message: '正在检查更新…' }
+    case 'quit':
+      await quitApp()
+      return { ok: true, message: '' }
+    default:
+      return { ok: false, message: `未知操作：${name}` }
+  }
+})
+
+/** 状态每 2 秒推一次：启停可能由托盘或服务自身引起，页面不能只信自己的操作结果 */
+async function pushPanelState(force = false) {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (panelPushing && !force) return
+  panelPushing = true
+  try {
+    const alive = await waitForServer(600)
+    if (alive !== serviceRunning) {
+      serviceRunning = alive
+      trayTooltip(`画境 · 服务${serviceStatusLabel()}`)
+      refreshMenus()
+    }
+    const state = serverState()
+    mainWindow.webContents.send('panel:state', {
+      running: alive,
+      pid: state.pid ?? null,
+      port: SERVER_PORT,
+      uptimeMs: alive && state.startedAt ? Date.now() - state.startedAt : 0,
+      lanUrl: lanAddress(),
+      clientUrl: CLIENT_URL,
+      loginUrl: CLIENT_LOGIN_URL,
+      needsSetup: alive ? await authNeedsSetup() : false,
+      version: app.getVersion(),
+    })
+  } catch {
+    // 探测失败按「没在跑」处理即可，页面下一轮会自己刷新
+  } finally {
+    panelPushing = false
+  }
 }
 
 /* ===== 运行日志窗口：直接读 LOG_DIR 下的 .log，不经服务端 ===== */
@@ -512,15 +647,14 @@ async function refreshServiceState() {
 }
 
 async function runServiceAction(label, action) {
-  const wasRunning = serviceRunning
   try {
     const result = await action()
     // stopServer 用布尔值报告结果：false 表示端口还在监听
     if (result === false) throw new Error('服务没有停下，端口仍在监听，请查看日志')
     await refreshServiceState()
     log(`${label}完成，服务${serviceStatusLabel()}`)
-    // 窗口在服务停着的时候打开会停在错误页，服务起来后补一次导航
-    if (!wasRunning && serviceRunning && mainWindow) mainWindow.loadURL(CLIENT_URL)
+    // 控制台是本地页面，不用随服务状态换页面，推一次状态即可
+    await pushPanelState(true)
   } catch (error) {
     log(`${label}失败：${error.message}`)
     await refreshServiceState()
@@ -672,9 +806,9 @@ async function bootstrap() {
     return
   }
 
-  // 首次使用：账号库还是空的，主窗口直接停在初始化向导，并亮出管理密钥
+  // 首次使用：账号库还是空的，控制台里会提示「先去浏览器初始化」并亮出管理密钥
   const needsSetup = await authNeedsSetup()
-  createMainWindow(needsSetup ? CLIENT_LOGIN_URL : CLIENT_URL)
+  createMainWindow()
 
   await refreshServiceState()
   createTray()

@@ -23,6 +23,8 @@ let adopted = false
 
 /** 每次启动换一个：只有本进程知道，服务端的 /api/shutdown 靠它验身 */
 const SHUTDOWN_TOKEN = randomBytes(24).toString('hex')
+/** 桌面控制台免登录调管理接口的凭据；同样每次启动换一个，只注入给本机服务 */
+const DESKTOP_TOKEN = randomBytes(24).toString('hex')
 
 const START_TIMEOUT_MS = 20000
 const STOP_TIMEOUT_MS = 4000
@@ -62,9 +64,15 @@ function serverEnv() {
     LOG_DIR: paths.logDir,
     WEB_DIST_DIR: join(paths.root, 'web', 'dist'),
     SHUTDOWN_TOKEN,
+    DESKTOP_TOKEN,
     ...settings,
     PORT: String(port),
   }
+}
+
+/** 桌面控制台调管理接口时带上的凭据（服务端只认回环 + 这个值） */
+export function desktopToken() {
+  return DESKTOP_TOKEN
 }
 
 /** undici 把连接拒绝包在 cause / AggregateError 里，逐层找一下 ECONNREFUSED */
