@@ -191,14 +191,32 @@
               <span>描述你想看见的画面</span>
               <span class="counter"><span id="free-count">0</span> 字</span>
             </div>
-            <div class="prompt-shell">
+            <div class="prompt-shell" id="free-prompt-shell">
               <textarea
                 class="textarea"
                 id="free-prompt"
                 aria-label="自由创作提示词"
-                placeholder="输入画面、人物、场景、光影与材质描述……"
+                placeholder="输入画面、人物、场景、光影与材质描述……（可直接粘贴或拖入参考图）"
                 required
               ></textarea>
+              <div class="free-ref" id="free-ref" hidden>
+                <button class="free-ref-thumb" id="free-ref-thumb" type="button" aria-label="查看参考图大图">
+                  <img id="free-ref-img" alt="自由创作参考图" />
+                </button>
+                <div class="free-ref-meta">
+                  <span class="free-ref-title">参考图</span>
+                  <span class="free-ref-name" id="free-ref-name"></span>
+                </div>
+                <div class="free-ref-actions">
+                  <button class="free-ref-action" id="free-ref-replace" type="button">替换</button>
+                  <button class="free-ref-action" id="free-ref-remove" type="button">移除</button>
+                </div>
+              </div>
+              <div class="free-ref-busy" id="free-ref-busy" hidden>
+                <span class="free-ref-spinner" aria-hidden="true"></span>
+                <span>参考图上传中…</span>
+              </div>
+              <input id="free-ref-file" type="file" accept="image/png,image/jpeg,image/webp" hidden />
               <div class="prompt-float-tools" aria-label="提示词快捷操作">
                 <button
                   class="prompt-float-button"

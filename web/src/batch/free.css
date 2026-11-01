@@ -40,6 +40,145 @@
   line-height: 1.8;
 }
 
+/* 有参考图时上抬内边距：缩略图悬浮在文本框上沿，不压住第一行文字 */
+.free-form .prompt-shell.has-ref .textarea {
+  padding-top: 96px;
+}
+
+.free-form .prompt-shell.is-dragover .textarea {
+  border-color: var(--moss);
+  background: var(--surface-raised);
+}
+
+/* ===== 参考图：悬浮在文本框上沿（不占按钮位，靠粘贴 / 拖入 / 替换） ===== */
+
+.free-ref {
+  position: absolute;
+  top: -18px;
+  left: 14px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.free-ref-thumb {
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-subtle);
+  cursor: zoom-in;
+}
+
+.free-ref-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.free-ref-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.free-ref-title {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.free-ref-name {
+  max-width: 140px;
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.free-ref-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 4px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.free-ref:hover .free-ref-actions,
+.free-ref:focus-within .free-ref-actions {
+  opacity: 1;
+}
+
+.free-ref-action {
+  padding: 4px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.free-ref-action:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.free-ref-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.free-ref-busy {
+  position: absolute;
+  top: -18px;
+  left: 14px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.free-ref-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line-soft);
+  border-top-color: var(--moss);
+  border-radius: 50%;
+  animation: free-ref-spin 720ms linear infinite;
+}
+
+@keyframes free-ref-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .free-ref-spinner {
+    animation-duration: 2s;
+  }
+}
+
 .free-params {
   display: grid;
   grid-template-columns: 1fr;

@@ -163,6 +163,9 @@ import { setupTablist } from '../lib/tabs.js'
       // 自由创作的画面比例与提示词草稿，刷新后保持
       freeRatio: '1:1',
       freePrompt: '',
+      // 自由创作的参考图：只存相对路径与可预览地址，快照里不塞 base64
+      freeReference: null,
+      freeRefUploading: false,
       styleType: 'role',
       styleEditingId: '',
       styleDirty: false,
@@ -257,6 +260,15 @@ import { setupTablist } from '../lib/tabs.js'
       freeMaximize: document.querySelector('#free-maximize'),
       freePromptMaximize: document.querySelector('#free-prompt-maximize'),
       freePromptCopy: document.querySelector('#free-prompt-copy'),
+      freePromptShell: document.querySelector('#free-prompt-shell'),
+      freeRef: document.querySelector('#free-ref'),
+      freeRefThumb: document.querySelector('#free-ref-thumb'),
+      freeRefImg: document.querySelector('#free-ref-img'),
+      freeRefName: document.querySelector('#free-ref-name'),
+      freeRefReplace: document.querySelector('#free-ref-replace'),
+      freeRefRemove: document.querySelector('#free-ref-remove'),
+      freeRefFile: document.querySelector('#free-ref-file'),
+      freeRefBusy: document.querySelector('#free-ref-busy'),
     }
 
     let toastTimer = 0
@@ -298,6 +310,14 @@ import { setupTablist } from '../lib/tabs.js'
         // 恢复自由创作的提示词草稿与上次生成结果，刷新不清空
         if (typeof saved.freePrompt === 'string') {
           state.freePrompt = saved.freePrompt
+        }
+        // 参考图同样恢复：只认 path + url，坏的直接忽略
+        if (saved.freeReference && typeof saved.freeReference.path === 'string' && saved.freeReference.path) {
+          state.freeReference = {
+            path: saved.freeReference.path,
+            url: typeof saved.freeReference.url === 'string' ? saved.freeReference.url : '',
+            name: typeof saved.freeReference.name === 'string' ? saved.freeReference.name : '',
+          }
         }
         if (typeof saved.freeImageUrl === 'string') {
           state.freeImageUrl = saved.freeImageUrl
@@ -498,6 +518,9 @@ import { setupTablist } from '../lib/tabs.js'
           concurrencyCustom: state.concurrencyCustom,
           freeRatio: state.freeRatio,
           freePrompt: state.freePrompt,
+          freeReference: state.freeReference
+            ? { path: state.freeReference.path, url: state.freeReference.url, name: state.freeReference.name }
+            : null,
           freeImageUrl: state.freeImageUrl,
           freeImageExtension: state.freeImageExtension,
           page: { ...state.page },
@@ -2941,12 +2964,110 @@ import { setupTablist } from '../lib/tabs.js'
       dom.freeSubmit.textContent = '生成图像'
     }
 
+    /* ===== 自由创作的参考图：粘贴 / 拖入即可，不占按钮位 ===== */
+
+    /** 参考图在页面里能用的地址：优先服务端返回的，退回按相对路径拼 */
+    function freeReferenceUrl(ref) {
+      if (!ref || !ref.path) return ''
+      return ref.url || referenceUrl(ref.path)
+    }
+
+    function renderFreeReference() {
+      if (!dom.freeRef || !dom.freePromptShell) return
+      const ref = state.freeReference
+      const hasRef = Boolean(ref && ref.path)
+
+      dom.freePromptShell.classList.toggle('has-ref', hasRef)
+      dom.freeRef.hidden = !hasRef || state.freeRefUploading
+      if (dom.freeRefBusy) dom.freeRefBusy.hidden = !state.freeRefUploading
+
+      const busy = state.freeBusy || state.processing || state.freeRefUploading
+      if (dom.freeRefReplace) dom.freeRefReplace.disabled = busy
+      if (dom.freeRefRemove) dom.freeRefRemove.disabled = busy
+
+      if (!hasRef) return
+      const url = freeReferenceUrl(ref)
+      if (dom.freeRefImg && dom.freeRefImg.getAttribute('src') !== url) {
+        dom.freeRefImg.src = url
+      }
+      if (dom.freeRefName) dom.freeRefName.textContent = ref.name || '已添加'
+    }
+
+    /** 校验 → dataURL → 上传 → 写回 state；失败只提示，不动原有参考图 */
+    async function attachFreeReference(file) {
+      if (!file) return
+      if (state.freeBusy) {
+        showToast('正在生成中，稍后再换参考图', true)
+        return
+      }
+      if (!/^image\/(png|jpeg|webp)$/i.test(file.type)) {
+        showToast('参考图仅支持 PNG / JPEG / WebP', true)
+        return
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        showToast('参考图不能超过 8 MB', true)
+        return
+      }
+      if (state.freeRefUploading) return
+
+      state.freeRefUploading = true
+      renderFreeReference()
+      try {
+        const dataUrl = await readFileAsDataUrl(file)
+        const result = await uploadReferenceImage({ name: '自由创作', dataUrl })
+        if (!result?.path) throw new Error('上传接口没有返回图片路径')
+        state.freeReference = {
+          path: result.path,
+          url: result.url || '',
+          name: file.name || '参考图',
+        }
+        persistSoon()
+        showToast('参考图已添加，生成时会以它为参考')
+      } catch (error) {
+        showToast(error.message || '参考图上传失败', true)
+      } finally {
+        state.freeRefUploading = false
+        renderFreeReference()
+      }
+    }
+
+    function clearFreeReference() {
+      if (!state.freeReference) return
+      state.freeReference = null
+      persistSoon()
+      renderFreeReference()
+      showToast('参考图已移除')
+    }
+
+    /** 粘贴 / 拖入里挑第一张图片 */
+    function imageFileFromEvent(event) {
+      const items = event.clipboardData?.items || event.dataTransfer?.items
+      if (items && items.length) {
+        for (const item of items) {
+          if (item.kind === 'file' && /^image\//i.test(item.type || '')) {
+            const file = item.getAsFile ? item.getAsFile() : null
+            if (file) return file
+          }
+        }
+      }
+      const files = event.clipboardData?.files || event.dataTransfer?.files
+      if (files && files.length) {
+        for (const file of files) {
+          if (/^image\//i.test(file.type || '')) return file
+        }
+      }
+      return null
+    }
+
     async function generateFreeImage(event) {
       event.preventDefault()
-      const prompt = dom.freePrompt.value.trim()
+      const reference = state.freeReference
+      const typed = dom.freePrompt.value.trim()
+      // 只给参考图也能生成：补一句默认描述（服务端仍然要求非空提示词）
+      const prompt = typed || (reference ? '以参考图为基础生成画面，保持参考图的主体与构图' : '')
       if (!prompt) {
         dom.freePrompt.focus()
-        dom.freeStatus.textContent = '请先写下画面描述'
+        dom.freeStatus.textContent = '请先写下画面描述，或粘贴一张参考图'
         return
       }
       if (state.processing) {
@@ -2960,6 +3081,7 @@ import { setupTablist } from '../lib/tabs.js'
       dom.freeSubmit.disabled = true
       dom.freeSubmit.textContent = '正在生成…'
       dom.freeStatus.textContent = 'Magpie 正在绘制'
+      renderFreeReference()
       startFreeProgress()
 
       const jobId = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now())
@@ -2973,6 +3095,7 @@ import { setupTablist } from '../lib/tabs.js'
           name: `自由创作-${timestamp()}`,
           source: 'free',
           jobId,
+          referencePath: reference?.path || undefined,
         })
         if (!result?.imageUrl) throw new Error('接口没有返回图片地址')
         clearPendingJob()
@@ -2999,6 +3122,7 @@ import { setupTablist } from '../lib/tabs.js'
         dom.freePrompt.disabled = false
         dom.freeSubmit.disabled = false
         dom.freeSubmit.textContent = '生成图像'
+        renderFreeReference()
       }
     }
 
@@ -3014,6 +3138,7 @@ import { setupTablist } from '../lib/tabs.js'
         dom.freeDownload.disabled = false
         dom.freeMaximize.disabled = false
       }
+      renderFreeReference()
     }
 
     function startFreeProgress() {
@@ -3263,6 +3388,60 @@ import { setupTablist } from '../lib/tabs.js'
       })
 
       dom.freePromptMaximize.addEventListener('click', () => openFreePromptEditor())
+
+      /* ===== 自由创作参考图：粘贴 / 拖入即可添加或替换，不占按钮位 ===== */
+      const freeShell = dom.freePromptShell
+      if (freeShell) {
+        const hasFiles = event =>
+          Boolean(event.dataTransfer && Array.from(event.dataTransfer.types || []).includes('Files'))
+
+        dom.freePrompt.addEventListener('paste', event => {
+          const file = imageFileFromEvent(event)
+          if (!file) return
+          // 图片不往文本框里粘，直接当参考图
+          event.preventDefault()
+          void attachFreeReference(file)
+        })
+
+        freeShell.addEventListener('dragover', event => {
+          if (!hasFiles(event)) return
+          event.preventDefault()
+          if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+          freeShell.classList.add('is-dragover')
+        })
+
+        freeShell.addEventListener('dragleave', event => {
+          if (!freeShell.contains(event.relatedTarget)) freeShell.classList.remove('is-dragover')
+        })
+
+        freeShell.addEventListener('drop', event => {
+          if (!hasFiles(event)) return
+          // 不拦的话浏览器会直接把文件当页面打开
+          event.preventDefault()
+          freeShell.classList.remove('is-dragover')
+          const file = imageFileFromEvent(event)
+          if (file) void attachFreeReference(file)
+          else showToast('参考图仅支持 PNG / JPEG / WebP', true)
+        })
+
+        dom.freeRefThumb.addEventListener('click', () => {
+          const url = freeReferenceUrl(state.freeReference)
+          if (url) openLightbox(url, '自由创作参考图')
+        })
+
+        dom.freeRefReplace.addEventListener('click', () => {
+          if (!dom.freeRefFile) return
+          dom.freeRefFile.value = ''
+          dom.freeRefFile.click()
+        })
+
+        dom.freeRefFile.addEventListener('change', () => {
+          const file = dom.freeRefFile.files && dom.freeRefFile.files[0]
+          if (file) void attachFreeReference(file)
+        })
+
+        dom.freeRefRemove.addEventListener('click', clearFreeReference)
+      }
 
       /* 悬浮工具只在输入框右上角热区出现：热区 = 右侧 150px、顶部 56px */
       const promptShell = dom.freePrompt.closest('.prompt-shell')
