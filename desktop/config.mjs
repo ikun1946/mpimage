@@ -17,6 +17,10 @@ const DEFAULTS = {
   // 同时打向上游的生图请求上限；批量页的「并行数」不会超过它
   IMAGE_CONCURRENCY: '5',
   PUBLIC_BASE_URL: '',
+  // 更新下载连接数：1 强制单流，2/4/6 强制该段数，auto 或其它值按探测速率自适应
+  UPDATE_DOWNLOAD_CONNECTIONS: 'auto',
+  // 更新下载镜像前缀（默认空 = 直连）：只在用户自己填时才把地址拼到原始下载链接前
+  UPDATE_DOWNLOAD_MIRROR: '',
   LOG_LEVEL: 'info',
   CORS_ORIGINS: 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173',
 }

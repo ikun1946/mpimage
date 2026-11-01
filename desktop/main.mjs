@@ -194,6 +194,177 @@ function openLogWindow() {
   logWindow.on('closed', () => { logWindow = null })
 }
 
+/* ===== 更新下载窗口：进度条 / 取消 / 装 ===== */
+let updateWindow = null
+let updateTarget = { url: '', name: '', version: '', pageUrl: '' }
+let updateController = null
+let updateTimer = 0
+let updateDirty = false
+let updateState = {
+  phase: 'resolve',
+  version: '',
+  fileName: '',
+  received: 0,
+  total: 0,
+  speed: 0,
+  connections: 1,
+  mirror: false,
+  message: '',
+  filePath: '',
+}
+
+function updateView() {
+  return updateWindow && !updateWindow.isDestroyed() ? updateWindow.webContents : null
+}
+
+/** 进度每 120ms 才推一次：下载每个 chunk 都来一条，直接转发会把渲染进程压垮 */
+function paintUpdate(patch) {
+  updateState = { ...updateState, ...patch }
+  const downloading = updateState.phase === 'download' || updateState.phase === 'resolve'
+  if (mainWindow) {
+    if (!downloading) mainWindow.setProgressBar(-1)
+    else if (updateState.total > 0) mainWindow.setProgressBar(Math.min(1, updateState.received / updateState.total))
+    else mainWindow.setProgressBar(2)
+  }
+  if (downloading) {
+    trayTooltip(updateState.total > 0
+      ? `画境 · 更新 ${Math.round((updateState.received / updateState.total) * 100)}%`
+      : `画境 · 已下载 ${(updateState.received / 1048576).toFixed(1)} MB`)
+  }
+  updateDirty = true
+  if (updateTimer) return
+  updateTimer = setTimeout(() => {
+    updateTimer = 0
+    if (!updateDirty) return
+    updateDirty = false
+    updateView()?.send('update:state', updateState)
+  }, 120)
+}
+
+function openUpdateWindow() {
+  if (updateWindow && !updateWindow.isDestroyed()) {
+    if (updateWindow.isMinimized()) updateWindow.restore()
+    updateWindow.show()
+    updateWindow.focus()
+    return
+  }
+
+  updateWindow = new BrowserWindow({
+    width: 520,
+    height: 260,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    title: '画境 · 更新下载',
+    backgroundColor: '#f4f0e6',
+    icon: iconPath(),
+    show: false,
+    webPreferences: {
+      preload: join(app.getAppPath(), 'desktop', 'update-preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  })
+
+  updateWindow.loadFile(join(app.getAppPath(), 'desktop', 'update.html'))
+  updateWindow.once('ready-to-show', () => updateWindow?.show())
+  updateWindow.webContents.on('did-finish-load', () => updateView()?.send('update:state', updateState))
+  // 下载途中关窗只是收起来：要停请点「取消」，别让误触丢掉已经下好的进度
+  updateWindow.on('close', event => {
+    if (quitting) return
+    if (updateState.phase === 'download' || updateState.phase === 'resolve') {
+      event.preventDefault()
+      updateWindow?.hide()
+    }
+  })
+  updateWindow.on('closed', () => { updateWindow = null })
+}
+
+async function startUpdateDownload() {
+  if (!updateTarget.url) return
+  updateController = new AbortController()
+  openUpdateWindow()
+  paintUpdate({
+    phase: 'resolve',
+    version: updateTarget.version,
+    fileName: updateTarget.name,
+    received: 0,
+    total: 0,
+    speed: 0,
+    connections: 1,
+    mirror: Boolean(config.UPDATE_DOWNLOAD_MIRROR),
+    message: '',
+    filePath: '',
+  })
+
+  try {
+    const result = await downloadInstaller({
+      url: updateTarget.url,
+      name: updateTarget.name,
+      signal: updateController.signal,
+      // 探测阶段也是「还没开始下」，页面上归到 resolve 态
+      onProgress: event => paintUpdate(event.phase === 'probe' ? { ...event, phase: 'resolve' } : event),
+    })
+    paintUpdate({
+      phase: 'done',
+      filePath: result.file,
+      received: result.size,
+      total: result.size,
+      connections: result.connections,
+    })
+    openUpdateWindow()
+    trayTooltip('画境 · 更新已下载，可以安装')
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      log('更新下载已取消')
+      paintUpdate({ phase: 'cancelled', message: '已取消下载' })
+    } else {
+      log(`下载安装包失败：${error?.message || error}`)
+      paintUpdate({ phase: 'error', message: error?.message || '下载失败' })
+      openUpdateWindow()
+    }
+  } finally {
+    updateController = null
+    updateBusy = false
+    if (!['download', 'resolve'].includes(updateState.phase)) {
+      setTimeout(() => trayTooltip(`画境 · 服务${serviceStatusLabel()}`), 3000)
+    }
+  }
+}
+
+ipcMain.handle('update:cancel', () => {
+  updateController?.abort()
+})
+
+ipcMain.handle('update:retry', () => {
+  if (updateBusy) return { ok: false }
+  void startUpdateDownload()
+  return { ok: true }
+})
+
+ipcMain.handle('update:install', async () => {
+  const file = updateState.filePath
+  if (!file) return { ok: false, message: '安装包还没下载好' }
+  try {
+    await launchInstaller(file)
+  } catch (error) {
+    log(`打开安装包失败：${error.message}`)
+    return { ok: false, message: error.message }
+  }
+  // 安装器接管后本进程就该退了，留一点时间让窗口显示「正在启动安装程序」
+  setTimeout(() => { void quitApp() }, 1200)
+  return { ok: true }
+})
+
+ipcMain.handle('update:open-folder', () => {
+  if (updateState.filePath) shell.showItemInFolder(updateState.filePath)
+})
+
+ipcMain.handle('update:open-page', () => {
+  if (updateTarget.pageUrl) void shell.openExternal(updateTarget.pageUrl)
+})
+
 async function openClientInBrowser() {
   try {
     // 账号库为空时先给初始化页，否则直接进工作台
@@ -452,54 +623,14 @@ async function checkUpdates() {
       return
     }
 
-    trayTooltip('画境 · 正在下载更新…')
-    let lastTick = 0
-    let file = ''
-    try {
-      file = await downloadInstaller({
-        url: info.downloadUrl,
-        name: info.downloadName,
-        onProgress: (received, total) => {
-          const now = Date.now()
-          if (now - lastTick < 500) return
-          lastTick = now
-          trayTooltip(total
-            ? `画境 · 下载更新 ${Math.round((received / total) * 100)}%`
-            : `画境 · 已下载 ${(received / 1024 / 1024).toFixed(1)} MB`)
-        },
-      })
-    } catch (error) {
-      log(`下载安装包失败：${error.message}`)
-      await dialog.showMessageBox({
-        type: 'error',
-        title: '下载失败',
-        message: error.message,
-        detail: info.pageUrl ? `也可以去发布页手动下载：${info.pageUrl}` : '',
-      })
-      return
-    } finally {
-      trayTooltip(`画境 · 服务${serviceStatusLabel()}`)
+    updateTarget = {
+      url: info.downloadUrl,
+      name: info.downloadName || '',
+      version: info.latestVersion || '',
+      pageUrl: info.pageUrl || '',
     }
-
-    const install = await dialog.showMessageBox({
-      type: 'info',
-      title: '下载完成',
-      message: '安装包已下载',
-      detail: `${file}\n\n安装会关闭画境，装完需要手动重新打开。`,
-      buttons: ['立即安装', '稍后'],
-      defaultId: 0,
-      cancelId: 1,
-    })
-    if (install.response !== 0) return
-
-    try {
-      await launchInstaller(file)
-    } catch (error) {
-      log(`打开安装包失败：${error.message}`)
-      await dialog.showMessageBox({ type: 'error', title: '无法安装', message: error.message })
-      return
-    }
-    await quitApp()
+    // 进度条、取消、重试、立即安装都在下载窗口里，不再用阻塞式对话框问安装
+    await startUpdateDownload()
   } finally {
     updateBusy = false
     trayTooltip(`画境 · 服务${serviceStatusLabel()}`)

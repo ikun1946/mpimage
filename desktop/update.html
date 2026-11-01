@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'" />
+<title>画境 · 更新下载</title>
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #f3f1eb;
+    --surface: #fcfbf7;
+    --surface-raised: #ffffff;
+    --surface-subtle: #f5f3ed;
+    --ink: #202722;
+    --ink-soft: #59645c;
+    --ink-faint: #6e776f;
+    --line: rgba(32, 39, 34, 0.14);
+    --line-soft: rgba(32, 39, 34, 0.08);
+    --line-strong: rgba(32, 39, 34, 0.24);
+    --moss: #365445;
+    --moss-dark: #35503c;
+    --moss-tint: rgba(54, 84, 69, 0.12);
+    --on-moss: #fffdf8;
+    --gold: #a78243;
+    --danger: #a74331;
+    --success: #3f6b4b;
+    --radius-sm: 10px;
+    --radius-pill: 999px;
+    --shadow-soft: 0 4px 16px rgba(40, 43, 36, 0.045);
+    --font-body: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    --font-mono: "Cascadia Mono", "Consolas", "Sarasa Mono SC", "Microsoft YaHei", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --paper: #151915;
+      --surface: #1c211d;
+      --surface-raised: #242a25;
+      --surface-subtle: #202520;
+      --ink: #e8e6df;
+      --ink-soft: #adb5ab;
+      --ink-faint: #939c91;
+      --line: rgba(232, 230, 223, 0.14);
+      --line-soft: rgba(232, 230, 223, 0.08);
+      --line-strong: rgba(232, 230, 223, 0.26);
+      --moss: #8aaa8f;
+      --moss-dark: #6f8f74;
+      --moss-tint: rgba(138, 170, 143, 0.14);
+      --on-moss: #12180f;
+      --gold: #c9a468;
+      --danger: #cf8574;
+      --success: #7fae84;
+      --shadow-soft: 0 6px 20px rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    overflow: hidden;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 13px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  .shell {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+    min-height: 0;
+    padding: 18px 22px 14px;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .head-text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+    overflow-wrap: anywhere;
+  }
+
+  .caption {
+    margin: 3px 0 0;
+    color: var(--ink-soft);
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .caption.is-error {
+    color: var(--danger);
+  }
+
+  .badge {
+    flex: none;
+    margin-top: 3px;
+    padding: 1px 8px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--gold);
+    font-size: 11px;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .gauge {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .track {
+    position: relative;
+    flex: 1 1 auto;
+    height: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-subtle);
+    box-shadow: inset 0 0 0 1px var(--line-soft);
+    overflow: hidden;
+  }
+
+  .fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 0;
+    border-radius: inherit;
+    background: var(--moss);
+    transition: width 200ms linear;
+  }
+
+  .track.is-indeterminate .fill {
+    width: 34%;
+    transition: none;
+    animation: slide 1200ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+
+  @keyframes slide {
+    from {
+      transform: translateX(-110%);
+    }
+    to {
+      transform: translateX(310%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .track.is-indeterminate .fill {
+      width: 100%;
+      animation: pulse 1600ms ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%,
+      100% {
+        opacity: 0.35;
+      }
+      50% {
+        opacity: 1;
+      }
+    }
+  }
+
+  .percent {
+    flex: none;
+    min-width: 68px;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metrics {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metrics .bytes {
+    color: var(--ink);
+    font-family: var(--font-mono);
+  }
+
+  .metrics .dot {
+    color: var(--ink-faint);
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    color: var(--ink-faint);
+    font-size: 11px;
+  }
+
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 4px;
+  }
+
+  .button {
+    min-height: 34px;
+    padding: 6px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-raised);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 120ms cubic-bezier(0.2, 0.75, 0.2, 1), border-color 120ms cubic-bezier(0.2, 0.75, 0.2, 1),
+      color 120ms cubic-bezier(0.2, 0.75, 0.2, 1);
+  }
+
+  .button:hover:not(:disabled) {
+    border-color: var(--line-strong);
+  }
+
+  .button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .button:focus-visible {
+    outline: none;
+    border-color: var(--moss);
+    box-shadow: 0 0 0 3px var(--moss-tint);
+  }
+
+  .button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .button.primary {
+    border-color: transparent;
+    background: var(--moss);
+    color: var(--on-moss);
+  }
+
+  .button.primary:hover:not(:disabled) {
+    background: var(--moss-dark);
+  }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <header class="head">
+      <div class="head-text">
+        <h1 class="title" id="title">准备中…</h1>
+        <p class="caption" id="caption" hidden></p>
+      </div>
+      <span class="badge" id="badge" hidden>镜像</span>
+    </header>
+
+    <section class="body">
+      <div class="gauge" id="gauge" hidden>
+        <div class="track" id="track" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+          <div class="fill" id="fill"></div>
+        </div>
+        <span class="percent" id="percent">0%</span>
+      </div>
+
+      <div class="metrics" id="metrics" hidden>
+        <span class="bytes" id="bytes"></span>
+        <span class="dot" id="dot-speed" hidden>·</span>
+        <span id="speed"></span>
+        <span class="dot" id="dot-eta" hidden>·</span>
+        <span id="eta"></span>
+      </div>
+
+      <p class="meta" id="meta" hidden><span id="connections"></span></p>
+    </section>
+
+    <footer class="foot">
+      <button type="button" class="button primary" id="install" hidden>立即安装</button>
+      <button type="button" class="button" id="folder" hidden>打开所在文件夹</button>
+      <button type="button" class="button" id="close" hidden>关闭</button>
+      <button type="button" class="button primary" id="retry" hidden>重试</button>
+      <button type="button" class="button" id="page" hidden>前往发布页</button>
+      <button type="button" class="button" id="cancel" hidden>取消</button>
+    </footer>
+  </div>
+
+<script>
+  const MIN_PAINT_MS = 200
+
+  const api = window.updaterApi || null
+  const els = {
+    title: document.getElementById('title'),
+    caption: document.getElementById('caption'),
+    badge: document.getElementById('badge'),
+    gauge: document.getElementById('gauge'),
+    track: document.getElementById('track'),
+    fill: document.getElementById('fill'),
+    percent: document.getElementById('percent'),
+    metrics: document.getElementById('metrics'),
+    bytes: document.getElementById('bytes'),
+    dotSpeed: document.getElementById('dot-speed'),
+    speed: document.getElementById('speed'),
+    dotEta: document.getElementById('dot-eta'),
+    eta: document.getElementById('eta'),
+    meta: document.getElementById('meta'),
+    connections: document.getElementById('connections'),
+    install: document.getElementById('install'),
+    folder: document.getElementById('folder'),
+    close: document.getElementById('close'),
+    retry: document.getElementById('retry'),
+    page: document.getElementById('page'),
+    cancel: document.getElementById('cancel'),
+  }
+
+  const BUTTONS = {
+    install: els.install,
+    folder: els.folder,
+    close: els.close,
+    retry: els.retry,
+    page: els.page,
+    cancel: els.cancel,
+  }
+
+  let renderedPhase = 'idle'
+  let lastPaint = 0
+  let queued = null
+  let queuedTimer = 0
+
+  function text(node, value) {
+    if (node.textContent !== value) node.textContent = value
+  }
+
+  function show(node, visible) {
+    const hidden = !visible
+    if (node.hidden !== hidden) node.hidden = hidden
+  }
+
+  function mb(bytes) {
+    return `${(Math.max(0, Number(bytes) || 0) / 1048576).toFixed(1)} MB`
+  }
+
+  function perSecond(speed) {
+    return `${(Math.max(0, Number(speed) || 0) / 1048576).toFixed(1)} MB/s`
+  }
+
+  function etaText(received, total, speed) {
+    if (!total || !speed || speed <= 0) return ''
+    const rest = Math.ceil((total - received) / speed)
+    if (rest <= 0) return ''
+    if (rest > 60) return `剩余约 ${Math.round(rest / 60)} 分`
+    return `剩余约 ${rest} 秒`
+  }
+
+  function connText(count) {
+    const n = Math.max(0, Number(count) || 0)
+    return n > 1 ? `${n} 线程` : '单线程'
+  }
+
+  function setButtons(list, retryLabel) {
+    const active = Array.isArray(list) ? list : []
+    for (const name of Object.keys(BUTTONS)) {
+      show(BUTTONS[name], active.includes(name))
+    }
+    if (retryLabel) text(els.retry, retryLabel)
+  }
+
+  function render(state) {
+    lastPaint = Date.now()
+    const phase = state && state.phase ? String(state.phase) : 'idle'
+    renderedPhase = phase
+
+    const version = state && state.version ? String(state.version) : ''
+    const fileName = state && state.fileName ? String(state.fileName) : ''
+    const received = state ? Math.max(0, Number(state.received) || 0) : 0
+    const total = state ? Math.max(0, Number(state.total) || 0) : 0
+    const speed = state ? Math.max(0, Number(state.speed) || 0) : 0
+    const connections = state ? Number(state.connections) || 0 : 0
+    const mirror = Boolean(state && state.mirror)
+
+    show(els.badge, mirror && (phase === 'resolve' || phase === 'download'))
+    show(els.gauge, phase === 'resolve' || phase === 'download')
+    els.track.classList.toggle('is-indeterminate', phase === 'resolve')
+    els.caption.classList.toggle('is-error', phase === 'error')
+    show(els.metrics, phase === 'download')
+    show(els.meta, phase === 'download')
+
+    switch (phase) {
+      case 'resolve':
+        text(els.title, '正在获取下载地址…')
+        text(els.caption, version ? `目标版本 ${version}` : '')
+        show(els.caption, Boolean(version))
+        show(els.percent, false)
+        els.track.removeAttribute('aria-valuenow')
+        setButtons([])
+        break
+
+      case 'download': {
+        text(els.title, version ? `正在下载画境 ${version}` : '正在下载画境')
+        text(els.caption, fileName)
+        show(els.caption, Boolean(fileName))
+        const ratio = total > 0 ? Math.min(1, received / total) : 0
+        const percent = Math.floor(ratio * 100)
+        els.fill.style.width = `${(ratio * 100).toFixed(2)}%`
+        show(els.percent, total > 0)
+        text(els.percent, `${percent}%`)
+        els.track.setAttribute('aria-valuenow', String(percent))
+        text(els.bytes, total > 0 ? `${mb(received)} / ${mb(total)}` : mb(received))
+        const rate = speed > 0 ? perSecond(speed) : ''
+        text(els.speed, rate)
+        show(els.dotSpeed, Boolean(rate))
+        const eta = etaText(received, total, speed)
+        text(els.eta, eta)
+        show(els.dotEta, Boolean(eta))
+        text(els.connections, connText(connections))
+        setButtons(['cancel'])
+        break
+      }
+
+      case 'done': {
+        text(els.title, '安装包已下载')
+        const size = total || received
+        text(els.caption, [fileName || '安装包', size > 0 ? mb(size) : ''].filter(Boolean).join(' · '))
+        show(els.caption, true)
+        setButtons(['install', 'folder', 'close'])
+        break
+      }
+
+      case 'error':
+        text(els.title, '下载失败')
+        text(els.caption, state && state.message ? String(state.message) : '下载过程出错，请重试')
+        show(els.caption, true)
+        setButtons(['retry', 'page'], '重试')
+        break
+
+      case 'cancelled':
+        text(els.title, '已取消')
+        text(els.caption, version ? `画境 ${version} 尚未下载完成` : '')
+        show(els.caption, Boolean(version))
+        setButtons(['retry'], '重新下载')
+        break
+
+      default:
+        text(els.title, '准备中…')
+        text(els.caption, '')
+        show(els.caption, false)
+        show(els.gauge, false)
+        show(els.metrics, false)
+        show(els.meta, false)
+        show(els.badge, false)
+        setButtons([])
+        break
+    }
+  }
+
+  // 主进程按 chunk 推送，这里限到每秒最多 5 次重绘；阶段切换立即生效
+  function receive(state) {
+    const phase = state && state.phase ? String(state.phase) : 'idle'
+    if (phase !== renderedPhase) {
+      if (queuedTimer) {
+        clearTimeout(queuedTimer)
+        queuedTimer = 0
+      }
+      queued = null
+      render(state)
+      return
+    }
+    const wait = MIN_PAINT_MS - (Date.now() - lastPaint)
+    if (wait <= 0) {
+      if (queuedTimer) {
+        clearTimeout(queuedTimer)
+        queuedTimer = 0
+      }
+      queued = null
+      render(state)
+      return
+    }
+    queued = state
+    if (!queuedTimer) {
+      queuedTimer = setTimeout(() => {
+        queuedTimer = 0
+        const last = queued
+        queued = null
+        if (last) render(last)
+      }, wait)
+    }
+  }
+
+  function call(name) {
+    if (!api || typeof api[name] !== 'function') return
+    try {
+      const result = api[name]()
+      if (result && typeof result.catch === 'function') result.catch(() => {})
+    } catch {
+      return
+    }
+  }
+
+  function lock(button, ms) {
+    button.disabled = true
+    setTimeout(() => {
+      button.disabled = false
+    }, ms)
+  }
+
+  els.cancel.addEventListener('click', () => {
+    lock(els.cancel, 800)
+    call('cancel')
+  })
+
+  els.retry.addEventListener('click', () => {
+    lock(els.retry, 800)
+    call('retry')
+  })
+
+  els.install.addEventListener('click', () => {
+    lock(els.install, 1500)
+    call('install')
+  })
+
+  els.folder.addEventListener('click', () => call('openFolder'))
+  els.page.addEventListener('click', () => call('openPage'))
+  els.close.addEventListener('click', () => window.close())
+
+  render(null)
+
+  if (api && typeof api.onState === 'function') {
+    const unsubscribe = api.onState(receive)
+    window.addEventListener('beforeunload', () => {
+      if (typeof unsubscribe === 'function') unsubscribe()
+    })
+  }
+</script>
+</body>
+</html>
