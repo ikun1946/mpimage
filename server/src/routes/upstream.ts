@@ -36,6 +36,23 @@ function parseBaseUrl(raw: unknown): string {
   return `${url.origin}${url.pathname.replace(/\/+$/, '')}`
 }
 
+/**
+ * 对话模型名会原样拼进上游请求，带空格基本是手滑粘了空格或整段说明，
+ * 长度上限只是防止有人把整段提示词填进来。
+ * 空串是「清除后台覆写、回落到环境变量」，不是错误，控制台靠它复位。
+ */
+function parseTextModel(raw: unknown): string {
+  const model = typeof raw === 'string' ? raw.trim() : ''
+  if (!model) return ''
+  if (model.length > 120) {
+    throw new ApiError('UPSTREAM_INVALID', '对话模型不能超过 120 个字符', 400)
+  }
+  if (/\s/.test(model)) {
+    throw new ApiError('UPSTREAM_INVALID', '对话模型不能包含空格', 400)
+  }
+  return model
+}
+
 export function registerUpstreamRoutes(
   app: FastifyInstance,
   deps: { settings: SettingsStore },
@@ -46,16 +63,38 @@ export function registerUpstreamRoutes(
       baseUrl: await deps.settings.getBaseUrl(),
       model: deps.settings.getModel(),
       fromSettings: deps.settings.isFromSettings(),
+      /** 生效中的对话模型（可能是环境变量默认值） */
+      textModel: await deps.settings.getTextModel(),
+      /** 后台覆写值，空串表示没覆写；控制台输入框绑定这个 */
+      textModelOverride: deps.settings.getTextModelOverride(),
+      textModelFromSettings: deps.settings.isTextModelFromSettings(),
     }
   })
 
   app.put('/api/admin/upstream', async (request, reply) => {
     requireAdmin(request)
-    const body = (request.body ?? {}) as { baseUrl?: unknown }
+    const body = (request.body ?? {}) as { baseUrl?: unknown; textModel?: unknown }
     const baseUrl = parseBaseUrl(body.baseUrl)
+
+    // 两项都校验完再落盘，否则模型名不合法时地址已经被写进去一半
+    const textModel = body.textModel === undefined ? undefined : parseTextModel(body.textModel)
+
     await deps.settings.setBaseUrl(baseUrl)
     request.log.info({ baseUrl }, '上游地址已更新')
-    return reply.send({ ok: true, baseUrl })
+
+    // 对话模型是后加的，旧客户端不会传，不能因此报错
+    if (textModel !== undefined) {
+      await deps.settings.setTextModel(textModel)
+      request.log.info({ textModel }, '提示词优化模型已更新')
+    }
+
+    return reply.send({
+      ok: true,
+      baseUrl,
+      textModel: await deps.settings.getTextModel(),
+      textModelOverride: deps.settings.getTextModelOverride(),
+      textModelFromSettings: deps.settings.isTextModelFromSettings(),
+    })
   })
 
   /**

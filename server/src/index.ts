@@ -19,6 +19,7 @@ import { registerFileRoutes } from './routes/files.js'
 import { registerUploadRoutes } from './routes/uploads.js'
 import { registerHistoryRoutes } from './routes/history.js'
 import { registerImageRoutes } from './routes/images.js'
+import { registerPromptRoutes } from './routes/prompts.js'
 import { registerMonitorRoutes } from './routes/monitor.js'
 import { ConcurrencyStore } from './services/concurrency-store.js'
 import { FeedbackStore } from './services/feedback-store.js'
@@ -250,6 +251,7 @@ registerMetaRoutes(app, { concurrency: () => gate.limitCount, settings })
 registerAuthRoutes(app, { users, sessions })
 registerAdminRoutes(app, { users, usage, quotas })
 registerImageRoutes(app, { storage, gate, usage, quotas, settings })
+registerPromptRoutes(app, { settings })
 registerFileRoutes(app, { storage })
 registerUploadRoutes(app, { storage })
 registerStyleRoutes(app, { library: styleLibrary })

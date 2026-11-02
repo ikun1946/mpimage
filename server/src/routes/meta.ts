@@ -21,6 +21,10 @@ export function registerMetaRoutes(
     maxPromptLength: config.maxPromptLength,
     /** 当前允许的最大并行生图数（可在服务端控制台调整）；前端并行数不会超过它 */
     imageConcurrency: deps.concurrency ? deps.concurrency() : config.imageConcurrency,
+    /** 前端据此决定要不要显示 AI 优化入口：没有可用对话模型时 hide */
+    promptOptimize: {
+      textModel: await deps.settings.getTextModel(),
+    },
     defaults: {
       ratio: config.defaultRatio,
       byAssetType: {

@@ -17,6 +17,7 @@ mpimage/
 │   │   │   ├── uploads.ts     POST /api/reference-images（角色面部参考图）
 │   │   │   ├── files.ts       GET  /api/files/*
 │   │   │   ├── meta.ts        GET  /api/config、/api/health
+│   │   │   ├── prompts.ts     POST /api/prompts/optimize（AI 优化提示词）
 │   │   │   ├── auth.ts        登录、登入、当前用户、首次引导
 │   │   │   ├── admin.ts       账号管理、生成统计
 │   │   │   ├── projects.ts    项目增删改查（按账号隔离）
@@ -32,7 +33,8 @@ mpimage/
 │   │   │   ├── usage-store.ts 生图统计与生成记录（含提示词、耗时、图片路径）
 │   │   │   ├── project-store.ts 项目库（项目归属 ownerId）
 │   │   │   ├── style-library.ts 风格库（每账号一份）
-│   │   │   ├── settings-store.ts 运行期设置（上游地址）落盘 settings.json
+│   │   │   ├── settings-store.ts 运行期设置（上游地址、对话模型）落盘 settings.json
+│   │   │   ├── prompt-optimizer.ts 调对话模型扩写提示词
 │   │   │   └── update-checker.ts 版本检查：GitHub Releases / 自定义 JSON，带缓存
 │   │   └── lib/
 │   │       ├── errors.ts      统一错误码
@@ -61,7 +63,7 @@ mpimage/
 │   └── package.json
 ├── desktop/                   Electron：服务控制台 + 主服务进程
 │   ├── main.mjs               窗口、菜单 / 托盘、控制台状态推送、优雅退出
-│   ├── panel.html / panel-preload.cjs    服务控制台（服务、客户端入口、后台管理、维护）
+│   ├── panel.html / panel-preload.cjs    服务控制台（单页：服务状态与启停、账号、上游、限流、反馈、统计）
 │   ├── server.mjs             启停 server/dist/index.js（ELECTRON_RUN_AS_NODE=1），8787 探测与接管
 │   ├── updater.mjs            检查更新、解析直链后按链路自适应单流/并发下载
 │   ├── logs.html / logs-preload.cjs    运行日志窗口（读本地 logs/*.log）
@@ -93,9 +95,11 @@ npm run desktop:dev    # 开发模式直接跑起来
 npm run desktop:build  # 出安装包 + 便携版，产物在 release/
 ```
 
-- **形态**：Electron 外壳，**主窗口就是服务控制台**（`desktop/panel.html`，本地页面）：
-  服务状态与启停 / 重启、客户端地址、「在浏览器打开客户端」、运行日志、检查更新、数据与日志目录、
-  复制管理密钥，以及**后台管理**（账号、待审核、限流与并发、上游、反馈、统计、流量）。
+- **形态**：Electron 外壳，**主窗口就是服务控制台**（`desktop/panel.html`，本地页面）。
+  控制台是**单页**的，不再分页签：顶栏是服务状态与启停 / 重启，第二行直接是客户端地址与
+  「复制地址 / 在浏览器打开」；下面是账号（通栏，待审核收在表头下的一条提示条里）、
+  上游与限流（各占半列）、反馈与统计（各占半列）；最底部一行是运行日志、检查更新、
+  数据与日志目录、复制管理密钥。
   **生图客户端不在桌面端里跑**——一律在浏览器打开 `http://<本机或局域网IP>:8787/batch.html`
 - **启停不依赖网页登录**：主进程用 `desktop/server.mjs` 自己拉起
   `server/dist/index.js`（`ELECTRON_RUN_AS_NODE=1`），控制台与菜单 / 托盘都能启停；
@@ -118,7 +122,7 @@ npm run desktop:build  # 出安装包 + 便携版，产物在 release/
   （密钥保存在 `config.env` 的 `ADMIN_SETUP_KEY`，建好管理员后服务端会忽略它）
 - **配置**：改 `config.env`（`PORT`、`HOST`、`MAGPIE_BASE_URL`、`SESSION_SECRET`、
   `IMAGE_CONCURRENCY` 等）后重启应用生效；桌面端不读 `server/.env`。
-  上游地址、限流、并发这些运行期设置在**控制台的「后台管理」里**改，不必动 `config.env`
+  上游地址、限流、并发这些运行期设置在**控制台的「上游」「限流与并发」卡里**改，不必动 `config.env`
 - **端口占用只剩 8787**：启动前先探测 8787——如果是本应用的服务在跑，直接接管，
   不再拉起第二份；如果被别的程序占用，弹窗说明后退出
 - **退出是优雅的**：先 `POST /api/shutdown`（请求头 `x-shutdown-token`，每次启动随机生成、
@@ -164,10 +168,13 @@ npm run desktop:build  # 出安装包 + 便携版，产物在 release/
 `DESKTOP_TOKEN`（只注入给本机服务，服务端只认回环地址 + 该令牌，令牌不出主进程），
 所以打开就能用，不需要再登录一次。
 
+- **单页布局**：五张卡片铺在 12 列栅格里——账号通栏，上游与限流各占半列，
+  反馈与统计各占半列。卡片按内容定高，展开趋势图或待审核列表只让那张卡自己变高，
+  不会把同一行另一张卡拉长；窗口窄到 880px 以下自动堆成一列
 - **账号**：待审核申请与账号管理。申请来自客户端登录页，带用户名、显示名、申请时间；
   点「通过」后账号**立刻可登录**（`pending` 置否），点「拒绝」删掉该条记录。
-  待审数量直接显示在「账号」页签的小角标上，为 0 时角标隐藏、整段换成一行提示，
-  不再摆一张空表头。账号管理可新建账号、改显示名 / 密码、停用 / 启用、删除
+  待审数量显示在账号卡表头下方那条提示条上（「待审核 2 · alice、bob」，点开才展开列表），
+  为 0 时整条隐藏。账号管理可新建账号、改显示名 / 密码、停用 / 启用、删除
 - **运行配置**：请求限流的开关 + 窗口秒数 + 每窗口最大请求数（超额 429）与生图并发上限 1–8，
   改完**即时生效**，分别落盘到 `data/rate-limit.json`、`data/concurrency.json`；
   下面是上游 Magpie 地址（默认 `http://127.0.0.1:3425`）与「测试连通」——
@@ -221,6 +228,12 @@ POST /api/reference-images
   请求  { name, dataUrl }   data:image/(png|jpeg|webp);base64,...   需要登录
         单张上限 8 MiB（路由 bodyLimit 12 MiB）
   成功  { path, url, width, height, bytes }   201
+
+POST /api/prompts/optimize
+  请求  { prompt, ratio?, referenceCount? }   需要登录
+        ratio 为 config 里的比例 id；referenceCount 为 0–6
+  成功  { prompt, model, tokens: { input, output, total } }
+        由上游对话模型把短描述扩写成完整中文提示词；output/total 缺失时为 null
 
 GET    /api/config      画面比例、原生尺寸、提示词上限、默认值
 GET  /api/health      后端与上游 Magpie 的连通状态
@@ -454,7 +467,7 @@ generated/    图片文件
 
 ## 生图并发闸门
 
-打向上游的生图请求有全局上限（默认 5，范围 1–8），可在**桌面控制台 → 后台管理 → 限流与并发**里运行时调整：
+打向上游的生图请求有全局上限（默认 5，范围 1–8），可在**桌面控制台的「限流与并发」卡**里运行时调整：
 保存后立即生效，写入 `data/concurrency.json`，服务重启后沿用。批量页的「并行数」不会超过它。
 
 - 前端默认并行 5（实测上游约 5 个并发槽），可在批量页 1–8 之间调整；调到 1 即逐张生成。
@@ -510,9 +523,13 @@ generated/    图片文件
 - 生成时把**多张参考图一起直传**给上游 `/v1/images/edits`（每张一个 `image` 字段）；
   提示词留空会用一句默认描述兜底。参考图只记相对路径与地址，刷新后仍在；
   单张 ≤8 MB，仅支持 PNG / JPEG / WebP。
+- **AI 优化提示词**：提示词框右上角有「AI 优化」按钮，把一句简短的中文想法扩写成完整的生图提示词，
+  结果直接写回输入框，可再手动改。接口是 `POST /api/prompts/optimize`（需要登录），
+  由服务端调 Magpie 的对话模型完成；模型在桌面控制台「上游」页改（`MAGPIE_TEXT_MODEL` 只是默认值），
+  超时用 `PROMPT_OPTIMIZE_TIMEOUT_MS`。
 - **改自己的名称**：头像菜单 →「修改名称」可以改自己的**显示名**（登录用的用户名不变）。
   名称在账号库里唯一，重名会被拒绝并给出提示；最多 24 个字，改完头像首字与菜单里的名字立即更新。
-- **关于画境 / 检查更新**：头像菜单 →「关于画境 v1.0.8」显示当前版本，打开时自动检查一次，
+- **关于画境 / 检查更新**：头像菜单 →「关于画境 v1.0.9」显示当前版本，打开时自动检查一次，
   也可点「重新检查」；有新版本时列出更新说明，并给「下载安装包 / 前往发布页」
   （没有直链就只去发布页）。启动 6 秒后还会静默查一次，有更新时头像出现红点、
   菜单项显示「有新版本 vX」；同一标签页 2 小时内不重复检查。桌面端菜单里也有「检查更新…」
@@ -611,6 +628,8 @@ HOST / PORT                后端监听地址与端口（局域网访问设 HOST
 PUBLIC_BASE_URL            对外地址；留空按请求 Host 推断
 MAGPIE_BASE_URL            上游 Magpie 网关，默认 http://127.0.0.1:3425（后台保存过 settings.json 后以文件为准）
 MAGPIE_IMAGE_MODEL         生图模型，默认 codex/gpt-image-2
+MAGPIE_TEXT_MODEL          自由创作「AI 优化提示词」的对话模型，默认 auto/deepseek-v4.1-flash（桌面控制台「上游」页可改）
+PROMPT_OPTIMIZE_TIMEOUT_MS 提示词优化的上游超时，默认 60000
 IMAGE_CONCURRENCY          同时打向上游的生图请求上限，默认 5（1–8）；后台保存过 data/concurrency.json 后以文件为准
 IMAGE_TIMEOUT_MS           单次生成超时，默认 300000
 MAX_PROMPT_LENGTH          提示词上限，默认 12000

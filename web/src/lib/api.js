@@ -46,6 +46,14 @@ export function fetchGenerationJob(jobId) {
   return request(`/api/images/jobs/${encodeURIComponent(jobId)}`, { method: 'GET' })
 }
 
+/** 对话模型扩写提示词：ratio 与参考图张数让模型按实际出图条件写画面 */
+export function optimizePrompt({ prompt, ratio, referenceCount }) {
+  return request('/api/prompts/optimize', {
+    method: 'POST',
+    body: JSON.stringify({ prompt, ratio, referenceCount }),
+  })
+}
+
 export function fetchServerConfig() {
   return request('/api/config', { method: 'GET' })
 }

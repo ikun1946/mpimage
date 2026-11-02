@@ -31,6 +31,7 @@ import {
   generateImage,
   getUpdateStatus,
   logout,
+  optimizePrompt,
   updateMyProfile,
   saveStyleLibrary,
   submitFeedback,
@@ -259,6 +260,7 @@ import { setupTablist } from '../lib/tabs.js'
       freeDownload: document.querySelector('#free-download'),
       freeMaximize: document.querySelector('#free-maximize'),
       freePromptMaximize: document.querySelector('#free-prompt-maximize'),
+      freePromptOptimize: document.querySelector('#free-prompt-optimize'),
       freePromptCopy: document.querySelector('#free-prompt-copy'),
       freePromptShell: document.querySelector('#free-prompt-shell'),
       freeRefStack: document.querySelector('#free-ref-stack'),
@@ -562,10 +564,22 @@ import { setupTablist } from '../lib/tabs.js'
       return state.assets.find(asset => asset.id === id)
     }
 
-    function showToast(message, isError = false) {
+    function showToast(message, isError = false, action = null) {
       window.clearTimeout(toastTimer)
+      // textContent 赋值同时清掉上一次的按钮，旧回调随节点一起失效，不会残留
       dom.toast.textContent = message
       dom.toast.classList.toggle('error', isError)
+      if (action) {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = 'toast-action'
+        button.textContent = action.label
+        button.addEventListener('click', () => {
+          dom.toast.classList.remove('visible')
+          action.onClick()
+        })
+        dom.toast.append(button)
+      }
       dom.toast.classList.add('visible')
       toastTimer = window.setTimeout(() => dom.toast.classList.remove('visible'), 3600)
     }
@@ -2871,6 +2885,55 @@ import { setupTablist } from '../lib/tabs.js'
       editorText.setSelectionRange(editorText.value.length, editorText.value.length)
     }
 
+    /** 只留最近一次优化前的文本：连续优化时撤销退回上一步，不堆栈 */
+    let freePromptBeforeOptimize = ''
+
+    /** 提示词写回输入框时要同时照顾字数与本地快照，避免刷新后回退 */
+    function applyFreePrompt(value) {
+      dom.freePrompt.value = value
+      state.freePrompt = value
+      dom.freeCount.textContent = String(value.length)
+      persistSoon()
+    }
+
+    /** 用对话模型把一句短描述扩写成完整生图提示词；失败时原样保留用户输入 */
+    async function optimizeFreePrompt() {
+      const current = dom.freePrompt.value.trim()
+      if (!current) {
+        showToast('先写一点画面描述，AI 才能帮你扩写')
+        return
+      }
+
+      // 请求期间锁住按钮，避免连点发起多次付费请求
+      dom.freePromptOptimize.disabled = true
+      dom.freePromptOptimize.classList.add('is-busy')
+      dom.freePromptOptimize.setAttribute('aria-busy', 'true')
+      try {
+        const result = await optimizePrompt({
+          prompt: current,
+          ratio: dom.freeRatio.value,
+          referenceCount: state.freeReferences.length,
+        })
+        const next = (result?.prompt || '').trim()
+        if (!next) {
+          showToast('提示词优化失败，请稍后重试', true)
+          return
+        }
+        freePromptBeforeOptimize = dom.freePrompt.value
+        applyFreePrompt(next)
+        showToast('提示词已优化', false, {
+          label: '撤销',
+          onClick: () => applyFreePrompt(freePromptBeforeOptimize),
+        })
+      } catch (error) {
+        showToast(error.message || '提示词优化失败，请稍后重试', true)
+      } finally {
+        dom.freePromptOptimize.disabled = false
+        dom.freePromptOptimize.classList.remove('is-busy')
+        dom.freePromptOptimize.removeAttribute('aria-busy')
+      }
+    }
+
     /* ===== 断线恢复：刷新页面后接回仍在后台生成的图片 =====
        提交前先生成 jobId 存到本地；页面若被刷新，重新载入时凭 jobId
        轮询服务端任务状态，拿到结果后照常渲染。
@@ -3621,7 +3684,7 @@ import { setupTablist } from '../lib/tabs.js'
         if (state.freeImageUrl) openLightbox(state.freeImageUrl, '自由创作生成图')
       })
 
-      // 提示词悬浮工具：复制 + 最大化编辑器（与单张工作台同款）
+      // 提示词悬浮工具：复制 + AI 优化 + 最大化编辑器（与单张工作台同款）
       dom.freePromptCopy.addEventListener('click', async () => {
         const value = dom.freePrompt.value
         if (!value) {
@@ -3640,6 +3703,7 @@ import { setupTablist } from '../lib/tabs.js'
       })
 
       dom.freePromptMaximize.addEventListener('click', () => openFreePromptEditor())
+      dom.freePromptOptimize.addEventListener('click', optimizeFreePrompt)
 
       /* ===== 自由创作参考图：粘贴 / 拖入追加（可多张），点图看大图，右上角删除 ===== */
       const freeShell = dom.freePromptShell
@@ -4033,6 +4097,9 @@ import { setupTablist } from '../lib/tabs.js'
           serverConfig = config
           renderActivePanel()
           renderRatioSelects()
+          // 没配文本模型时不亮出按钮，省得点了才发现用不了
+          const textModel = config?.promptOptimize?.textModel
+          if (textModel) dom.freePromptOptimize.hidden = false
         })
         .catch(() => {})
     }

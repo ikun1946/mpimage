@@ -12,6 +12,8 @@
   right: 10px;
   display: flex;
   gap: 6px;
+  /* 自由创作的文本框为了压住参考图设了 z-index:1，工具条不抬层级就会被它盖住点不到 */
+  z-index: 3;
   /* 默认隐藏，鼠标靠近提示词框时浮现 */
   opacity: 0;
   transform: translateY(-4px);
@@ -63,6 +65,11 @@
   stroke-width: 2;
 }
 
+/* 上面的 display 会盖掉 UA 给 [hidden] 的 display:none，这里显式压回去 */
+.prompt-float-button[hidden] {
+  display: none;
+}
+
 .prompt-float-button:hover {
   transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.9);
@@ -73,6 +80,29 @@
 
 .prompt-float-button:active {
   transform: translateY(0);
+}
+
+/* 禁用态压过 hover 的上移与高亮，避免看起来还能点 */
+.prompt-float-button:disabled {
+  cursor: progress;
+  opacity: 0.66;
+}
+
+.prompt-float-button:disabled:hover,
+.prompt-float-button:disabled:active {
+  transform: none;
+  border-color: rgba(255, 255, 255, 0.66);
+}
+
+/* 转的是图标本身，按钮尺寸不变，不会让一排按钮跳动 */
+.prompt-float-button.is-busy svg {
+  animation: prompt-tool-spin 900ms linear infinite;
+}
+
+@keyframes prompt-tool-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ===== 提示词最大化编辑器 ===== */

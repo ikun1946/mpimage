@@ -355,42 +355,71 @@
     font-size: 12px;
   }
 
-  /* ---------- 主体 ---------- */
+  /* ---------- 主体：12 列栅格 ---------- */
 
-  .stack {
-    display: flex;
-    flex-direction: column;
+  /* 只挂主容器：SVG 折线图里的 <line class="grid"> 也用同名类 */
+  main.grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    /* 卡片按内容定高：某张卡展开时，同一行左边的卡不被一起拉高 */
+    align-items: start;
     gap: 12px;
     width: 100%;
-    max-width: 980px;
+    max-width: 1320px;
     margin: 0 auto;
-    padding: 14px 20px 4px;
+    padding: 12px 16px 20px;
   }
 
-  .stack > * {
-    min-width: 0;
+  .span-12 {
+    grid-column: span 12;
+  }
+
+  .span-7 {
+    grid-column: span 7;
+  }
+
+  .span-6 {
+    grid-column: span 6;
+  }
+
+  .span-5 {
+    grid-column: span 5;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .card {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
-    padding: 14px 16px 16px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
+    padding: 12px 14px 14px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
     background: var(--surface);
-    box-shadow: var(--shadow-soft);
+    box-shadow: var(--shadow);
   }
 
   .card-head {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    gap: 8px 10px;
+    align-items: center;
+    gap: 6px 8px;
     margin-bottom: 10px;
   }
 
   .card-head h2 {
     margin: 0;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.06em;
     color: var(--ink-soft);
@@ -401,30 +430,40 @@
     font-size: 11.5px;
   }
 
-  .card-head .spacer {
-    flex: 1;
+  .head-actions {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
   }
 
-  /* ---------- 客户端入口 ---------- */
+  .card-head .segmented {
+    margin-left: auto;
+  }
+
+  /* ---------- 顶栏两行 ---------- */
 
   .url-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 10px;
+    gap: 6px 8px;
+    min-width: 0;
   }
 
   .url {
-    flex: 1 1 320px;
+    flex: 1 1 auto;
     min-width: 0;
-    padding: 7px 10px;
+    overflow: hidden;
+    padding: 6px 10px;
     border: 1px solid var(--line-soft);
-    border-radius: var(--radius-sm);
-    background: var(--surface-raised);
+    border-radius: 8px;
+    background: var(--surface-subtle);
     color: var(--ink);
     font-family: var(--font-mono);
-    font-size: 12.5px;
-    word-break: break-all;
+    font-size: 12px;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     user-select: text;
     cursor: text;
   }
@@ -436,99 +475,82 @@
 
   .url-actions {
     display: flex;
+    flex: none;
     gap: 6px;
   }
 
   .url-hint {
-    margin: 6px 0 0;
+    margin: 0;
     color: var(--ink-faint);
     font-size: 11.5px;
   }
 
   .setup {
     display: flex;
+    flex: none;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 12px;
-    margin-top: 10px;
-    padding: 8px 10px;
+    gap: 6px 10px;
+    padding: 3px 8px;
     border-radius: var(--radius-sm);
     background: var(--gold-tint);
     color: var(--gold);
-    font-size: 12px;
+    font-size: 11.5px;
   }
 
   .setup span {
-    flex: 1 1 260px;
+    flex: 1 1 auto;
   }
 
-  /* ---------- 页签 ---------- */
+  /* ---------- 待审核条 ---------- */
 
-  .tabs {
+  .pending-bar {
     display: flex;
-    gap: 2px;
-    padding: 3px;
-    margin-bottom: 12px;
-    border: 1px solid var(--line-soft);
-    border-radius: var(--radius-pill);
-    background: var(--surface-subtle);
-    overflow-x: auto;
-  }
-
-  .tab {
-    flex: none;
-    padding: 5px 13px;
-    border: 0;
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--ink-soft);
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 5px 9px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 8px;
+    background: var(--gold-tint);
+    color: var(--gold);
     font-family: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
+    font-size: 11.5px;
+    text-align: left;
     cursor: pointer;
   }
 
-  .tab:hover {
-    color: var(--ink);
+  .pending-bar:hover {
+    border-color: var(--gold);
   }
 
-  .tab[aria-selected="true"] {
-    background: var(--surface-raised);
-    color: var(--ink);
-    box-shadow: var(--shadow-soft);
+  .pending-bar .count {
+    color: inherit;
+    opacity: 0.9;
   }
 
-  .tab:focus-visible {
-    outline: 2px solid var(--moss);
-    outline-offset: 1px;
+  .pending-bar .chevron {
+    margin-left: auto;
+    transition: transform 140ms cubic-bezier(0.2, 0.75, 0.2, 1);
   }
 
-  .panel-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 10px;
-    margin-bottom: 8px;
+  .pending-bar[aria-expanded="true"] .chevron {
+    transform: rotate(180deg);
   }
 
-  .panel-head h3,
-  .panel-head h4 {
-    margin: 0;
-    font-size: 12.5px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+  .pending-list[hidden] {
+    display: none;
   }
 
-  .panel-head .count,
+  .pending-list {
+    margin-bottom: 10px;
+  }
+
   .count {
     color: var(--ink-faint);
     font-size: 11.5px;
     font-weight: 400;
-  }
-
-  .panel-head .spacer {
-    flex: 1;
   }
 
   .segmented {
@@ -673,15 +695,13 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 12px;
-    padding: 8px 10px;
-    border: 1px solid var(--line-soft);
-    border-radius: var(--radius-sm);
-    background: var(--surface-raised);
+    gap: 6px 10px;
+    padding: 6px 2px;
+    border-top: 1px solid var(--line-soft);
   }
 
-  .reg + .reg {
-    margin-top: 6px;
+  .reg:first-child {
+    border-top: 0;
   }
 
   .reg-main {
@@ -689,7 +709,7 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: 4px 8px;
-    flex: 1 1 280px;
+    flex: 1 1 240px;
     min-width: 0;
   }
 
@@ -713,7 +733,7 @@
   }
 
   .form-row .grow {
-    flex: 1 1 300px;
+    flex: 1 1 180px;
   }
 
   .form-row label,
@@ -808,118 +828,194 @@
     letter-spacing: 0.04em;
   }
 
-  /* ---------- 反馈 ---------- */
+  /* ---------- 反馈：紧凑列表 ---------- */
 
   .fb-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
   }
 
   .fb {
-    padding: 9px 11px;
-    border: 1px solid var(--line-soft);
-    border-radius: var(--radius-sm);
-    background: var(--surface-raised);
-  }
-
-  .fb-head {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 8px;
-    margin-bottom: 4px;
-    font-size: 11.5px;
-    color: var(--ink-faint);
+    align-items: flex-start;
+    gap: 8px;
+    padding: 9px 0;
+    border-top: 1px solid var(--line-soft);
   }
 
-  .fb-head strong {
-    color: var(--ink);
-    font-size: 12px;
+  .fb:first-child {
+    padding-top: 2px;
+    border-top: 0;
   }
 
-  .fb-head .grow {
+  .fb-main {
+    min-width: 0;
     flex: 1;
   }
 
-  .fb-body {
+  .fb-title {
     margin: 0;
     color: var(--ink);
-    font-size: 12.5px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-word;
   }
 
   .fb-meta {
-    margin: 4px 0 0;
+    margin: 2px 0 0;
     color: var(--ink-faint);
-    font-size: 11px;
+    font-size: 10.5px;
+    line-height: 1.45;
+    word-break: break-word;
+  }
+
+  .fb-side {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
   }
 
   /* ---------- 统计 ---------- */
 
-  .stats {
+  .stat-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 8px;
-    margin-bottom: 14px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0 0 10px;
+    padding: 7px 0 6px;
+    border-top: 1px solid var(--line-soft);
+    border-bottom: 1px solid var(--line-soft);
   }
 
   .stat {
-    padding: 10px 12px;
-    border: 1px solid var(--line-soft);
-    border-radius: var(--radius-md);
-    background: var(--surface-raised);
+    min-width: 0;
+    padding: 0 10px 0 0;
+  }
+
+  .stat + .stat {
+    padding-left: 10px;
+    border-left: 1px solid var(--line-soft);
   }
 
   .stat dt {
     margin: 0;
     color: var(--ink-faint);
-    font-size: 11px;
+    font-size: 10.5px;
     letter-spacing: 0.04em;
   }
 
   .stat dd {
-    margin: 2px 0 0;
+    margin: 1px 0 0;
+    overflow: hidden;
     font-family: var(--font-mono);
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
     color: var(--ink);
-    word-break: break-word;
+    /* 四块并排时列很窄：宁可省略，也不要把数字从中间拆行 */
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .stat .sub {
     display: block;
-    margin-top: 2px;
+    overflow: hidden;
+    margin-top: 1px;
     color: var(--ink-faint);
     font-family: var(--font-body);
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 半宽卡里六个指标要挤在一屏，标签和值同一行才省地方 */
+  .sub-title {
+    display: block;
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
   }
 
   .monitor {
     display: grid;
-    grid-template-columns: minmax(64px, auto) 1fr;
-    gap: 6px 12px;
-    margin: 0 0 14px;
-    padding: 10px 12px;
-    border: 1px solid var(--line-soft);
-    border-radius: var(--radius-md);
-    background: var(--surface-raised);
-    font-size: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px 10px;
+    margin: 6px 0 0;
+    padding: 0;
+  }
+
+  .monitor > div {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
   }
 
   .monitor dt {
+    flex: none;
     margin: 0;
     color: var(--ink-faint);
-    font-size: 11.5px;
+    font-size: 10.5px;
+    white-space: nowrap;
   }
 
   .monitor dd {
     margin: 0;
+    overflow: hidden;
     font-family: var(--font-mono);
-    font-size: 11.5px;
-    word-break: break-word;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .trend {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .trend-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+  }
+
+  .trend-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink-soft);
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .trend-toggle:hover {
+    color: var(--ink);
+  }
+
+  .trend-toggle svg {
+    width: 11px;
+    height: 11px;
+    transition: transform 140ms cubic-bezier(0.2, 0.75, 0.2, 1);
+  }
+
+  .trend-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+  }
+
+  .trend-head .segmented {
+    margin-left: auto;
   }
 
   .chart {
@@ -964,15 +1060,28 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: 4px 10px;
-    margin: 0 0 6px;
+    margin: 4px 0 6px;
   }
 
-  /* ---------- 维护 ---------- */
+  .chart[hidden] {
+    display: none;
+  }
 
-  .maint-row {
+  /* ---------- 底部维护条 ---------- */
+
+  .tools {
     display: flex;
+    grid-column: 1 / -1;
     flex-wrap: wrap;
-    gap: 6px;
+    align-items: center;
+    gap: 6px 8px;
+    padding: 0 2px;
+  }
+
+  .tools .line-result {
+    flex: 1 1 220px;
+    min-width: 0;
+    margin: 0;
   }
 
   /* ---------- 页脚 ---------- */
@@ -983,9 +1092,9 @@
     align-items: baseline;
     gap: 4px 10px;
     width: 100%;
-    max-width: 980px;
+    max-width: 1320px;
     margin: 0 auto;
-    padding: 6px 20px 18px;
+    padding: 0 16px 18px;
     color: var(--ink-faint);
     font-size: 11.5px;
   }
@@ -1043,36 +1152,38 @@
     font-size: 11px;
   }
 
+  .form-row + .hint {
+    margin: 8px 0 0;
+  }
+
   /* ---------- 窄窗口 ---------- */
 
-  @media (max-width: 720px) {
+  @media (max-width: 880px) {
     .masthead {
       padding: 10px 14px 8px;
     }
 
-    .stack {
-      padding: 12px 14px 4px;
+    main.grid {
+      padding: 12px 14px 16px;
     }
 
     .foot {
-      padding: 6px 14px 16px;
+      padding: 0 14px 16px;
     }
 
-    .brand {
-      width: 100%;
-      margin-right: 0;
+    .span-12,
+    .span-7,
+    .span-6,
+    .span-5 {
+      grid-column: span 12;
     }
 
     .service {
       flex: 1 1 auto;
     }
 
-    .service-meta {
-      display: none;
-    }
-
-    table {
-      min-width: 660px;
+    .brand {
+      margin-right: 0;
     }
   }
 </style>
@@ -1096,200 +1207,200 @@
       <button class="button" type="button" id="btn-restart">重启</button>
     </div>
   </div>
-  <p class="line-result" id="service-result" role="status" aria-live="polite"></p>
-</header>
-
-<main class="stack">
-  <section class="card" aria-labelledby="client-title">
-    <div class="card-head">
-      <h2 id="client-title">客户端入口</h2>
-      <span class="card-note">生图只在浏览器里进行</span>
+  <div class="url-row" role="group" aria-labelledby="client-title">
+    <span class="sr-only" id="client-title">客户端地址</span>
+    <code class="url is-empty" id="client-url" tabindex="0">服务启动后在这里显示客户端地址</code>
+    <div class="url-actions">
+      <button class="button mini" type="button" id="btn-copy-url">复制地址</button>
+      <button class="button mini" type="button" id="btn-open-client">在浏览器打开</button>
     </div>
-    <div class="url-row">
-      <code class="url is-empty" id="client-url" tabindex="0">服务启动后在这里显示客户端地址</code>
-      <div class="url-actions">
-        <button class="button" type="button" id="btn-open-client">在浏览器打开</button>
-        <button class="button" type="button" id="btn-copy-url">复制地址</button>
-      </div>
-    </div>
-    <p class="url-hint" id="url-label">还没有可用的地址</p>
     <div class="setup" id="setup-hint" hidden>
       <span>账号库还是空的，先去浏览器完成初始化。</span>
       <button class="button mini primary" type="button" id="btn-setup">去初始化</button>
     </div>
-  </section>
+  </div>
+  <p class="url-hint" id="url-label">还没有可用的地址</p>
+  <p class="line-result" id="service-result" role="status" aria-live="polite"></p>
+  <p class="flash" id="admin-flash" role="status" aria-live="polite" hidden></p>
+</header>
 
-  <section class="card" aria-labelledby="admin-title">
+<h1 class="sr-only" id="admin-title">后台管理</h1>
+
+<main class="grid">
+  <section class="card span-12" aria-labelledby="accounts-title">
     <div class="card-head">
-      <h2 id="admin-title">后台管理</h2>
+      <h2 id="accounts-title">账号</h2>
       <span class="card-note">改动直接打到本机服务，立即生效</span>
-    </div>
-    <p class="flash" id="admin-flash" role="status" aria-live="polite" hidden></p>
-    <div class="tabs" role="tablist" aria-label="后台管理分区">
-      <button class="tab" type="button" role="tab" id="tab-users" data-tab="users" aria-controls="panel-users" aria-selected="true" tabindex="0">账号</button>
-      <button class="tab" type="button" role="tab" id="tab-regs" data-tab="regs" aria-controls="panel-regs" aria-selected="false" tabindex="-1">待审核</button>
-      <button class="tab" type="button" role="tab" id="tab-limits" data-tab="limits" aria-controls="panel-limits" aria-selected="false" tabindex="-1">限流与并发</button>
-      <button class="tab" type="button" role="tab" id="tab-upstream" data-tab="upstream" aria-controls="panel-upstream" aria-selected="false" tabindex="-1">上游</button>
-      <button class="tab" type="button" role="tab" id="tab-feedback" data-tab="feedback" aria-controls="panel-feedback" aria-selected="false" tabindex="-1">反馈</button>
-      <button class="tab" type="button" role="tab" id="tab-stats" data-tab="stats" aria-controls="panel-stats" aria-selected="false" tabindex="-1">统计</button>
-    </div>
-
-    <div class="tabpanel" id="panel-users" role="tabpanel" data-panel="users" aria-labelledby="tab-users">
-      <div class="panel-head">
-        <h3>账号</h3>
-        <span class="spacer"></span>
-        <button class="button mini" type="button" id="btn-users-refresh">刷新</button>
+      <div class="head-actions">
+        <button class="button mini" type="button" id="btn-users-refresh">刷新账号</button>
+        <button class="button mini" type="button" id="btn-regs-refresh">刷新待审核</button>
         <button class="button mini primary" type="button" id="btn-new-user">新建账号</button>
       </div>
-      <div class="notice" id="users-notice" hidden></div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">用户名</th>
-              <th scope="col">显示名</th>
-              <th scope="col">角色</th>
-              <th scope="col">状态</th>
-              <th scope="col" class="num">今日生图</th>
-              <th scope="col">每日额度</th>
-              <th scope="col" class="actions">操作</th>
-            </tr>
-          </thead>
-          <tbody id="users-body"></tbody>
-        </table>
-      </div>
-      <p class="empty" id="users-empty" hidden>账号库还是空的。用「新建账号」创建一个，或到浏览器登录页完成初始化。</p>
     </div>
 
-    <div class="tabpanel" id="panel-regs" role="tabpanel" data-panel="regs" aria-labelledby="tab-regs" hidden>
-      <div class="panel-head">
-        <h3>待审核 <span class="count" id="regs-count"></span></h3>
-        <span class="spacer"></span>
-        <button class="button mini" type="button" id="btn-regs-refresh">刷新</button>
-      </div>
+    <button class="pending-bar" type="button" id="pending-toggle" aria-expanded="false" aria-controls="pending-list">
+      <span>待审核</span>
+      <span class="count" id="regs-count"></span>
+      <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <path d="M4 6.5 8 10.5 12 6.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
+    <div class="pending-list" id="pending-list" hidden>
       <div class="notice" id="regs-notice" hidden></div>
       <div id="regs-list"></div>
       <p class="empty" id="regs-empty" hidden>没有待审核的申请</p>
     </div>
 
-    <div class="tabpanel" id="panel-limits" role="tabpanel" data-panel="limits" aria-labelledby="tab-limits" hidden>
-      <div class="panel-head">
-        <h3>限流与并发</h3>
-        <span class="spacer"></span>
-        <button class="button mini" type="button" id="btn-limits-refresh">刷新</button>
-      </div>
-      <div class="notice" id="limits-notice" hidden></div>
-      <div class="block">
-        <h4>请求限流</h4>
-        <div class="form-row">
-          <label class="check"><input type="checkbox" id="rl-enabled" /> 启用限流</label>
-          <label>窗口（秒）<input type="number" id="rl-window" min="1" max="3600" step="1" inputmode="numeric" /></label>
-          <label>每窗口最大请求数<input type="number" id="rl-max" min="1" max="100000" step="1" inputmode="numeric" /></label>
-          <button class="button primary" type="button" id="rl-save">保存</button>
-        </div>
-        <p class="current" id="rl-current">读取中…</p>
-      </div>
-      <div class="block">
-        <h4>生图并发</h4>
-        <div class="form-row">
-          <label>同时生图上限
-            <select id="cc-limit">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-            </select>
-          </label>
-          <button class="button primary" type="button" id="cc-save">保存</button>
-        </div>
-        <p class="current" id="cc-current">读取中…</p>
-      </div>
+    <div class="notice" id="users-notice" hidden></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">用户名</th>
+            <th scope="col">显示名</th>
+            <th scope="col">角色</th>
+            <th scope="col">状态</th>
+            <th scope="col" class="num">今日生图</th>
+            <th scope="col">每日额度</th>
+            <th scope="col" class="actions">操作</th>
+          </tr>
+        </thead>
+        <tbody id="users-body"></tbody>
+      </table>
     </div>
+    <p class="empty" id="users-empty" hidden>账号库还是空的。用「新建账号」创建一个，或到浏览器登录页完成初始化。</p>
+  </section>
 
-    <div class="tabpanel" id="panel-upstream" role="tabpanel" data-panel="upstream" aria-labelledby="tab-upstream" hidden>
-      <div class="panel-head">
-        <h3>上游</h3>
-        <span class="spacer"></span>
+  <section class="card span-6" aria-labelledby="upstream-title">
+    <div class="card-head">
+      <h2 id="upstream-title">上游</h2>
+      <div class="head-actions">
         <button class="button mini" type="button" id="btn-upstream-refresh">刷新</button>
       </div>
-      <div class="notice" id="upstream-notice" hidden></div>
+    </div>
+    <div class="notice" id="upstream-notice" hidden></div>
+    <div class="form-row">
+      <label class="grow">上游地址
+        <input type="url" id="upstream-url" placeholder="http://127.0.0.1:3425" spellcheck="false" autocomplete="off" />
+      </label>
+      <button class="button" type="button" id="upstream-test">测试连通</button>
+      <button class="button primary" type="button" id="upstream-save">保存</button>
+    </div>
+    <div class="form-row">
+      <label class="grow">提示词优化模型
+        <input type="text" id="upstream-text-model" placeholder="auto/deepseek-v4.1-flash" spellcheck="false" autocomplete="off" />
+      </label>
+    </div>
+    <p class="hint">用于自由创作的 AI 优化提示词，需与上面地址是同一个网关；留空表示使用环境变量默认值。</p>
+    <p class="current" id="upstream-meta">读取中…</p>
+    <p class="current" id="upstream-result"></p>
+  </section>
+
+  <section class="card span-6" aria-labelledby="limits-title">
+    <div class="card-head">
+      <h2 id="limits-title">限流与并发</h2>
+      <div class="head-actions">
+        <button class="button mini" type="button" id="btn-limits-refresh">刷新</button>
+      </div>
+    </div>
+    <div class="notice" id="limits-notice" hidden></div>
+    <div class="block">
+      <h4>请求限流</h4>
       <div class="form-row">
-        <label class="grow">上游地址
-          <input type="url" id="upstream-url" placeholder="http://127.0.0.1:3425" spellcheck="false" autocomplete="off" />
+        <label class="check"><input type="checkbox" id="rl-enabled" /> 启用限流</label>
+        <label>窗口（秒）<input type="number" id="rl-window" min="1" max="3600" step="1" inputmode="numeric" /></label>
+        <label>每窗口最大请求数<input type="number" id="rl-max" min="1" max="100000" step="1" inputmode="numeric" /></label>
+        <button class="button primary" type="button" id="rl-save">保存</button>
+      </div>
+      <p class="current" id="rl-current">读取中…</p>
+    </div>
+    <div class="block">
+      <h4>生图并发</h4>
+      <div class="form-row">
+        <label>同时生图上限
+          <select id="cc-limit">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+          </select>
         </label>
-        <button class="button" type="button" id="upstream-test">测试连通</button>
-        <button class="button primary" type="button" id="upstream-save">保存</button>
+        <button class="button primary" type="button" id="cc-save">保存</button>
       </div>
-      <p class="current" id="upstream-meta">读取中…</p>
-      <p class="current" id="upstream-result"></p>
+      <p class="current" id="cc-current">读取中…</p>
     </div>
+  </section>
 
-    <div class="tabpanel" id="panel-feedback" role="tabpanel" data-panel="feedback" aria-labelledby="tab-feedback" hidden>
-      <div class="panel-head">
-        <h3>反馈 <span class="count" id="feedback-count"></span></h3>
-        <span class="spacer"></span>
-        <div class="segmented" role="group" aria-label="反馈筛选">
-          <button class="seg" type="button" data-filter="all" aria-pressed="true">全部</button>
-          <button class="seg" type="button" data-filter="new" aria-pressed="false">未处理</button>
-          <button class="seg" type="button" data-filter="resolved" aria-pressed="false">已处理</button>
-        </div>
+  <section class="card span-6" aria-labelledby="feedback-title">
+    <div class="card-head">
+      <h2 id="feedback-title">反馈</h2>
+      <span class="count" id="feedback-count"></span>
+      <div class="segmented" role="group" aria-label="反馈筛选">
+        <button class="seg" type="button" data-filter="all" aria-pressed="true">全部</button>
+        <button class="seg" type="button" data-filter="new" aria-pressed="false">未处理</button>
+        <button class="seg" type="button" data-filter="resolved" aria-pressed="false">已处理</button>
       </div>
-      <div class="notice" id="feedback-notice" hidden></div>
-      <div class="fb-list" id="feedback-list"></div>
-      <p class="empty" id="feedback-empty" hidden>没有反馈</p>
     </div>
+    <div class="notice" id="feedback-notice" hidden></div>
+    <div class="fb-list" id="feedback-list"></div>
+    <p class="empty" id="feedback-empty" hidden>没有反馈</p>
+  </section>
 
-    <div class="tabpanel" id="panel-stats" role="tabpanel" data-panel="stats" aria-labelledby="tab-stats" hidden>
-      <div class="panel-head">
-        <h3>统计</h3>
-        <span class="spacer"></span>
+  <section class="card span-6" aria-labelledby="stats-title">
+    <div class="card-head">
+      <h2 id="stats-title">统计</h2>
+      <span class="card-note">本机累计</span>
+      <div class="head-actions">
         <button class="button mini" type="button" id="btn-stats-refresh">刷新</button>
       </div>
-      <div class="notice" id="stats-notice" hidden></div>
-      <dl class="stats">
-        <div class="stat">
-          <dt>累计生成</dt>
-          <dd id="stat-total">—</dd>
-          <span class="sub" id="stat-total-sub"></span>
-        </div>
-        <div class="stat">
-          <dt>参与账号</dt>
-          <dd id="stat-accounts">—</dd>
-          <span class="sub" id="stat-accounts-sub"></span>
-        </div>
-        <div class="stat">
-          <dt>占用空间</dt>
-          <dd id="stat-bytes">—</dd>
-          <span class="sub" id="stat-bytes-sub"></span>
-        </div>
-        <div class="stat">
-          <dt>Token 合计</dt>
-          <dd id="stat-tokens">—</dd>
-          <span class="sub" id="stat-tokens-sub"></span>
-        </div>
-      </dl>
-      <h4>服务流量</h4>
+    </div>
+    <div class="notice" id="stats-notice" hidden></div>
+    <dl class="stat-grid">
+      <div class="stat">
+        <dt>累计生成</dt>
+        <dd id="stat-total">—</dd>
+        <span class="sub" id="stat-total-sub"></span>
+      </div>
+      <div class="stat">
+        <dt>参与账号</dt>
+        <dd id="stat-accounts">—</dd>
+        <span class="sub" id="stat-accounts-sub"></span>
+      </div>
+      <div class="stat">
+        <dt>占用空间</dt>
+        <dd id="stat-bytes">—</dd>
+        <span class="sub" id="stat-bytes-sub"></span>
+      </div>
+      <div class="stat">
+        <dt>Token 合计</dt>
+        <dd id="stat-tokens">—</dd>
+        <span class="sub" id="stat-tokens-sub"></span>
+      </div>
+    </dl>
+    <div class="traffic">
+      <p class="sub-title">服务流量</p>
       <dl class="monitor">
-        <dt>累计请求</dt>
-        <dd id="mon-requests">—</dd>
-        <dt>累计流量</dt>
-        <dd id="mon-traffic">—</dd>
-        <dt>运行时间</dt>
-        <dd id="mon-uptime">—</dd>
-        <dt>限流</dt>
-        <dd id="mon-rate">—</dd>
-        <dt>生图队列</dt>
-        <dd id="mon-queue">—</dd>
-        <dt>主机</dt>
-        <dd id="mon-host">—</dd>
+        <div><dt>累计请求</dt><dd id="mon-requests">—</dd></div>
+        <div><dt>累计流量</dt><dd id="mon-traffic">—</dd></div>
+        <div><dt>运行时间</dt><dd id="mon-uptime">—</dd></div>
+        <div><dt>限流</dt><dd id="mon-rate">—</dd></div>
+        <div><dt>生图队列</dt><dd id="mon-queue">—</dd></div>
+        <div><dt>主机</dt><dd id="mon-host">—</dd></div>
       </dl>
-      <div class="panel-head">
-        <h4>生图趋势</h4>
-        <span class="spacer"></span>
+    </div>
+    <div class="trend">
+      <div class="trend-head">
+        <span class="sub-title">生图趋势</span>
+        <button class="trend-toggle" type="button" id="trend-toggle" aria-expanded="false" aria-controls="trend-chart">
+          <span id="trend-toggle-text">展开趋势</span>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+            <path d="M4 6.5 8 10.5 12 6.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
         <div class="segmented" role="group" aria-label="趋势区间">
           <button class="seg" type="button" data-range="today" aria-pressed="false">今天</button>
           <button class="seg" type="button" data-range="7d" aria-pressed="true">七天</button>
@@ -1302,23 +1413,19 @@
         <span class="count" id="trend-total"></span>
         <span class="count" id="trend-hint" hidden></span>
       </p>
-      <div class="chart" id="trend-chart"></div>
+      <div class="chart" id="trend-chart" hidden></div>
     </div>
   </section>
 
-  <section class="card" aria-labelledby="maint-title">
-    <div class="card-head">
-      <h2 id="maint-title">维护</h2>
-    </div>
-    <div class="maint-row">
-      <button class="button" type="button" id="btn-logs">运行日志…</button>
-      <button class="button" type="button" id="btn-update">检查更新…</button>
-      <button class="button" type="button" id="btn-open-data">打开数据目录</button>
-      <button class="button" type="button" id="btn-open-logs">打开日志目录</button>
-      <button class="button" type="button" id="btn-copy-key">复制管理密钥</button>
-    </div>
+  <div class="tools" role="group" aria-labelledby="maint-title">
+    <span class="sr-only" id="maint-title">维护</span>
+    <button class="button mini" type="button" id="btn-logs">运行日志…</button>
+    <button class="button mini" type="button" id="btn-update">检查更新…</button>
+    <button class="button mini" type="button" id="btn-open-data">打开数据目录</button>
+    <button class="button mini" type="button" id="btn-open-logs">打开日志目录</button>
+    <button class="button mini" type="button" id="btn-copy-key">复制管理密钥</button>
     <p class="line-result" id="maint-result" role="status" aria-live="polite"></p>
-  </section>
+  </div>
 </main>
 
 <footer class="foot">
@@ -1375,8 +1482,8 @@
     setupHint: $('setup-hint'),
     btnSetup: $('btn-setup'),
     adminFlash: $('admin-flash'),
-    tabs: Array.from(document.querySelectorAll('.tab')),
-    panels: Array.from(document.querySelectorAll('.tabpanel')),
+    pendingToggle: $('pending-toggle'),
+    pendingList: $('pending-list'),
     usersNotice: $('users-notice'),
     usersBody: $('users-body'),
     usersEmpty: $('users-empty'),
@@ -1400,6 +1507,7 @@
     upstreamNotice: $('upstream-notice'),
     btnUpstreamRefresh: $('btn-upstream-refresh'),
     upstreamUrl: $('upstream-url'),
+    upstreamTextModel: $('upstream-text-model'),
     upstreamTest: $('upstream-test'),
     upstreamSave: $('upstream-save'),
     upstreamMeta: $('upstream-meta'),
@@ -1429,6 +1537,8 @@
     trendTotal: $('trend-total'),
     trendHint: $('trend-hint'),
     trendChart: $('trend-chart'),
+    trendToggle: $('trend-toggle'),
+    trendToggleText: $('trend-toggle-text'),
     btnLogs: $('btn-logs'),
     btnUpdate: $('btn-update'),
     btnData: $('btn-open-data'),
@@ -1463,7 +1573,6 @@
 
   const serviceBusy = new Set()
   let booted = false
-  let activeTab = 'users'
   let feedbackFilter = 'all'
   let trendRange = '7d'
   let usersCache = []
@@ -1712,50 +1821,29 @@
     return Boolean(result) && (result.status === 401 || result.status === 403)
   }
 
-  const tabLabels = {
-    users: '账号',
-    regs: '待审核',
-    limits: '限流与并发',
-    upstream: '上游',
-    feedback: '反馈',
-    stats: '统计',
+  // 五张卡一起刷；各卡的「刷新」按钮只负责自己那一块
+  function refreshAll() {
+    return Promise.all([
+      loadUsers(),
+      loadRegistrations(),
+      loadLimits(),
+      loadUpstream(),
+      loadFeedback(feedbackFilter),
+      loadStats(),
+    ]).catch(error => {
+      flash(`刷新失败：${errorText(error)}`, 'error')
+    })
   }
 
-  const sectionLoaders = {
-    users: loadUsers,
-    regs: loadRegistrations,
-    limits: loadLimits,
-    upstream: loadUpstream,
-    feedback: () => loadFeedback(feedbackFilter),
-    stats: loadStats,
+  function setPendingOpen(open) {
+    dom.pendingList.hidden = !open
+    dom.pendingToggle.setAttribute('aria-expanded', open ? 'true' : 'false')
   }
 
-  const loadedSections = new Set()
-
-  async function loadSection(name, force) {
-    const loader = sectionLoaders[name]
-    if (!loader || !booted) return
-    if (!force && loadedSections.has(name)) return
-    loadedSections.add(name)
-    try {
-      await loader()
-    } catch (error) {
-      flash(`刷新${tabLabels[name] || '数据'}失败：${errorText(error)}`, 'error')
-    }
-  }
-
-  function selectTab(name) {
-    if (!name) return
-    activeTab = name
-    for (const button of dom.tabs) {
-      const active = button.dataset.tab === name
-      button.setAttribute('aria-selected', active ? 'true' : 'false')
-      button.tabIndex = active ? 0 : -1
-    }
-    for (const panel of dom.panels) {
-      panel.hidden = panel.dataset.panel !== name
-    }
-    loadSection(name)
+  function setTrendOpen(open) {
+    dom.trendChart.hidden = !open
+    dom.trendToggle.setAttribute('aria-expanded', open ? 'true' : 'false')
+    dom.trendToggleText.textContent = open ? '收起趋势' : '展开趋势'
   }
 
   // ---------- 账号 ----------
@@ -2014,10 +2102,7 @@
       }
       flash(approve ? '已通过申请，该账号现在可以登录' : '已拒绝该申请')
       await loadRegistrations()
-      if (approve) {
-        loadedSections.add('users')
-        await loadUsers()
-      }
+      if (approve) await loadUsers()
     })
   }
 
@@ -2146,9 +2231,10 @@
 
     const data = result.data || {}
     dom.upstreamUrl.value = data.baseUrl || ''
+    dom.upstreamTextModel.value = data.textModelOverride || ''
     setCurrent(
       dom.upstreamMeta,
-      `当前模型：${data.model || '—'} · 地址来源：${data.fromSettings ? '后台设置（settings.json）' : '环境变量默认值'}`,
+      `当前模型：${data.model || '—'} · 地址来源：${data.fromSettings ? '后台设置（settings.json）' : '环境变量默认值'} · 优化模型：${data.textModel || '未设置'}（${data.textModelFromSettings ? '后台设置' : '环境变量默认值'}）`,
     )
     setCurrent(dom.upstreamResult, '')
   }
@@ -2174,7 +2260,7 @@
       const data = result.data || {}
       setCurrent(
         dom.upstreamResult,
-        `${data.reachable ? '可连通' : '连不上'}：${data.detail || '没有更多信息'}`,
+        `${data.reachable ? '可连通' : '连不上'}：${data.detail || '没有更多信息'}（只测地址连通，不校验模型）`,
         data.reachable ? 'ok' : 'error',
       )
     })
@@ -2187,8 +2273,19 @@
       return
     }
 
+    // 留空表示清除后台覆写、回落到环境变量默认值，所以这里不拦空值
+    const textModel = dom.upstreamTextModel.value.trim()
+    if (textModel.length > 120) {
+      setCurrent(dom.upstreamResult, '提示词优化模型最多 120 个字符', 'error')
+      return
+    }
+    if (/\s/.test(textModel)) {
+      setCurrent(dom.upstreamResult, '提示词优化模型里不能有空格', 'error')
+      return
+    }
+
     await withBusy(dom.upstreamSave, async () => {
-      const result = await api('/api/admin/upstream', { method: 'PUT', body: { baseUrl } })
+      const result = await api('/api/admin/upstream', { method: 'PUT', body: { baseUrl, textModel } })
       if (isAuthFailure(result)) {
         setCurrent(dom.upstreamResult, AUTH_HINT, 'error')
         return
@@ -2198,7 +2295,11 @@
         return
       }
       const saved = (result.data && result.data.baseUrl) || baseUrl
-      flash(`上游地址已保存：${saved}`)
+      const effectiveModel = (result.data && result.data.textModel) || '未设置'
+      const fromSettings = Boolean(result.data && result.data.textModelFromSettings)
+      flash(
+        `上游地址已保存：${saved} · 提示词优化模型：${effectiveModel}（${fromSettings ? '后台设置' : '环境变量默认值'}）`,
+      )
       await loadUpstream()
     })
   }
@@ -2257,19 +2358,24 @@
       if (entry.page) metaParts.push(`页面 ${entry.page}`)
       if (entry.appVersion) metaParts.push(`版本 ${entry.appVersion}`)
       if (resolved && entry.handledAt) metaParts.push(`处理于 ${formatTime(entry.handledAt)}`)
+      const who = entry.displayName || entry.username || '（未知）'
+      const meta = [
+        who,
+        entry.username && entry.username !== who ? entry.username : '',
+        categoryLabels[entry.category] || entry.category || '反馈',
+        formatTime(entry.createdAt),
+        ...metaParts,
+      ].filter(Boolean).join(' · ')
       return `
         <article class="fb" data-id="${escapeHtml(entry.id)}" data-status="${resolved ? 'resolved' : 'new'}">
-          <div class="fb-head">
-            <span class="chip">${escapeHtml(categoryLabels[entry.category] || entry.category || '反馈')}</span>
-            <strong>${escapeHtml(entry.displayName || entry.username || '（未知）')}</strong>
-            <span class="mono muted">${escapeHtml(entry.username || '')}</span>
-            <span>${formatTime(entry.createdAt)}</span>
+          <div class="fb-main">
+            <p class="fb-title">${escapeHtml(entry.content)}</p>
+            <p class="fb-meta">${escapeHtml(meta)}</p>
+          </div>
+          <div class="fb-side">
             <span class="chip ${resolved ? 'ok' : 'warn'}">${resolved ? '已处理' : '未处理'}</span>
-            <span class="grow"></span>
             <button class="button mini" type="button" data-action="toggle">${resolved ? '改回未处理' : '标记处理'}</button>
           </div>
-          <p class="fb-body">${escapeHtml(entry.content)}</p>
-          ${metaParts.length ? `<p class="fb-meta">${escapeHtml(metaParts.join(' · '))}</p>` : ''}
         </article>`
     }).join('')
   }
@@ -2475,26 +2581,6 @@
 
   // ---------- 事件绑定 ----------
 
-  function bindTabs() {
-    for (const button of dom.tabs) {
-      button.addEventListener('click', () => selectTab(button.dataset.tab))
-      button.addEventListener('keydown', event => {
-        const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End']
-        if (!keys.includes(event.key)) return
-        event.preventDefault()
-        const index = dom.tabs.indexOf(button)
-        let next = index
-        if (event.key === 'ArrowRight') next = (index + 1) % dom.tabs.length
-        if (event.key === 'ArrowLeft') next = (index - 1 + dom.tabs.length) % dom.tabs.length
-        if (event.key === 'Home') next = 0
-        if (event.key === 'End') next = dom.tabs.length - 1
-        const target = dom.tabs[next]
-        target.focus()
-        selectTab(target.dataset.tab)
-      })
-    }
-  }
-
   function bindEvents() {
     dom.btnStart.addEventListener('click', () => runServiceAction('start', '启动服务'))
     dom.btnStop.addEventListener('click', () => runServiceAction('stop', '停止服务'))
@@ -2510,9 +2596,11 @@
       runOpenAction('open-client', '打开初始化页面', dom.btnSetup)
     })
 
-    bindTabs()
+    dom.pendingToggle.addEventListener('click', () => {
+      setPendingOpen(dom.pendingList.hidden)
+    })
 
-    dom.btnUsersRefresh.addEventListener('click', () => loadSection('users', true))
+    dom.btnUsersRefresh.addEventListener('click', () => loadUsers())
     dom.btnNewUser.addEventListener('click', () => openUserDialog(null))
     dom.usersBody.addEventListener('click', event => {
       const button = event.target.closest('button[data-action]')
@@ -2532,18 +2620,18 @@
       submitUserDialog()
     })
 
-    dom.btnRegsRefresh.addEventListener('click', () => loadSection('regs', true))
+    dom.btnRegsRefresh.addEventListener('click', () => loadRegistrations())
     dom.regsList.addEventListener('click', event => {
       const button = event.target.closest('button[data-action]')
       if (!button) return
       handleRegistration(button, button.dataset.action === 'approve')
     })
 
-    dom.btnLimitsRefresh.addEventListener('click', () => loadSection('limits', true))
+    dom.btnLimitsRefresh.addEventListener('click', () => loadLimits())
     dom.rlSave.addEventListener('click', saveRateLimit)
     dom.ccSave.addEventListener('click', saveConcurrency)
 
-    dom.btnUpstreamRefresh.addEventListener('click', () => loadSection('upstream', true))
+    dom.btnUpstreamRefresh.addEventListener('click', () => loadUpstream())
     dom.upstreamTest.addEventListener('click', testUpstream)
     dom.upstreamSave.addEventListener('click', saveUpstream)
 
@@ -2559,9 +2647,15 @@
       toggleFeedback(button)
     })
 
-    dom.btnStatsRefresh.addEventListener('click', () => loadSection('stats', true))
+    dom.btnStatsRefresh.addEventListener('click', () => loadStats())
+    dom.trendToggle.addEventListener('click', () => {
+      setTrendOpen(dom.trendChart.hidden)
+    })
     for (const button of dom.trendRanges) {
-      button.addEventListener('click', () => loadTrend(button.dataset.range))
+      button.addEventListener('click', () => {
+        setTrendOpen(true)
+        loadTrend(button.dataset.range)
+      })
     }
 
     dom.btnLogs.addEventListener('click', () => runMaintAction('open-log-window', '打开日志窗口', dom.btnLogs))
@@ -2579,19 +2673,16 @@
 
     if (!booted) {
       booted = true
-      loadedSections.clear()
-      loadSection(activeTab, true)
+      refreshAll()
       return
     }
 
     if (!wasRunning && state.running) {
-      loadedSections.clear()
-      loadSection(activeTab, true)
+      refreshAll()
       flash('服务已启动，数据正在刷新')
     }
 
     if (wasRunning && !state.running) {
-      loadedSections.clear()
       flash('服务已停止，管理接口暂时不可用', 'warn')
     }
   }

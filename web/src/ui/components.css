@@ -355,6 +355,27 @@
   color: var(--danger);
 }
 
+/* 提示里的动作（如撤销）：颜色继承 toast，浅色/深色主题都不必另写 */
+.toast-action {
+  margin-left: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0.78;
+  /* toast 本身 pointer-events: none，这里单独放行，否则按钮点不到 */
+  pointer-events: auto;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.toast-action:hover {
+  opacity: 1;
+}
+
 /* ============================== 账户菜单 ============================== */
 
 .user-avatar {

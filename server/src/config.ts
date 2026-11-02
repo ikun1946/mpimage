@@ -105,6 +105,13 @@ export const config = {
   magpieBaseUrl: (process.env.MAGPIE_BASE_URL || 'http://127.0.0.1:3425').replace(/\/+$/, ''),
   imageModel: process.env.MAGPIE_IMAGE_MODEL || 'codex/gpt-image-2',
   /**
+   * 提示词优化专用的对话模型，与生图模型互不相干。
+   * 选 flash 档是因为只做扩写，1–2 秒返回，没必要上更贵的模型。
+   */
+  textModel: process.env.MAGPIE_TEXT_MODEL || 'auto/deepseek-v4.1-flash',
+  /** 提示词优化的上游超时；对话模型偶尔排队，比生图短得多也够用 */
+  promptOptimizeTimeoutMs: intFromEnv('PROMPT_OPTIMIZE_TIMEOUT_MS', 60000),
+  /**
    * 同时打向 Magpie 的生图请求上限（1–8）。
    * 服务端控制台保存过 data/concurrency.json 时以文件为准；这里只是文件缺失时的默认值，
    * 前端并行数不会超过当前上限。
