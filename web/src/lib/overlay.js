@@ -96,7 +96,23 @@ function releaseScrollLock() {
 }
 
 /**
+ * 打开弹层时的元素现在是否还“看得见”。
+ * 头像菜单里的按钮收起后仍在 DOM 里，只是被 visibility/opacity 藏起来；
+ * 直接把焦点还给它，会让 :focus-within 把菜单重新顶出来。
+ */
+function canRestoreFocus(node) {
+  if (!node?.isConnected) return false
+  if (node === document.body || node === document.documentElement) return false
+  if (typeof node.checkVisibility === 'function') {
+    return node.checkVisibility({ visibilityProperty: true, checkOpacity: true })
+  }
+  return node.getClientRects().length > 0
+}
+
+/**
  * 把元素登记为活动弹层。
+ * 同一个元素重复登记时返回已有的 handle：不会再叠一层滚动锁，
+ * 也不会在栈里留下两个同样元素的句柄（关闭时就可能漏掉一次释放）。
  * @param {HTMLElement} element 弹层容器
  * @param {{ onRequestClose?: () => void, initialFocus?: HTMLElement | null, lockScroll?: boolean }} options
  * @returns {{ element: HTMLElement, release: () => void }}
@@ -105,23 +121,36 @@ export function activateOverlay(element, options = {}) {
   if (!element) return { element: null, release() {} }
 
   const { onRequestClose = null, initialFocus = null, lockScroll = true } = options
+
+  const registered = stack.find(item => item.element === element)
+  if (registered) {
+    if (onRequestClose) registered.onRequestClose = onRequestClose
+    return registered
+  }
+
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
 
   const handle = {
     element,
     onRequestClose,
+    released: false,
     release() {
       const index = stack.indexOf(handle)
       if (index === -1) return
+      handle.released = true
       stack.splice(index, 1)
       if (lockScroll) releaseScrollLock()
       if (!stack.length && keydownBound) {
         document.removeEventListener('keydown', handleKeydown, true)
         keydownBound = false
       }
-      // 焦点归还给打开它的元素；元素已不在页面上就交给 body
-      if (opener && opener.isConnected) opener.focus({ preventScroll: true })
-      else if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+      // 不是栈顶（下面还压着别的弹层）时不抢焦点
+      if (index !== stack.length) return
+      // 焦点归还给打开它的元素；元素已被收起或不在页面上，就把焦点收掉
+      if (canRestoreFocus(opener)) opener.focus({ preventScroll: true })
+      else if (element.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur()
+      }
     },
   }
 
@@ -134,7 +163,11 @@ export function activateOverlay(element, options = {}) {
 
   const target = initialFocus || focusablesIn(element)[0] || element
   if (target === element && !element.hasAttribute('tabindex')) element.setAttribute('tabindex', '-1')
-  window.requestAnimationFrame(() => target?.focus?.({ preventScroll: true }))
+  // 同一帧里开了又关时，这一帧的回调不能再把焦点塞回已经收起的弹层
+  window.requestAnimationFrame(() => {
+    if (handle.released) return
+    target?.focus?.({ preventScroll: true })
+  })
 
   return handle
 }

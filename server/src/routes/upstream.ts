@@ -2,8 +2,12 @@ import type { FastifyInstance } from 'fastify'
 import { config } from '../config.js'
 import { ApiError } from '../lib/errors.js'
 import { checkHealth } from '../services/magpie.js'
+import { ModelCatalog } from '../services/model-catalog.js'
 import type { SettingsStore } from '../services/settings-store.js'
 import { requireAdmin } from './auth.js'
+
+/** 缓存按上游地址分键，放在模块级才能跨请求复用 */
+const modelCatalog = new ModelCatalog()
 
 /**
  * 上游地址必须是 http/https 绝对地址，且不带账号密码——
@@ -53,6 +57,11 @@ function parseTextModel(raw: unknown): string {
   return model
 }
 
+/** query 里 refresh=1/true 都算刷新，其余一律走缓存 */
+function wantsRefresh(raw: unknown): boolean {
+  return raw === true || raw === 1 || raw === '1' || raw === 'true'
+}
+
 export function registerUpstreamRoutes(
   app: FastifyInstance,
   deps: { settings: SettingsStore },
@@ -69,6 +78,18 @@ export function registerUpstreamRoutes(
       textModelOverride: deps.settings.getTextModelOverride(),
       textModelFromSettings: deps.settings.isTextModelFromSettings(),
     }
+  })
+
+  /**
+   * 模型自动发现：后台填完地址后直接列出上游可用模型，省得手抄模型名。
+   * refresh=1 跳过缓存（后台的「刷新」按钮），其余请求走 60 秒缓存。
+   */
+  app.get('/api/admin/upstream/models', async request => {
+    requireAdmin(request)
+    const query = (request.query ?? {}) as { refresh?: unknown }
+    const baseUrl = await deps.settings.getBaseUrl()
+    const result = await modelCatalog.list(baseUrl, { force: wantsRefresh(query.refresh) })
+    return { baseUrl, ...result }
   })
 
   app.put('/api/admin/upstream', async (request, reply) => {

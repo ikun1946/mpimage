@@ -12,18 +12,34 @@
   -webkit-backdrop-filter: blur(12px);
 }
 
-.modal.visible,
+/* 关闭时的淡出只属于灯箱 */
 .lightbox.is-closing {
   animation: none;
   opacity: 0;
   transition: opacity 200ms ease;
 }
 
+/* 可见态必须自己就是不透明的：不再把 opacity: 0 和 animation 写在同一层上。
+   以前两条规则同优先级，opacity: 0 被留着、只靠 fade-in 的 fill 兜底；
+   一旦动画没跑起来（系统关掉动效、关键帧缺失、动画被中断），
+   弹窗就变成一层透明却照样接收点击的全屏遮罩，整页看起来就是卡死。 */
 .modal.visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fade-in 180ms ease both;
+  opacity: 1;
+}
+
+/* 动画只作用在卡片上：整块遮罩带 backdrop-filter，
+   逐帧重绘会把后面的页面反复重新模糊，页面越复杂越像卡住 */
+.modal.visible .modal-sheet {
+  animation: modal-sheet-in 180ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal.visible .modal-sheet {
+    animation: none;
+  }
 }
 
 .lightbox.visible {
@@ -1005,6 +1021,17 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes modal-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 

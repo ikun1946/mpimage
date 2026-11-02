@@ -1,26 +1,22 @@
 /**
  * 生图闸门：限制同时打向 Magpie 的生图请求数。
  *
- * 上限可在运行时调整（服务端控制台 → 生图并发），调整后立即生效，
- * 并拆成两档：前端默认并行 5，批量页的并行数不会超过这里；调到 1 即逐张生成。
+ * 上限可在运行时调整（服务端控制台 → 生图并发），调整后立即生效。
+ * 语义：0 表示不限制，正整数 N 表示同时最多 N 个（调到 1 即逐张生成）。
  * 无论多少标签页/账号，合计都不会超过这个上限，避免把上游刷爆触发风控。
  */
-const MIN_LIMIT = 1
-const MAX_LIMIT = 8
-
-function clampLimit(value: number): number {
-  const limit = Math.floor(Number(value))
-  if (!Number.isFinite(limit)) return MIN_LIMIT
-  return Math.min(Math.max(limit, MIN_LIMIT), MAX_LIMIT)
-}
-
 export class SerialGate {
   private active = 0
   private readonly waiters: Array<() => void> = []
+  /** 配置值：0 代表不限制 */
+  private configured: number
+  /** 参与比较的有效值：配置的 0 映射为 Infinity */
   private limit: number
 
   constructor(limit = 1) {
-    this.limit = clampLimit(limit)
+    this.configured = 1
+    this.limit = 1
+    this.setLimit(limit)
   }
 
   get isBusy(): boolean {
@@ -32,9 +28,9 @@ export class SerialGate {
     return this.active
   }
 
-  /** 允许的最大并行数 */
+  /** 允许的最大并行数（原样返回配置值，0 代表不限制） */
   get limitCount(): number {
-    return this.limit
+    return this.configured
   }
 
   get queueLength(): number {
@@ -42,13 +38,16 @@ export class SerialGate {
   }
 
   /**
-   * 调整并行上限：调高会立刻放行排队的请求；调低不会打断在途请求，
-   * 但新请求要等在途数降下来才会进入。返回实际生效的值（夹在 1–8）。
+   * 调整并行上限：只接受安全整数且 ≥ 0，0 表示不限制。
+   * 调高会立刻放行排队的请求；调低不会打断在途请求，
+   * 但新请求要等在途数降下来才会进入。返回配置值（0 代表不限制）。
    */
   setLimit(limit: number): number {
-    this.limit = clampLimit(limit)
+    const next = Number.isSafeInteger(limit) && limit >= 0 ? limit : this.configured
+    this.configured = next
+    this.limit = next === 0 ? Number.POSITIVE_INFINITY : next
     this.wake()
-    return this.limit
+    return this.configured
   }
 
   async run<T>(task: () => Promise<T>): Promise<T> {

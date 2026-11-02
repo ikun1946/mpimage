@@ -12,6 +12,7 @@ import { config } from './config.js'
 import { ApiError } from './lib/errors.js'
 import { SerialGate } from './lib/serial-gate.js'
 import { SessionStore } from './lib/session.js'
+import { isCountedTraffic } from './lib/traffic-scope.js'
 import { registerAdminRoutes } from './routes/admin.js'
 import { registerAuthRoutes, resolveAuth } from './routes/auth.js'
 import { registerFeedbackRoutes } from './routes/feedback.js'
@@ -41,6 +42,13 @@ import { UserStore } from './services/user-store.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(here, '..', '..')
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    /** 本次请求是否被限流拒绝：onRequest 只标记，onResponse 统一记一次统计 */
+    trafficRejected: boolean
+  }
+}
 
 /**
  * 环境变量里的路径：绝对路径直接用，相对路径按**项目根**解析。
@@ -190,20 +198,28 @@ await quotas.init()
 await feedback.init()
 const processStartedAt = Date.now()
 
-// 每个请求：限流 → 解析登录身份 → 流量统计
+// 每个请求：限流 → 解析登录身份；统计只在 onResponse 写一次
 app.addHook('onRequest', async request => {
-  const ip = request.ip
-  const retryAfterSec = rateLimiter.tryAccept(ip)
+  const retryAfterSec = rateLimiter.tryAccept(request.ip)
+  // 这里只标记结果：限流的请求同样是"一次请求"，交给 onResponse 统一记账，
+  // 否则 429 会在 onRequest 与 onResponse 各记一次。
+  request.trafficRejected = retryAfterSec !== null
   if (retryAfterSec !== null) {
-    traffic.record(ip, 0, 0, true)
     throw new ApiError('RATE_LIMITED', `请求过于频繁，请 ${retryAfterSec} 秒后重试`, 429)
   }
   request.auth = await resolveAuth(request, { users, sessions })
 })
 
 app.addHook('onResponse', async (request, reply) => {
+  // 只统计客户端业务接口：健康探测、配置读取、后台管理与静态资源都不计入
+  if (!isCountedTraffic(request.method, request.raw.url || '')) return
   const bytesIn = Number(request.headers['content-length'] || 0)
-  traffic.record(request.ip, bytesIn, Number(reply.getHeader('content-length') || 0))
+  traffic.record(
+    request.ip,
+    bytesIn,
+    Number(reply.getHeader('content-length') || 0),
+    request.trafficRejected === true,
+  )
 })
 
 // 流量数据定期落盘，进程退出时也会补写

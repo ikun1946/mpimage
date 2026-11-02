@@ -1,84 +1,9 @@
 {
   "name": "mpimage",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "private": true,
   "type": "module",
   "description": "画境生图：前后端分离的单张工作台与资产批量工作台",
   "main": "desktop/main.mjs",
-  "scripts": {
-    "install:all": "npm --prefix server install && npm --prefix web install",
-    "dev": "node scripts/dev.mjs",
-    "dev:server": "npm --prefix server run dev",
-    "dev:web": "npm --prefix web run dev",
-    "build": "npm --prefix web run build",
-    "build:server": "npm --prefix server run build",
-    "start": "npm --prefix server run start",
-    "desktop:dev": "electron .",
-    "desktop:prepare": "npm run build && npm run build:server",
-    "desktop:build": "npm run desktop:prepare && electron-builder --win nsis portable",
-    "desktop:pack": "npm run desktop:prepare && electron-builder --win --dir"
-  },
-  "devDependencies": {
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
-  },
-  "build": {
-    "appId": "com.huajing.desktop",
-    "productName": "画境",
-    "directories": {
-      "output": "release",
-      "buildResources": "build"
-    },
-    "files": [
-      "desktop/**/*",
-      "build/icon.png",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "server/dist",
-        "to": "app-server/server/dist"
-      },
-      {
-        "from": "server/node_modules",
-        "to": "app-server/server/node_modules",
-        "filter": [
-          "**/*",
-          "!typescript/**",
-          "!@types/**",
-          "!@esbuild/**",
-          "!esbuild/**",
-          "!tsx/**",
-          "!.bin/**"
-        ]
-      },
-      {
-        "from": "server/package.json",
-        "to": "app-server/server/package.json"
-      },
-      {
-        "from": "web/dist",
-        "to": "app-server/web/dist"
-      }
-    ],
-    "win": {
-      "target": [
-        "nsis",
-        "portable"
-      ],
-      "icon": "build/icon.png"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "画境"
-    },
-    "portable": {
-      "artifactName": "huajing-portable-${version}.exe"
-    }
-  },
   "author": "huajing"
 }

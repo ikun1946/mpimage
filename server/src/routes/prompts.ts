@@ -2,16 +2,20 @@ import type { FastifyInstance } from 'fastify'
 import { config, findRatio } from '../config.js'
 import { ApiError } from '../lib/errors.js'
 import { optimizePrompt } from '../services/prompt-optimizer.js'
+import {
+  MAX_REFERENCE_IMAGES,
+  loadReferenceImages,
+  type ReferenceImage,
+} from '../services/reference-images.js'
 import type { SettingsStore } from '../services/settings-store.js'
 import { requireAuth } from './auth.js'
-
-/** 与生图一致：自由创作最多直传 6 张参考图 */
-const MAX_REFERENCE_IMAGES = 6
 
 interface OptimizeBody {
   prompt?: unknown
   ratio?: unknown
   referenceCount?: unknown
+  /** 本次一起送模型的参考图：存储目录相对路径，必须以「参考图/」开头 */
+  referencePaths?: unknown
 }
 
 export function registerPromptRoutes(
@@ -44,8 +48,24 @@ export function registerPromptRoutes(
       ratioLabel = ratio.label
     }
 
+    // 参考图：优先按路径实际加载，张数以真正读到的图片为准；
+    // 老客户端只传 referenceCount（不上图），继续按原来的方式处理。
     let referenceCount: number | undefined
-    if (body.referenceCount !== undefined) {
+    let images: ReferenceImage[] | undefined
+    if (body.referencePaths !== undefined) {
+      if (!Array.isArray(body.referencePaths)) {
+        throw new ApiError('REFERENCE_INVALID', '参考图参数格式无效', 400)
+      }
+      const referencePaths: string[] = []
+      for (const item of body.referencePaths) {
+        if (typeof item !== 'string') {
+          throw new ApiError('REFERENCE_INVALID', '参考图地址无效', 400)
+        }
+        referencePaths.push(item.trim())
+      }
+      images = await loadReferenceImages(referencePaths)
+      referenceCount = images.length
+    } else if (body.referenceCount !== undefined) {
       const count = body.referenceCount
       if (
         typeof count !== 'number' ||
@@ -64,7 +84,7 @@ export function registerPromptRoutes(
         model: await deps.settings.getTextModel(),
         timeoutMs: config.promptOptimizeTimeoutMs,
       },
-      { prompt, ratioLabel, referenceCount },
+      { prompt, ratioLabel, referenceCount, images },
     )
   })
 }

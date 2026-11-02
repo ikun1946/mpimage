@@ -40,15 +40,28 @@ function guardWheel(scroller, host = scroller.parentElement) {
   }, { passive: false })
 }
 
+/** 进出场动画时长，和 history-panel.css 里的动画保持一致 */
+const LEAVE_MS = 140
+/* 已加载过的面板在这么短时间内重复打开不再发刷新请求：
+   连续开关不该把记录接口打成热点；生成成功后由业务侧调用 invalidate() 主动失效。 */
+const REFRESH_INTERVAL_MS = 5000
+
+function prefersReducedMotion() {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+}
+
 /**
  * 生成记录面板：挂在页面右上角头像菜单下，
  * 调用 setupHistoryPanel() 即可接入，入口按钮需自带 id="history-button"。
  * 面板结构与样式见 history-panel.css。
+ *
+ * @returns {{ open: () => void, close: () => void, invalidate: () => void }}
+ *   invalidate 供业务代码在生成成功后调用：丢掉在途请求，缓存标脏，下次打开/当前打开立即刷新。
  */
 export function setupHistoryPanel() {
   const panel = qs('#history-panel')
   const button = qs('#history-button')
-  if (!panel || !button) return
+  if (!panel || !button) return { open() {}, close() {}, invalidate() {} }
 
   const list = qs('#history-list', panel)
   const searchInput = qs('#history-search', panel)
@@ -57,30 +70,103 @@ export function setupHistoryPanel() {
 
   let records = []
   let keyword = ''
-  let loaded = false
+  let loaded = false          // 已经成功拉到过一次数据
+  let errorText = ''
+  let inFlight = null         // 在途请求：重复的 load 合并到同一个 Promise
+  let lastLoadedAt = 0        // 上次成功拉取的时间，用来压掉连续开关引发的重复刷新
+  let generation = 0          // 关闭/失效后递增，迟到的响应直接丢弃
+  let closeTimer = 0
+  let savedScrollTop = 0
 
   function open() {
+    if (closeTimer) {
+      window.clearTimeout(closeTimer)
+      closeTimer = 0
+    }
+    panel.classList.remove('is-closing')
     panel.classList.add('visible')
-    document.body.classList.add('history-open')
-    if (!loaded) load()
+
+    // 搜索词和滚动位置在关闭期间都留着，重新打开回到原处
+    if (searchInput && searchInput.value !== keyword) searchInput.value = keyword
+    if (list) list.scrollTop = savedScrollTop
+    // 上次关闭时可能停在“刷新中…”，先按手里的数据写回正常文案
+    if (meta && records.length) meta.textContent = `共 ${records.length} 条`
+
+    if (loaded) load({ silent: true })
+    else load({ silent: false })
   }
 
   function close() {
+    if (!panel.classList.contains('visible') && !panel.classList.contains('is-closing')) return
+    savedScrollTop = list?.scrollTop || 0
+    // 关闭后不再采纳还在路上的响应：它们要么属于旧的关键词，要么已经把状态刷旧了。
+    // 同时放开 inFlight，重新打开时能立刻发自己的请求，不用等旧请求超时。
+    generation += 1
+    inFlight = null
+    if (prefersReducedMotion()) {
+      hideNow()
+      return
+    }
+    panel.classList.add('is-closing')
     panel.classList.remove('visible')
-    document.body.classList.remove('history-open')
+    window.clearTimeout(closeTimer)
+    closeTimer = window.setTimeout(hideNow, LEAVE_MS)
   }
 
-  async function load() {
-    list.innerHTML = '<div class="history-loading">正在载入生成记录…</div>'
-    try {
-      const result = await fetchHistory(200)
-      records = Array.isArray(result?.entries) ? result.entries : []
-      loaded = true
-      meta.textContent = `共 ${records.length} 条`
-      render()
-    } catch (error) {
-      list.innerHTML = `<div class="history-empty">${escapeHtml(error.message || '载入失败，请稍后重试')}</div>`
-    }
+  function hideNow() {
+    window.clearTimeout(closeTimer)
+    closeTimer = 0
+    panel.classList.remove('visible', 'is-closing')
+  }
+
+  function invalidate() {
+    generation += 1
+    inFlight = null
+    lastLoadedAt = 0
+    errorText = ''
+    if (panel.classList.contains('visible')) load({ silent: loaded, force: true })
+  }
+
+  function renderLoading() {
+    meta.textContent = '载入中…'
+    list.innerHTML = '<li class="history-loading">正在载入生成记录…</li>'
+  }
+
+  /**
+   * silent = true：手里已经有数据，立即展示旧内容并在后台刷新；
+   * silent = false：首次打开或重试，先给加载态。
+   */
+  function load({ silent = false, force = false } = {}) {
+    if (inFlight) return inFlight
+    // 刚拉过就再打开：直接用缓存，不再打一次接口
+    if (silent && !force && Date.now() - lastLoadedAt < REFRESH_INTERVAL_MS) return Promise.resolve()
+    if (!silent) renderLoading()
+    else if (meta) meta.textContent = records.length ? `共 ${records.length} 条 · 刷新中…` : '载入中…'
+
+    const token = generation
+    const request = fetchHistory(200)
+      .then(result => {
+        if (token !== generation) return
+        records = Array.isArray(result?.entries) ? result.entries : []
+        errorText = ''
+        loaded = true
+        lastLoadedAt = Date.now()
+        meta.textContent = `共 ${records.length} 条`
+        render()
+      })
+      .catch(error => {
+        if (token !== generation) return
+        errorText = error?.message || '载入失败，请稍后重试'
+        // 失败不清空旧数据：列表上方挂一条错误，下面继续展示上一次的结果
+        meta.textContent = records.length ? `共 ${records.length} 条 · 刷新失败` : '载入失败'
+        render()
+      })
+      .finally(() => {
+        if (inFlight === request) inFlight = null
+      })
+
+    inFlight = request
+    return request
   }
 
   function filtered() {
@@ -99,7 +185,7 @@ export function setupHistoryPanel() {
 
   function formatBytes(bytes) {
     if (!Number.isFinite(bytes) || bytes <= 0) return ''
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`
   }
 
@@ -111,55 +197,75 @@ export function setupHistoryPanel() {
 
   function render() {
     const rows = filtered()
-    if (!rows.length) {
-      list.innerHTML = `<div class="history-empty">${records.length ? '没有匹配的记录' : '还没有生成记录'}</div>`
-      return
+    const keepTop = list.scrollTop
+    const parts = []
+
+    if (errorText) {
+      parts.push(`
+        <li class="history-error" role="alert">
+          <span>${escapeHtml(errorText)}</span>
+          <button class="history-retry" type="button" data-action="retry">重试</button>
+        </li>
+      `)
     }
 
-    list.innerHTML = rows.map((record, index) => `
-      <li class="history-item" data-index="${index}">
-        <button class="history-thumb" type="button" data-action="view" title="查看大图">
-          <img src="${escapeAttr(record.imageUrl)}" alt="${escapeAttr(record.name || '生成图片')}" loading="lazy">
-        </button>
-        <div class="history-body">
-          <div class="history-title-row">
-            <span class="history-name" title="${escapeAttr(record.name)}">${escapeHtml(record.name || '未命名')}</span>
-            <span class="history-badge">${escapeHtml(sourceLabel(record.source))} · ${escapeHtml(record.category)}</span>
+    if (!rows.length) {
+      const empty = records.length ? '没有匹配的记录' : '还没有生成记录'
+      parts.push(`<li class="history-empty">${empty}</li>`)
+    } else {
+      parts.push(rows.map((record, index) => `
+        <li class="history-item" data-index="${index}">
+          <button class="history-thumb" type="button" data-action="view" title="查看大图">
+            <img src="${escapeAttr(record.imageUrl)}" alt="${escapeAttr(record.name || '生成图片')}" loading="lazy" decoding="async">
+          </button>
+          <div class="history-body">
+            <div class="history-title-row">
+              <span class="history-name" title="${escapeAttr(record.name)}">${escapeHtml(record.name || '未命名')}</span>
+              <span class="history-badge">${escapeHtml(sourceLabel(record.source))} · ${escapeHtml(record.category)}</span>
+            </div>
+            <p class="history-prompt" title="${escapeAttr(record.prompt)}">${escapeHtml(record.prompt || '（无提示词）')}</p>
+            <div class="history-facts">
+              <span>${escapeHtml(formatDateTime(record.createdAt))}</span>
+              <span>${escapeHtml(formatDuration(record.durationMs))}</span>
+              <span>${escapeHtml(record.ratio || '')} · ${record.width || '?'} × ${record.height || '?'}</span>
+              <span>${escapeHtml(formatBytes(record.bytes))}</span>
+              <span>${escapeHtml(tokensLabel(record))}</span>
+            </div>
           </div>
-          <p class="history-prompt" title="${escapeAttr(record.prompt)}">${escapeHtml(record.prompt || '（无提示词）')}</p>
-          <div class="history-facts">
-            <span>${escapeHtml(formatDateTime(record.createdAt))}</span>
-            <span>${escapeHtml(formatDuration(record.durationMs))}</span>
-            <span>${escapeHtml(record.ratio || '')} · ${record.width || '?'} × ${record.height || '?'}</span>
-            <span>${escapeHtml(formatBytes(record.bytes))}</span>
-            <span>${escapeHtml(tokensLabel(record))}</span>
+          <div class="history-actions">
+            <button class="history-mini" type="button" data-action="view" title="查看大图">查看</button>
+            <button class="history-mini" type="button" data-action="download" title="下载原图">下载</button>
           </div>
-        </div>
-        <div class="history-actions">
-          <button class="history-mini" type="button" data-action="view" title="查看大图">查看</button>
-          <button class="history-mini" type="button" data-action="download" title="下载原图">下载</button>
-        </div>
-      </li>
-    `).join('')
+        </li>
+      `).join(''))
+    }
+
+    list.innerHTML = parts.join('')
+    // render 会重建列表节点，顺便把滚动位置放回去
+    if (keepTop) list.scrollTop = Math.min(keepTop, Math.max(0, list.scrollHeight - list.clientHeight))
   }
 
   // 事件委托：列表内所有按钮 + 大图遮罩
   panel.addEventListener('click', event => {
-    const target = event.target.closest('[data-action]')
-    if (target) {
-      const item = target.closest('.history-item')
-      const record = item ? filtered()[Number(item.dataset.index)] : null
-      if (!record) return
-
-      if (target.dataset.action === 'view') {
-        openLightbox(record)
-      } else if (target.dataset.action === 'download') {
-        download(record)
-      }
+    if (event.target === panel) {
+      close()
       return
     }
 
-    if (event.target === panel) close()
+    const action = event.target.closest('[data-action]')?.dataset.action
+    if (!action) return
+
+    if (action === 'retry') {
+      load({ silent: records.length > 0, force: true })
+      return
+    }
+
+    const item = event.target.closest('.history-item')
+    const record = item ? filtered()[Number(item.dataset.index)] : null
+    if (!record) return
+
+    if (action === 'view') openLightbox(record)
+    else if (action === 'download') download(record)
   })
 
   closeButton?.addEventListener('click', close)
@@ -180,9 +286,27 @@ export function setupHistoryPanel() {
     render()
   })
 
+  /* 点面板外的空白收起：头像菜单点过来的那一下、面板内部、大图预览都不算"外面" */
+  document.addEventListener('pointerdown', event => {
+    if (!panel.classList.contains('visible')) return
+    const target = event.target
+    if (!(target instanceof Element)) return
+    if (panel.contains(target)) return
+    if (target.closest('#user-avatar')) return
+    if (target.closest('#history-lightbox')) return
+    close()
+  }, true)
+
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && panel.classList.contains('visible')) close()
+    if (event.key !== 'Escape') return
+    // 大图打开时 Esc 先关大图，交给他自己的快捷键
+    if (qs('#history-lightbox')?.classList.contains('visible')) return
+    if (!panel.classList.contains('visible')) return
+    event.preventDefault()
+    close()
   })
+
+  return { open, close, invalidate }
 }
 
 /**

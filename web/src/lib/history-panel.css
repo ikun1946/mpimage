@@ -43,8 +43,27 @@
   overflow: hidden;
 }
 
-.history-panel.visible {
+.history-panel.visible,
+.history-panel.is-closing {
   display: flex;
+}
+
+.history-panel.visible {
+  animation: history-panel-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 收起动画单独一类：.visible 一摘掉 display 就变 none，动画根本没机会播。
+   再点开时把 is-closing 摘掉，收起动画立刻中断，不会两段动画打架。 */
+.history-panel.is-closing {
+  animation: history-panel-out 140ms ease both;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .history-panel.visible,
+  .history-panel.is-closing {
+    animation: none;
+  }
 }
 
 .history-head {
@@ -119,6 +138,40 @@
   text-align: center;
   font-size: 13px;
   color: rgba(255, 253, 248, 0.5);
+}
+
+/* 刷新失败：旧记录继续留在下面，失败提示挂在最上面，带一个重试 */
+.history-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(214, 96, 74, 0.42);
+  background: rgba(214, 96, 74, 0.14);
+  color: #ffd9cf;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.history-error span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.history-retry {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 217, 207, 0.35);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.history-retry:hover {
+  background: rgba(255, 217, 207, 0.14);
 }
 
 .history-item {
@@ -383,4 +436,25 @@
 .history-loading,
 .history-empty {
   color: rgba(255, 253, 248, 0.68);
+}
+@keyframes history-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes history-panel-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
 }

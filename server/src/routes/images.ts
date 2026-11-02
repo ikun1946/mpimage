@@ -4,8 +4,9 @@ import { config, findRatio } from '../config.js'
 import { ApiError } from '../lib/errors.js'
 import type { SerialGate } from '../lib/serial-gate.js'
 import { buildFileUrl } from '../lib/url.js'
-import { requestImage, requestImageEdit, type ReferenceImage } from '../services/magpie.js'
+import { requestImage, requestImageEdit } from '../services/magpie.js'
 import { detectImageType, readImageSize } from '../services/imaging.js'
+import { MAX_REFERENCE_IMAGES, loadReferenceImages } from '../services/reference-images.js'
 import { REFERENCE_CATEGORY, type ImageStorage } from '../services/storage.js'
 import type { QuotaStore } from '../services/quota-store.js'
 import type { SettingsStore } from '../services/settings-store.js'
@@ -13,9 +14,6 @@ import type { UsageStore } from '../services/usage-store.js'
 import { requireAuth } from './auth.js'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-/** 一次生图最多直传上游几张参考图 */
-const MAX_REFERENCE_IMAGES = 6
 
 /** 生图任务状态：刷新页面后可用 jobId 重新接回结果 */
 interface GenerationJob {
@@ -210,11 +208,7 @@ export function registerImageRoutes(
     const startedAt = Date.now()
     try {
     const generated = await deps.gate.run(async () => {
-      const references: ReferenceImage[] = []
-      for (const path of referencePaths) {
-        const reference = await loadReference(path, deps.storage)
-        if (reference) references.push(reference)
-      }
+      const references = await loadReferenceImages(referencePaths)
       // 每次生图都重读上游地址：后台改完立即生效，无需重启服务
       const upstreamOptions = {
         baseUrl: await deps.settings.getBaseUrl(),
@@ -312,37 +306,4 @@ export function registerImageRoutes(
       releaseSlot(auth.userId)
     }
   })
-}
-
-/**
- * 读取角色面部参考图。
- * 路径已在路由里限定为「参考图/」开头；这里再挡一次目录穿越，
- * 并把「文件没了」翻译成用户能处理的提示，而不是静默退回纯文本生成。
- */
-async function loadReference(
-  referencePath: string,
-  storage: ImageStorage,
-): Promise<ReferenceImage | undefined> {
-  if (!referencePath) return undefined
-
-  let buffer: Buffer
-  try {
-    buffer = await storage.resolve(referencePath)
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new ApiError('IMAGE_REFERENCE_MISSING', '参考图不存在，请重新上传', 400)
-    }
-    throw error
-  }
-
-  try {
-    const type = detectImageType(buffer)
-    return {
-      buffer,
-      mimeType: type.mimeType,
-      filename: referencePath.split('/').pop() || 'reference.png',
-    }
-  } catch {
-    throw new ApiError('IMAGE_REFERENCE_MISSING', '参考图不是有效图片，请重新上传', 400)
-  }
 }

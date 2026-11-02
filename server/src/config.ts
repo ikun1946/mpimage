@@ -1,6 +1,7 @@
 import { config as loadEnv } from 'dotenv'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { normalizeConcurrency } from './services/concurrency-store.js'
 
 // 优先加载 server/.env，其次项目根目录 .env
 const here = dirname(fileURLToPath(import.meta.url))
@@ -81,11 +82,11 @@ const ratios: RatioSpec[] = [
   },
 ]
 
-function intFromEnv(name: string, fallback: number): number {
+function intFromEnv(name: string, fallback: number, min = 1): number {
   const raw = process.env[name]
   if (!raw) return fallback
   const parsed = Number.parseInt(raw, 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+  return Number.isFinite(parsed) && parsed >= min ? parsed : fallback
 }
 
 function listFromEnv(name: string, fallback: string[]): string[] {
@@ -112,11 +113,11 @@ export const config = {
   /** 提示词优化的上游超时；对话模型偶尔排队，比生图短得多也够用 */
   promptOptimizeTimeoutMs: intFromEnv('PROMPT_OPTIMIZE_TIMEOUT_MS', 60000),
   /**
-   * 同时打向 Magpie 的生图请求上限（1–8）。
+   * 同时打向 Magpie 的生图请求上限：0 表示不限制，正整数表示最大并发，默认 5。
    * 服务端控制台保存过 data/concurrency.json 时以文件为准；这里只是文件缺失时的默认值，
-   * 前端并行数不会超过当前上限。
+   * 前端并行数不会超过当前上限（0 时不设限）。
    */
-  imageConcurrency: Math.min(Math.max(intFromEnv('IMAGE_CONCURRENCY', 5), 1), 8),
+  imageConcurrency: normalizeConcurrency(intFromEnv('IMAGE_CONCURRENCY', 5, 0)),
   requestTimeoutMs: intFromEnv('IMAGE_TIMEOUT_MS', 300000),
   maxPromptLength: intFromEnv('MAX_PROMPT_LENGTH', 12000),
   storageDir: process.env.STORAGE_DIR || '',

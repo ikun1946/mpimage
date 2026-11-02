@@ -37,6 +37,7 @@ export function registerMonitorRoutes(
         loadAvg: os.loadavg()[0] || 0,
       },
       traffic: {
+        scope: snapshot.scope,
         total: snapshot.total,
         since: snapshot.since,
         clients: snapshot.clients,
@@ -83,9 +84,10 @@ export function registerMonitorRoutes(
   app.put('/api/admin/concurrency', async (request, reply) => {
     requireAdmin(request)
     const body = (request.body ?? {}) as { limit?: unknown }
-    const limit = Number(body.limit)
-    if (!Number.isInteger(limit) || limit < 1 || limit > 8) {
-      throw new ApiError('CONCURRENCY_INVALID', '并发上限必须是 1–8 之间的整数', 400)
+    // 只接受 JSON 数字：null/''/布尔/数组经 Number() 会变成 0，不能当作“不限”放行
+    const limit = typeof body.limit === 'number' ? body.limit : Number.NaN
+    if (!Number.isSafeInteger(limit) || limit < 0) {
+      throw new ApiError('CONCURRENCY_INVALID', '生图并发必须是 0 或正整数，0 表示不限制', 400)
     }
 
     const saved = await deps.concurrency.set(limit)
@@ -96,8 +98,10 @@ export function registerMonitorRoutes(
 }
 
 function concurrencyStatus(deps: { gate: SerialGate; concurrency: ConcurrencyStore }) {
+  const limit = deps.gate.limitCount
   return {
-    limit: deps.gate.limitCount,
+    limit,
+    unlimited: limit === 0,
     active: deps.gate.activeCount,
     waiting: deps.gate.queueLength,
     persisted: deps.concurrency.get(),

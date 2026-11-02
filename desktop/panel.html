@@ -41,6 +41,8 @@
     --shadow-soft: 0 4px 16px rgba(40, 43, 36, 0.045);
     --font-body: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
     --font-mono: "Cascadia Mono", "Consolas", "Sarasa Mono SC", "Microsoft YaHei", monospace;
+    /* 顶层主卡片统一高度：卡头常驻，内容超出时在卡内滚动 */
+    --card-h: clamp(320px, 52vh, 460px);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -361,7 +363,7 @@
   main.grid {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    /* 卡片按内容定高：某张卡展开时，同一行左边的卡不被一起拉高 */
+    /* 卡片统一 --card-h 定高：展开/收起都只改内部滚动，不会把同一行的卡一起拉高 */
     align-items: start;
     gap: 12px;
     width: 100%;
@@ -402,6 +404,7 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    height: var(--card-h);
     padding: 12px 14px 14px;
     border: 1px solid var(--line-soft);
     border-radius: var(--radius-md);
@@ -409,12 +412,21 @@
     box-shadow: var(--shadow);
   }
 
+  /* 卡头固定不滚：展开待审核、展开反馈详情、展开趋势都只动下面的内容区 */
   .card-head {
     display: flex;
+    flex: none;
     flex-wrap: wrap;
     align-items: center;
     gap: 6px 8px;
     margin-bottom: 10px;
+  }
+
+  .card-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 
   .card-head h2 {
@@ -655,6 +667,11 @@
     width: 66px;
   }
 
+  /* 并发上限是自由填写的数字，固定宽度免得输入框被拉太长 */
+  .num-input {
+    width: 96px;
+  }
+
   /* ---------- 徽标 ---------- */
 
   .chip {
@@ -855,9 +872,7 @@
   .fb-list {
     display: flex;
     flex-direction: column;
-    max-height: 340px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    /* 高度由卡片内容区统一管：反馈详情展开后跟着 .card-body 滚，不再套一层滚动条 */
   }
 
   .fb {
@@ -999,31 +1014,28 @@
 
   .stat dd {
     margin: 1px 0 0;
-    overflow: hidden;
     font-family: var(--font-mono);
     font-size: 15px;
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.25;
     color: var(--ink);
-    /* 四块并排时列很窄：宁可省略，也不要把数字从中间拆行 */
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    /* 卡片定高、内容区能滚：宁可折行，也不要把数字截成省略号 */
+    overflow-wrap: anywhere;
   }
 
   .stat .sub {
     display: block;
-    overflow: hidden;
     margin-top: 1px;
     color: var(--ink-faint);
     font-family: var(--font-body);
     font-size: 10px;
     font-weight: 400;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
   }
 
-  /* 半宽卡里六个指标要挤在一屏，标签和值同一行才省地方 */
+  /* 标签和值排在同一行省地方；整行宽时改由 .stats-body 重排，不靠截断 */
   .sub-title {
     display: block;
     margin: 0;
@@ -1058,11 +1070,91 @@
 
   .monitor dd {
     margin: 0;
-    overflow: hidden;
+    min-width: 0;
     font-family: var(--font-mono);
     font-size: 11px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.45;
+    /* 流量、主机这类值本来就长：折行显示，截断就不可读了 */
+    overflow-wrap: anywhere;
+  }
+
+  /* 统计卡：整行宽时数字区与监控区并排，趋势独占一行 */
+  .stats-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 10px 24px;
+  }
+
+  .stats-body > .hint,
+  .stats-body > .notice {
+    grid-column: 1 / -1;
+  }
+
+  .stats-body > .stat-grid {
+    margin-bottom: 0;
+  }
+
+  .stats-body > .trend {
+    margin-top: 0;
+  }
+
+  .traffic {
+    min-width: 0;
+  }
+
+  @media (min-width: 1180px) {
+    .stats-body {
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    }
+
+    .stats-body > .trend {
+      grid-column: 1 / -1;
+    }
+
+    /* 左列四格改两行两列，数字和口径说明都放得下 */
+    .stats-body .stat-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      row-gap: 10px;
+    }
+
+    .stats-body .stat {
+      padding-right: 14px;
+    }
+
+    .stats-body .stat + .stat {
+      padding-left: 0;
+      border-left: 0;
+    }
+
+    .stats-body .stat:nth-child(even) {
+      padding-left: 14px;
+      border-left: 1px solid var(--line-soft);
+    }
+
+    .stats-body .stat:nth-child(n + 3) {
+      padding-top: 10px;
+      border-top: 1px solid var(--line-soft);
+    }
+
+    .stats-body .stat dd {
+      font-size: 18px;
+    }
+
+    .stats-body .stat .sub {
+      font-size: 10.5px;
+    }
+
+    /* 右列六项改两列三行，每项有整句的空间 */
+    .stats-body .monitor {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px 16px;
+    }
+
+    .stats-body .traffic {
+      padding-left: 24px;
+      border-left: 1px solid var(--line-soft);
+    }
   }
 
   .trend {
@@ -1250,6 +1342,11 @@
   /* ---------- 窄窗口 ---------- */
 
   @media (max-width: 880px) {
+    :root {
+      /* 单列时卡片更矮：一屏能看到下一张卡的开头 */
+      --card-h: clamp(280px, 46vh, 380px);
+    }
+
     .masthead {
       padding: 10px 14px 8px;
     }
@@ -1318,7 +1415,7 @@
 <h1 class="sr-only" id="admin-title">后台管理</h1>
 
 <main class="grid">
-  <section class="card span-12" aria-labelledby="accounts-title">
+  <section class="card span-6" aria-labelledby="accounts-title">
     <div class="card-head">
       <h2 id="accounts-title">账号</h2>
       <span class="card-note">改动直接打到本机服务，立即生效</span>
@@ -1328,38 +1425,39 @@
         <button class="button mini primary" type="button" id="btn-new-user">新建账号</button>
       </div>
     </div>
+    <div class="card-body">
+      <button class="pending-bar" type="button" id="pending-toggle" aria-expanded="false" aria-controls="pending-list">
+        <span>待审核</span>
+        <span class="count" id="regs-count"></span>
+        <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M4 6.5 8 10.5 12 6.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <div class="pending-list" id="pending-list" hidden>
+        <div class="notice" id="regs-notice" hidden></div>
+        <div id="regs-list"></div>
+        <p class="empty" id="regs-empty" hidden>没有待审核的申请</p>
+      </div>
 
-    <button class="pending-bar" type="button" id="pending-toggle" aria-expanded="false" aria-controls="pending-list">
-      <span>待审核</span>
-      <span class="count" id="regs-count"></span>
-      <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-        <path d="M4 6.5 8 10.5 12 6.5" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-    </button>
-    <div class="pending-list" id="pending-list" hidden>
-      <div class="notice" id="regs-notice" hidden></div>
-      <div id="regs-list"></div>
-      <p class="empty" id="regs-empty" hidden>没有待审核的申请</p>
+      <div class="notice" id="users-notice" hidden></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">用户名</th>
+              <th scope="col">显示名</th>
+              <th scope="col">角色</th>
+              <th scope="col">状态</th>
+              <th scope="col" class="num">今日生图</th>
+              <th scope="col">每日额度</th>
+              <th scope="col" class="actions">操作</th>
+            </tr>
+          </thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="users-empty" hidden>账号库还是空的。用「新建账号」创建一个，或到浏览器登录页完成初始化。</p>
     </div>
-
-    <div class="notice" id="users-notice" hidden></div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">用户名</th>
-            <th scope="col">显示名</th>
-            <th scope="col">角色</th>
-            <th scope="col">状态</th>
-            <th scope="col" class="num">今日生图</th>
-            <th scope="col">每日额度</th>
-            <th scope="col" class="actions">操作</th>
-          </tr>
-        </thead>
-        <tbody id="users-body"></tbody>
-      </table>
-    </div>
-    <p class="empty" id="users-empty" hidden>账号库还是空的。用「新建账号」创建一个，或到浏览器登录页完成初始化。</p>
   </section>
 
   <section class="card span-6" aria-labelledby="upstream-title">
@@ -1369,22 +1467,27 @@
         <button class="button mini" type="button" id="btn-upstream-refresh">刷新</button>
       </div>
     </div>
-    <div class="notice" id="upstream-notice" hidden></div>
-    <div class="form-row">
-      <label class="grow">上游地址
-        <input type="url" id="upstream-url" placeholder="http://127.0.0.1:3425" spellcheck="false" autocomplete="off" />
-      </label>
-      <button class="button" type="button" id="upstream-test">测试连通</button>
-      <button class="button primary" type="button" id="upstream-save">保存</button>
+    <div class="card-body">
+      <div class="notice" id="upstream-notice" hidden></div>
+      <div class="form-row">
+        <label class="grow">上游地址
+          <input type="url" id="upstream-url" placeholder="http://127.0.0.1:3425" spellcheck="false" autocomplete="off" />
+        </label>
+        <button class="button" type="button" id="upstream-test">测试连通</button>
+        <button class="button primary" type="button" id="upstream-save">保存</button>
+      </div>
+      <div class="form-row">
+        <label class="grow">提示词优化模型
+          <input type="text" id="upstream-text-model" list="upstream-model-options" placeholder="auto/deepseek-v4.1-flash" spellcheck="false" autocomplete="off" aria-describedby="upstream-model-status" />
+        </label>
+        <button class="button" type="button" id="upstream-models-refresh">获取模型</button>
+      </div>
+      <datalist id="upstream-model-options"></datalist>
+      <p class="current" id="upstream-model-status" role="status" aria-live="polite">还没获取模型列表。点「获取模型」从上游拉取，也可以直接手填模型 ID 或别名。</p>
+      <p class="hint">用于自由创作的 AI 优化提示词，需与上面地址是同一个网关；留空表示使用环境变量默认值。</p>
+      <p class="current" id="upstream-meta">读取中…</p>
+      <p class="current" id="upstream-result"></p>
     </div>
-    <div class="form-row">
-      <label class="grow">提示词优化模型
-        <input type="text" id="upstream-text-model" placeholder="auto/deepseek-v4.1-flash" spellcheck="false" autocomplete="off" />
-      </label>
-    </div>
-    <p class="hint">用于自由创作的 AI 优化提示词，需与上面地址是同一个网关；留空表示使用环境变量默认值。</p>
-    <p class="current" id="upstream-meta">读取中…</p>
-    <p class="current" id="upstream-result"></p>
   </section>
 
   <section class="card span-6" aria-labelledby="limits-title">
@@ -1394,35 +1497,29 @@
         <button class="button mini" type="button" id="btn-limits-refresh">刷新</button>
       </div>
     </div>
-    <div class="notice" id="limits-notice" hidden></div>
-    <div class="block">
-      <h4>请求限流</h4>
-      <div class="form-row">
-        <label class="check"><input type="checkbox" id="rl-enabled" /> 启用限流</label>
-        <label>窗口（秒）<input type="number" id="rl-window" min="1" max="3600" step="1" inputmode="numeric" /></label>
-        <label>每窗口最大请求数<input type="number" id="rl-max" min="1" max="100000" step="1" inputmode="numeric" /></label>
-        <button class="button primary" type="button" id="rl-save">保存</button>
+    <div class="card-body">
+      <div class="notice" id="limits-notice" hidden></div>
+      <div class="block">
+        <h4>请求限流</h4>
+        <div class="form-row">
+          <label class="check"><input type="checkbox" id="rl-enabled" /> 启用限流</label>
+          <label>窗口（秒）<input type="number" id="rl-window" min="1" max="3600" step="1" inputmode="numeric" /></label>
+          <label>每窗口最大请求数<input type="number" id="rl-max" min="1" max="100000" step="1" inputmode="numeric" /></label>
+          <button class="button primary" type="button" id="rl-save">保存</button>
+        </div>
+        <p class="current" id="rl-current">读取中…</p>
       </div>
-      <p class="current" id="rl-current">读取中…</p>
-    </div>
-    <div class="block">
-      <h4>生图并发</h4>
-      <div class="form-row">
-        <label>同时生图上限
-          <select id="cc-limit">
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-            <option value="6">6</option>
-            <option value="7">7</option>
-            <option value="8">8</option>
-          </select>
-        </label>
-        <button class="button primary" type="button" id="cc-save">保存</button>
+      <div class="block">
+        <h4>生图并发</h4>
+        <div class="form-row">
+          <label>同时生图上限
+            <input type="number" id="cc-limit" class="num-input" min="0" step="1" inputmode="numeric" placeholder="0" aria-describedby="cc-hint" />
+          </label>
+          <button class="button primary" type="button" id="cc-save">保存</button>
+        </div>
+        <p class="hint" id="cc-hint">0 表示不限制：不排队，所有生图请求直接并行打给上游。</p>
+        <p class="current" id="cc-current">读取中…</p>
       </div>
-      <p class="current" id="cc-current">读取中…</p>
     </div>
   </section>
 
@@ -1436,29 +1533,31 @@
         <button class="seg" type="button" data-filter="resolved" aria-pressed="false">已处理</button>
       </div>
     </div>
-    <div class="notice" id="feedback-notice" hidden></div>
-    <div class="fb-toolbar">
-      <div class="segmented" role="group" aria-label="反馈类型">
-        <button class="seg" type="button" data-category="all" aria-pressed="true">全部类型</button>
-        <button class="seg" type="button" data-category="bug" aria-pressed="false">问题</button>
-        <button class="seg" type="button" data-category="suggestion" aria-pressed="false">建议</button>
-        <button class="seg" type="button" data-category="other" aria-pressed="false">其他</button>
+    <div class="card-body">
+      <div class="notice" id="feedback-notice" hidden></div>
+      <div class="fb-toolbar">
+        <div class="segmented" role="group" aria-label="反馈类型">
+          <button class="seg" type="button" data-category="all" aria-pressed="true">全部类型</button>
+          <button class="seg" type="button" data-category="bug" aria-pressed="false">问题</button>
+          <button class="seg" type="button" data-category="suggestion" aria-pressed="false">建议</button>
+          <button class="seg" type="button" data-category="other" aria-pressed="false">其他</button>
+        </div>
+        <input
+          class="fb-search"
+          id="feedback-search"
+          type="search"
+          placeholder="搜索账号、昵称、正文或回复"
+          aria-label="搜索反馈"
+          autocomplete="off"
+        />
+        <button class="button mini" type="button" id="btn-feedback-refresh">刷新</button>
       </div>
-      <input
-        class="fb-search"
-        id="feedback-search"
-        type="search"
-        placeholder="搜索账号、昵称、正文或回复"
-        aria-label="搜索反馈"
-        autocomplete="off"
-      />
-      <button class="button mini" type="button" id="btn-feedback-refresh">刷新</button>
+      <div class="fb-list" id="feedback-list"></div>
+      <p class="empty" id="feedback-empty" hidden>没有反馈</p>
     </div>
-    <div class="fb-list" id="feedback-list"></div>
-    <p class="empty" id="feedback-empty" hidden>没有反馈</p>
   </section>
 
-  <section class="card span-6" aria-labelledby="stats-title">
+  <section class="card span-12" aria-labelledby="stats-title">
     <div class="card-head">
       <h2 id="stats-title">统计</h2>
       <span class="card-note">本机累计</span>
@@ -1466,62 +1565,65 @@
         <button class="button mini" type="button" id="btn-stats-refresh">刷新</button>
       </div>
     </div>
-    <div class="notice" id="stats-notice" hidden></div>
-    <dl class="stat-grid">
-      <div class="stat">
-        <dt>累计生成</dt>
-        <dd id="stat-total">—</dd>
-        <span class="sub" id="stat-total-sub"></span>
-      </div>
-      <div class="stat">
-        <dt>参与账号</dt>
-        <dd id="stat-accounts">—</dd>
-        <span class="sub" id="stat-accounts-sub"></span>
-      </div>
-      <div class="stat">
-        <dt>占用空间</dt>
-        <dd id="stat-bytes">—</dd>
-        <span class="sub" id="stat-bytes-sub"></span>
-      </div>
-      <div class="stat">
-        <dt>Token 合计</dt>
-        <dd id="stat-tokens">—</dd>
-        <span class="sub" id="stat-tokens-sub"></span>
-      </div>
-    </dl>
-    <div class="traffic">
-      <p class="sub-title">服务流量</p>
-      <dl class="monitor">
-        <div><dt>累计请求</dt><dd id="mon-requests">—</dd></div>
-        <div><dt>累计流量</dt><dd id="mon-traffic">—</dd></div>
-        <div><dt>运行时间</dt><dd id="mon-uptime">—</dd></div>
-        <div><dt>限流</dt><dd id="mon-rate">—</dd></div>
-        <div><dt>生图队列</dt><dd id="mon-queue">—</dd></div>
-        <div><dt>主机</dt><dd id="mon-host">—</dd></div>
-      </dl>
-    </div>
-    <div class="trend">
-      <div class="trend-head">
-        <span class="sub-title">生图趋势</span>
-        <button class="trend-toggle" type="button" id="trend-toggle" aria-expanded="false" aria-controls="trend-chart">
-          <span id="trend-toggle-text">展开趋势</span>
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-            <path d="M4 6.5 8 10.5 12 6.5" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-        <div class="segmented" role="group" aria-label="趋势区间">
-          <button class="seg" type="button" data-range="today" aria-pressed="false">今天</button>
-          <button class="seg" type="button" data-range="7d" aria-pressed="true">七天</button>
-          <button class="seg" type="button" data-range="30d" aria-pressed="false">一个月</button>
-          <button class="seg" type="button" data-range="90d" aria-pressed="false">三个月</button>
-          <button class="seg" type="button" data-range="180d" aria-pressed="false">六个月</button>
+    <div class="card-body stats-body">
+      <p class="hint" id="stats-scope">统计口径：仅统计客户端业务接口，不含管理端查询与健康探测。</p>
+      <div class="notice" id="stats-notice" hidden></div>
+      <dl class="stat-grid">
+        <div class="stat">
+          <dt>累计生成</dt>
+          <dd id="stat-total">—</dd>
+          <span class="sub" id="stat-total-sub"></span>
         </div>
+        <div class="stat">
+          <dt>参与账号</dt>
+          <dd id="stat-accounts">—</dd>
+          <span class="sub" id="stat-accounts-sub"></span>
+        </div>
+        <div class="stat">
+          <dt>占用空间</dt>
+          <dd id="stat-bytes">—</dd>
+          <span class="sub" id="stat-bytes-sub"></span>
+        </div>
+        <div class="stat">
+          <dt>Token 合计</dt>
+          <dd id="stat-tokens">—</dd>
+          <span class="sub" id="stat-tokens-sub"></span>
+        </div>
+      </dl>
+      <div class="traffic">
+        <p class="sub-title">服务流量</p>
+        <dl class="monitor">
+          <div><dt>累计请求</dt><dd id="mon-requests">—</dd></div>
+          <div><dt>累计流量</dt><dd id="mon-traffic">—</dd></div>
+          <div><dt>运行时间</dt><dd id="mon-uptime">—</dd></div>
+          <div><dt>限流</dt><dd id="mon-rate">—</dd></div>
+          <div><dt>生图队列</dt><dd id="mon-queue">—</dd></div>
+          <div><dt>主机</dt><dd id="mon-host">—</dd></div>
+        </dl>
       </div>
-      <p class="trend-note">
-        <span class="count" id="trend-total"></span>
-        <span class="count" id="trend-hint" hidden></span>
-      </p>
-      <div class="chart" id="trend-chart" hidden></div>
+      <div class="trend">
+        <div class="trend-head">
+          <span class="sub-title">生图趋势</span>
+          <button class="trend-toggle" type="button" id="trend-toggle" aria-expanded="false" aria-controls="trend-chart">
+            <span id="trend-toggle-text">展开趋势</span>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+              <path d="M4 6.5 8 10.5 12 6.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <div class="segmented" role="group" aria-label="趋势区间">
+            <button class="seg" type="button" data-range="today" aria-pressed="false">今天</button>
+            <button class="seg" type="button" data-range="7d" aria-pressed="true">七天</button>
+            <button class="seg" type="button" data-range="30d" aria-pressed="false">一个月</button>
+            <button class="seg" type="button" data-range="90d" aria-pressed="false">三个月</button>
+            <button class="seg" type="button" data-range="180d" aria-pressed="false">六个月</button>
+          </div>
+        </div>
+        <p class="trend-note">
+          <span class="count" id="trend-total"></span>
+          <span class="count" id="trend-hint" hidden></span>
+        </p>
+        <div class="chart" id="trend-chart" hidden></div>
+      </div>
     </div>
   </section>
 
@@ -1616,6 +1718,9 @@
     btnUpstreamRefresh: $('btn-upstream-refresh'),
     upstreamUrl: $('upstream-url'),
     upstreamTextModel: $('upstream-text-model'),
+    upstreamModelOptions: $('upstream-model-options'),
+    upstreamModelsRefresh: $('upstream-models-refresh'),
+    upstreamModelStatus: $('upstream-model-status'),
     upstreamTest: $('upstream-test'),
     upstreamSave: $('upstream-save'),
     upstreamMeta: $('upstream-meta'),
@@ -1629,6 +1734,7 @@
     feedbackSearch: $('feedback-search'),
     btnFeedbackRefresh: $('btn-feedback-refresh'),
     statsNotice: $('stats-notice'),
+    statsScope: $('stats-scope'),
     btnStatsRefresh: $('btn-stats-refresh'),
     statTotal: $('stat-total'),
     statTotalSub: $('stat-total-sub'),
@@ -1691,6 +1797,10 @@
   let feedbackSearchTimer = 0
   let feedbackEntries = new Map()
   let trendRange = '7d'
+  let trendInflight = null
+  let trendInflightRange = ''
+  let trendLoadedRange = ''
+  let statsInflight = null
   let usersCache = []
   let quotaCache = new Map()
   let flashTimer = 0
@@ -2299,22 +2409,33 @@
     }
 
     const data = result.data || {}
-    const limit = Math.min(8, Math.max(1, Number(data.limit) || 1))
+    const raw = Number(data.limit)
+    const limit = Number.isSafeInteger(raw) && raw >= 0 ? raw : 0
+    // 新契约带 unlimited；万一拿到的是旧响应，limit 为 0 也按「不限制」解释
+    const unlimited = data.unlimited === true || limit === 0
     dom.ccLimit.value = String(limit)
+
     const parts = [
-      `上限 ${limit}`,
+      unlimited ? '不限制并发（0）' : `上限 ${limit}`,
       `进行中 ${Number(data.active) || 0}`,
       `排队 ${Number(data.waiting) || 0}`,
     ]
-    const persisted = Number(data.persisted) || 0
-    if (persisted && persisted !== limit) parts.push(`已保存值 ${persisted}，等重启后生效`)
+    const persisted = Number(data.persisted)
+    if (Number.isSafeInteger(persisted) && persisted >= 0 && persisted !== limit) {
+      parts.push(`已保存值 ${persisted === 0 ? '不限制' : persisted}，等重启后生效`)
+    }
     setCurrent(dom.ccCurrent, `当前生效：${parts.join(' · ')}`, 'ok')
   }
 
   async function saveConcurrency() {
-    const limit = Number(dom.ccLimit.value)
-    if (!Number.isInteger(limit) || limit < 1 || limit > 8) {
-      flash('生图并发上限需要是 1–8 的整数', 'error')
+    const raw = dom.ccLimit.value.trim()
+    if (!raw) {
+      flash('先填并发上限，0 表示不限制', 'error')
+      return
+    }
+    const limit = Number(raw)
+    if (!Number.isSafeInteger(limit) || limit < 0) {
+      flash('生图并发上限需要是不小于 0 的整数，0 表示不限制', 'error')
       return
     }
 
@@ -2324,7 +2445,11 @@
         flash(result.error || '并发上限保存失败', 'error')
         return
       }
-      flash(`生图并发上限已设为 ${limit}，立即生效`)
+      const data = result.data || {}
+      const applied = Number(data.limit)
+      const unlimited = data.unlimited === true || applied === 0
+      const shown = Number.isSafeInteger(applied) && applied >= 0 ? applied : limit
+      flash(unlimited ? '已设为不限制并发，立即生效' : `生图并发上限已设为 ${shown}，立即生效`)
       await loadLimits()
     })
   }
@@ -2353,6 +2478,47 @@
       `当前模型：${data.model || '—'} · 地址来源：${data.fromSettings ? '后台设置（settings.json）' : '环境变量默认值'} · 优化模型：${data.textModel || '未设置'}（${data.textModelFromSettings ? '后台设置' : '环境变量默认值'}）`,
     )
     setCurrent(dom.upstreamResult, '')
+  }
+
+  // 模型自动发现：结果只填 datalist，输入框仍允许手填别名
+  async function loadUpstreamModels() {
+    await withBusy(dom.upstreamModelsRefresh, async () => {
+      setCurrent(dom.upstreamModelStatus, '正在获取上游模型列表…')
+      const result = await api('/api/admin/upstream/models?refresh=1')
+
+      if (isAuthFailure(result)) {
+        setCurrent(dom.upstreamModelStatus, AUTH_HINT, 'error')
+        return
+      }
+      if (!result.ok) {
+        setCurrent(dom.upstreamModelStatus, result.error || '获取模型列表失败', 'error')
+        return
+      }
+
+      const data = result.data || {}
+      const models = (Array.isArray(data.models) ? data.models : [])
+        .map(model => (typeof model === 'string' ? { id: model } : model || {}))
+        .filter(model => typeof model.id === 'string' && model.id.trim())
+        .map(model => ({ id: model.id.trim(), capabilities: model.capabilities || {} }))
+
+      dom.upstreamModelOptions.innerHTML = models
+        .map(model => `<option value="${escapeHtml(model.id)}" label="${escapeHtml(model.id)}"></option>`)
+        .join('')
+
+      if (!models.length) {
+        setCurrent(dom.upstreamModelStatus, '上游返回的模型列表是空的，可以直接手填模型 ID 或别名')
+        return
+      }
+
+      const notes = [`已获取 ${models.length} 个模型（来源：${data.source === 'cache' ? '缓存' : '上游'}）`]
+      const textCapable = models.filter(model => model.capabilities.text === true).length
+      // 上游常常不声明能力：照实说没验证，绝不按名字猜
+      if (textCapable === 0) notes.push('上游没有声明模型能力，能力未验证，保存前请确认它支持对话')
+      else notes.push(`${textCapable} 个标注支持对话`)
+      const fetchedAt = formatTime(data.fetchedAt)
+      if (fetchedAt !== '—') notes.push(`拉取于 ${fetchedAt}`)
+      setCurrent(dom.upstreamModelStatus, notes.join(' · '), 'ok')
+    })
   }
 
   async function testUpstream() {
@@ -2690,7 +2856,16 @@
     sub.textContent = subText || ''
   }
 
-  async function loadStats() {
+  // 折叠着就不请求趋势；连点「刷新」只跑一次在途请求
+  function loadStats() {
+    if (statsInflight) return statsInflight
+    statsInflight = runStatsLoad().finally(() => {
+      statsInflight = null
+    })
+    return statsInflight
+  }
+
+  async function runStatsLoad() {
     clearNotice(dom.statsNotice)
     const [statsResult, monitorResult] = await Promise.all([api('/api/admin/stats'), api('/api/admin/monitor')])
     if (isAuthFailure(statsResult) || isAuthFailure(monitorResult)) showNotice(dom.statsNotice, AUTH_HINT)
@@ -2699,7 +2874,22 @@
     }
     renderStats(statsResult)
     renderMonitor(monitorResult)
-    await loadTrend(trendRange)
+    // 口径与生效时间挂在监控负载的 traffic.scope 上
+    renderStatsScope(monitorResult)
+    // 趋势折叠着就别打这个接口，展开时再按当前区间补一次
+    if (!dom.trendChart.hidden) await loadTrend(trendRange)
+  }
+
+  // 口径说明：流量只统计客户端业务接口；scope.since 是当前口径的生效时间
+  function renderStatsScope(result) {
+    const parts = ['统计口径：仅统计客户端业务接口，不含管理端查询与健康探测']
+    const traffic = result && result.ok && result.data ? result.data.traffic || {} : {}
+    const since = (traffic.scope && traffic.scope.since) || traffic.since
+    let sinceText = ''
+    if (typeof since === 'number' && Number.isFinite(since)) sinceText = formatTime(new Date(since).toISOString())
+    else if (typeof since === 'string') sinceText = formatTime(since)
+    if (sinceText && sinceText !== '—') parts.push(`自 ${sinceText} 起累计`)
+    dom.statsScope.textContent = parts.join(' · ')
   }
 
   function renderStats(result) {
@@ -2743,7 +2933,10 @@
     dom.monRate.textContent = config.enabled && Number(config.maxRequests) > 0
       ? `每 ${Math.max(1, Math.round((Number(config.windowMs) || 0) / 1000))} 秒最多 ${config.maxRequests} 次`
       : '未启用（不限流）'
-    dom.monQueue.textContent = `进行中 ${Number(queue.active) || 0} / 上限 ${Number(queue.limit) || 0} · 排队 ${Number(queue.waiting) || 0}`
+    const queueLimit = Number(queue.limit)
+    // 0 表示不限制；字段缺失时老实显示未知，别把未知说成不限制
+    const queueCap = !Number.isFinite(queueLimit) ? '—' : queueLimit > 0 ? `上限 ${queueLimit}` : '不限制（0）'
+    dom.monQueue.textContent = `进行中 ${Number(queue.active) || 0} / ${queueCap} · 排队 ${Number(queue.waiting) || 0}`
     dom.monHost.textContent = data.host && data.host.hostname
       ? `${data.host.hostname} · ${data.host.platform || ''}`
       : '—'
@@ -2760,10 +2953,25 @@
     dom.trendHint.hidden = !text
   }
 
-  async function loadTrend(range) {
+  // 同一区间已有在途请求就并进去，只有换区间才另发一次
+  function loadTrend(range) {
     if (range) trendRange = range
     syncTrendRanges()
-    const result = await api(`/api/admin/stats/trend?range=${encodeURIComponent(trendRange)}`)
+    if (trendInflight && trendInflightRange === trendRange) return trendInflight
+    const requested = trendRange
+    trendInflightRange = requested
+    trendInflight = runTrendLoad(requested).finally(() => {
+      if (trendInflightRange !== requested) return
+      trendInflight = null
+      trendInflightRange = ''
+    })
+    return trendInflight
+  }
+
+  async function runTrendLoad(requested) {
+    const result = await api(`/api/admin/stats/trend?range=${encodeURIComponent(requested)}`)
+    // 等结果的这会儿用户可能已经切到别的区间，旧结果直接丢掉
+    if (requested !== trendRange) return
 
     if (isAuthFailure(result)) {
       dom.trendChart.innerHTML = ''
@@ -2779,6 +2987,7 @@
     }
 
     drawTrend(result.data || {})
+    trendLoadedRange = requested
   }
 
   function drawTrend(payload) {
@@ -2914,6 +3123,7 @@
     dom.ccSave.addEventListener('click', saveConcurrency)
 
     dom.btnUpstreamRefresh.addEventListener('click', () => loadUpstream())
+    dom.upstreamModelsRefresh.addEventListener('click', () => loadUpstreamModels())
     dom.upstreamTest.addEventListener('click', testUpstream)
     dom.upstreamSave.addEventListener('click', saveUpstream)
 
@@ -2965,7 +3175,10 @@
 
     dom.btnStatsRefresh.addEventListener('click', () => loadStats())
     dom.trendToggle.addEventListener('click', () => {
-      setTrendOpen(dom.trendChart.hidden)
+      const open = dom.trendChart.hidden
+      setTrendOpen(open)
+      // 折叠时不请求趋势：展开补一次，当前区间已经画过就不重复拉
+      if (open && trendLoadedRange !== trendRange) loadTrend(trendRange)
     })
     for (const button of dom.trendRanges) {
       button.addEventListener('click', () => {

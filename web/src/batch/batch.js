@@ -1539,7 +1539,7 @@ import { setupTablist } from '../lib/tabs.js'
             <div class="toolbar-group toolbar-generate" aria-label="生成与下载">
               <label class="toolbar-field toolbar-concurrency">
                 <span>并行</span>
-                ${concurrencySelect()}
+                ${concurrencySelect(type)}
               </label>
               <button class="button secondary" data-action="download-selected" type="button" data-download-selected>下载所选</button>
               <button class="button secondary" data-action="generate-type" type="button" data-generate-type>生成全部${meta.singular}</button>
@@ -1845,15 +1845,17 @@ import { setupTablist } from '../lib/tabs.js'
     }
 
     /**
-     * 并行数选择：服务端上限为 1（或不支持并行）时不渲染，保持逐张生成。
-     * 选项上限由服务端控制台决定（最多 8），默认选中 5。
+     * 并行数选择：可选项由任务数决定——上限取 min(服务端上限, 本类型任务数)，
+     * 服务端 0（不限制）时就是任务数本身；只有一个可选值时不渲染，保持逐张生成。
      */
-    function concurrencySelect() {
-      const limit = concurrencyLimit()
-      if (limit <= 1) return ''
-      const value = Math.min(Math.max(1, state.concurrency), limit)
+    function concurrencySelect(type) {
+      const tasks = Math.max(1, countType(type))
+      const limit = imageConcurrencyLimit()
+      const max = limit === 0 ? tasks : limit === null ? 1 : Math.min(limit, tasks)
+      if (max <= 1) return ''
+      const value = Math.min(Math.max(1, Math.floor(state.concurrency)), max)
       return `<select class="select concurrency-select" data-concurrency aria-label="并行生成数" title="同时生成的数量：调高更快，但上游可能限流或失败">
-        ${Array.from({ length: limit }, (_, index) => {
+        ${Array.from({ length: max }, (_, index) => {
           const count = index + 1
           return `<option value="${count}" ${count === value ? 'selected' : ''}>并行 ${count}</option>`
         }).join('')}
@@ -2290,11 +2292,16 @@ import { setupTablist } from '../lib/tabs.js'
 
     /* ===== 队列 ===== */
 
-    function startBatch(ids, label) {
+    async function startBatch(ids, label) {
       if (state.processing) {
         showToast('已有批量任务在运行，请等待完成或停止后续任务', true)
         return
       }
+
+      // 没拿到服务端并行上限就先不开批：宁可让用户重试，也不凭感觉限流
+      if (!(await ensureImageConcurrency())) return
+      // 等配置的这段时间里可能已经有另一批开始了，别把队列清掉重来
+      if (state.processing) return
 
       const unique = [...new Set(ids)]
         .map(findAsset)
@@ -2322,8 +2329,8 @@ import { setupTablist } from '../lib/tabs.js'
     }
 
     async function processQueue() {
-      // 并行度：默认 5；服务端 IMAGE_CONCURRENCY 是硬上限
-      const workers = Math.max(1, Math.min(concurrencyLimit(), state.concurrency || 5, state.queue.length || 1))
+      // 并行度：服务端给的是上限（0 = 不限制），本批不会超过任务数
+      const workers = batchWorkerCount(state.queue.length)
 
       const runWorker = async () => {
         while (state.queue.length && !state.stopRequested) {
@@ -2366,6 +2373,8 @@ import { setupTablist } from '../lib/tabs.js'
             asset.progress = 100
             asset.progressStage = '已完成'
             asset.updatedAt = finishedAt
+            // 新图已经落库，记录面板下次打开要重新拉一次
+            historyPanel.invalidate()
           } catch (error) {
             asset.status = 'error'
             asset.progress = 0
@@ -2412,14 +2421,81 @@ import { setupTablist } from '../lib/tabs.js'
       persistSoon()
 
       if (state.queueDone > 0) {
+        // 批次收尾再失效一次：最后几张的落库时间可能晚于中途那次刷新
+        historyPanel.invalidate()
         showToast(`批量任务完成：${state.queueDone} / ${state.queueTotal}`)
       }
     }
 
-    /** 服务端当前允许的最大并行数（控制台可调，最多 8；取不到时按 1 处理） */
-    function concurrencyLimit() {
-      const limit = Number(serverConfig?.imageConcurrency)
-      return Number.isFinite(limit) && limit >= 1 ? Math.min(8, Math.floor(limit)) : 1
+    /* 并发上限取自 /api/config：0 表示不限制，正整数是硬上限。
+       读不到时沿用本会话上一次成功读到的值；一次都没读到就交给开批前的拦截，
+       不静默退回某个固定的“安全值”。 */
+    const IMAGE_CONCURRENCY_CACHE_KEY = 'huajing.config.imageConcurrency'
+    let sessionImageConcurrency = readImageConcurrencyCache()
+
+    function readImageConcurrencyCache() {
+      try {
+        const raw = sessionStorage.getItem(IMAGE_CONCURRENCY_CACHE_KEY)
+        if (raw === null || raw === '') return null
+        const value = Number(raw)
+        return Number.isInteger(value) && value >= 0 ? value : null
+      } catch {
+        return null
+      }
+    }
+
+    function rememberImageConcurrency(value) {
+      sessionImageConcurrency = value
+      try {
+        sessionStorage.setItem(IMAGE_CONCURRENCY_CACHE_KEY, String(value))
+      } catch {
+        // 隐私模式写不进去，本次会话仍用内存里的值
+      }
+    }
+
+    /** 当前并行上限：0 = 不限制；null = 本次会话还没拿到过 */
+    function imageConcurrencyLimit() {
+      const raw = serverConfig?.imageConcurrency
+      if (Number.isInteger(raw) && raw >= 0) return raw
+      return sessionImageConcurrency
+    }
+
+    /** 本批实际并发：不限制时按任务数，正整数取 min(N, 任务数)，至少 1 */
+    function batchWorkerCount(taskCount) {
+      const tasks = Math.max(1, taskCount)
+      const limit = imageConcurrencyLimit()
+      const cap = limit === 0 ? tasks : Math.max(1, Math.min(limit ?? 1, tasks))
+      const preferred = state.concurrencyCustom ? Math.max(1, Math.floor(state.concurrency)) : cap
+      return Math.max(1, Math.min(cap, preferred))
+    }
+
+    /**
+     * 开批前确认拿得到并行上限。
+     * 有本会话缓存就直接用（拉配置失败时已经在 boot 里提示过），
+     * 一次都没读到过就拦住这批任务并给一个重试入口。
+     */
+    async function ensureImageConcurrency() {
+      if (imageConcurrencyLimit() !== null) return true
+      try {
+        const config = await fetchServerConfig()
+        serverConfig = config
+        const value = config?.imageConcurrency
+        if (!Number.isInteger(value) || value < 0) throw new Error('配置里没有可用的并行上限')
+        rememberImageConcurrency(value)
+        renderActivePanel()
+        renderRatioSelects()
+        return true
+      } catch {
+        showToast('没读到服务端并行上限，暂时无法开始批量生成', true, {
+          label: '重试',
+          onClick: () => {
+            ensureImageConcurrency().then(ok => {
+              if (ok) showToast('已拿到并行上限，可以开始生成')
+            })
+          },
+        })
+        return false
+      }
     }
 
     function stopQueue() {
@@ -2729,6 +2805,8 @@ import { setupTablist } from '../lib/tabs.js'
       }, 300)
     }
 
+    let renameOverlayHandle = null
+
     function openRenameDialog() {
       if (!renameModal) return
       renameInput.value = (document.querySelector('#header-user')?.textContent || '').trim()
@@ -2736,11 +2814,21 @@ import { setupTablist } from '../lib/tabs.js'
       renameInput.classList.remove('invalid')
       renameInput.removeAttribute('aria-invalid')
       renameModal.classList.add('visible')
+      // ESC、焦点陷阱、滚动锁、关闭后的焦点归还全部交给 overlay，
+      // 页面自己不再额外挂 keydown，免得一次 ESC 关两遍
+      if (!renameOverlayHandle) {
+        renameOverlayHandle = activateOverlay(renameModal, {
+          onRequestClose: closeRenameDialog,
+          initialFocus: renameInput,
+        })
+      }
       renameInput.focus()
       renameInput.select()
     }
 
     function closeRenameDialog() {
+      renameOverlayHandle?.release()
+      renameOverlayHandle = null
       renameModal?.classList.remove('visible')
     }
 
@@ -2887,6 +2975,21 @@ import { setupTablist } from '../lib/tabs.js'
 
     /** 只留最近一次优化前的文本：连续优化时撤销退回上一步，不堆栈 */
     let freePromptBeforeOptimize = ''
+    /* 在途的参考图上传：优化前必须等它落地，否则会把这张图静默漏掉 */
+    let freeRefUploadTask = null
+    /* 上一次上传失败的原因：失败后不许直接优化，要先把图重新传上来 */
+    let freeRefUploadFailed = ''
+    /* 优化请求序号：用户中途改了文本/比例/参考图时，旧响应不能覆盖新状态 */
+    let optimizeRequestSeq = 0
+
+    /** 一次优化请求的输入签名：文本、比例、参考图路径（按显示顺序） */
+    function freeOptimizeSignature(prompt) {
+      return JSON.stringify({
+        prompt,
+        ratio: dom.freeRatio.value,
+        references: state.freeReferences.map(ref => ref.path),
+      })
+    }
 
     /** 提示词写回输入框时要同时照顾字数与本地快照，避免刷新后回退 */
     function applyFreePrompt(value) {
@@ -2898,7 +3001,7 @@ import { setupTablist } from '../lib/tabs.js'
 
     /** 用对话模型把一句短描述扩写成完整生图提示词；失败时原样保留用户输入 */
     async function optimizeFreePrompt() {
-      const current = dom.freePrompt.value.trim()
+      let current = dom.freePrompt.value.trim()
       if (!current) {
         showToast('先写一点画面描述，AI 才能帮你扩写')
         return
@@ -2909,14 +3012,39 @@ import { setupTablist } from '../lib/tabs.js'
       dom.freePromptOptimize.classList.add('is-busy')
       dom.freePromptOptimize.setAttribute('aria-busy', 'true')
       try {
+        // 参考图还没传完就先等它：优化要带着这次上传的图一起送模型
+        if (freeRefUploadTask) {
+          await freeRefUploadTask.catch(() => {})
+          current = dom.freePrompt.value.trim()
+          if (!current) {
+            showToast('先写一点画面描述，AI 才能帮你扩写')
+            return
+          }
+        }
+        if (freeRefUploadFailed) {
+          const reason = freeRefUploadFailed
+          freeRefUploadFailed = ''
+          showToast(`参考图上传失败（${reason}），已取消本次优化，请重新上传`, true)
+          return
+        }
+
+        const referencePaths = state.freeReferences.slice(0, FREE_REF_LIMIT).map(ref => ref.path)
+        const signature = freeOptimizeSignature(current)
+        const seq = ++optimizeRequestSeq
         const result = await optimizePrompt({
           prompt: current,
           ratio: dom.freeRatio.value,
-          referenceCount: state.freeReferences.length,
+          referenceCount: referencePaths.length,
+          referencePaths,
         })
         const next = (result?.prompt || '').trim()
         if (!next) {
           showToast('提示词优化失败，请稍后重试', true)
+          return
+        }
+        // 响应回来时内容已经变了：旧结果丢弃，不覆盖用户当前输入
+        if (seq !== optimizeRequestSeq || freeOptimizeSignature(dom.freePrompt.value.trim()) !== signature) {
+          showToast('内容已改动，这次优化结果已丢弃')
           return
         }
         freePromptBeforeOptimize = dom.freePrompt.value
@@ -3139,7 +3267,7 @@ import { setupTablist } from '../lib/tabs.js'
       })
     }
 
-    /** 校验 → dataURL → 上传 → 追加到 state；失败只提示，不动已有的图 */
+    /** 校验 → 交给 runFreeReferenceUpload；在途的那一次记在 freeRefUploadTask 上 */
     async function attachFreeReference(file) {
       if (!file) return
       if (state.freeBusy) {
@@ -3160,6 +3288,18 @@ import { setupTablist } from '../lib/tabs.js'
       }
       if (state.freeRefUploading) return
 
+      freeRefUploadFailed = ''
+      const task = runFreeReferenceUpload(file)
+      freeRefUploadTask = task
+      try {
+        await task
+      } finally {
+        if (freeRefUploadTask === task) freeRefUploadTask = null
+      }
+    }
+
+    /** 真正的上传流程：失败时记下原因，优化据此拒绝发起 */
+    async function runFreeReferenceUpload(file) {
       state.freeRefUploading = true
       renderFreeReferences()
       try {
@@ -3173,8 +3313,11 @@ import { setupTablist } from '../lib/tabs.js'
         })
         persistSoon()
         showToast(`参考图已添加（${state.freeReferences.length} 张）`)
+        return true
       } catch (error) {
-        showToast(error.message || '参考图上传失败', true)
+        freeRefUploadFailed = error.message || '参考图上传失败'
+        showToast(freeRefUploadFailed, true)
+        return false
       } finally {
         state.freeRefUploading = false
         renderFreeReferences()
@@ -3184,6 +3327,8 @@ import { setupTablist } from '../lib/tabs.js'
     function removeFreeReference(index) {
       if (state.freeBusy) return
       if (!Number.isInteger(index) || !state.freeReferences[index]) return
+      // 用户已经改了参考图集合，上一次上传失败不再挡后续优化
+      freeRefUploadFailed = ''
       state.freeReferences.splice(index, 1)
       persistSoon()
       renderFreeReferences()
@@ -3427,6 +3572,8 @@ import { setupTablist } from '../lib/tabs.js'
         dom.freeDownload.disabled = false
         dom.freeMaximize.disabled = false
         dom.freeStatus.textContent = `生成完成 · ${result.width} × ${result.height}`
+        // 自由创作的图同样进服务端记录，面板下次打开要重新拉
+        historyPanel.invalidate()
       } catch (error) {
         clearPendingJob()
         stopFreeProgress()
@@ -3495,7 +3642,7 @@ import { setupTablist } from '../lib/tabs.js'
 
     /* ===== 启动 ===== */
 
-    setupHistoryPanel()
+    const historyPanel = setupHistoryPanel()
     const avatarMenu = setupAvatarMenu({
       shouldIgnoreOutsideClick: event => event.target.closest?.('#history-panel'),
     })
@@ -3531,9 +3678,6 @@ import { setupTablist } from '../lib/tabs.js'
     document.querySelector('#rename-close')?.addEventListener('click', closeRenameDialog)
     renameModal?.addEventListener('click', event => {
       if (event.target === renameModal) closeRenameDialog()
-    })
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && renameModal?.classList.contains('visible')) closeRenameDialog()
     })
 
     document.querySelector('#rename-form')?.addEventListener('submit', async event => {
@@ -3929,11 +4073,15 @@ import { setupTablist } from '../lib/tabs.js'
       // 并行生成数：记住选择，三个资产页共用同一个值
       const concurrency = event.target.closest('[data-concurrency]')
       if (concurrency) {
-        const value = Math.max(1, Math.min(concurrencyLimit(), Number(concurrency.value) || 1))
+        const limit = imageConcurrencyLimit()
+        const picked = Math.max(1, Math.floor(Number(concurrency.value) || 1))
+        const value = limit && limit > 0 ? Math.min(limit, picked) : picked
         state.concurrency = value
         state.concurrencyCustom = true
+        // 三个资产页共用同一个值，但各页任务数不同，按各自选项上限截断
         document.querySelectorAll('[data-concurrency]').forEach(select => {
-          select.value = String(value)
+          const options = select.options.length
+          select.value = String(options ? Math.min(value, options) : value)
         })
         persistSoon()
         return
@@ -4091,17 +4239,24 @@ import { setupTablist } from '../lib/tabs.js'
       // 先加载项目，再决定风格库用项目的还是全局模板的
       loadProjects().then(() => loadSharedStyles())
 
-      // 后端配置决定可选画面比例，拉取失败时保留本地兜底值
+      // 后端配置决定可选画面比例与并行上限，拉取失败时不静默掩盖
       fetchServerConfig()
         .then(config => {
           serverConfig = config
+          const concurrency = config?.imageConcurrency
+          if (Number.isInteger(concurrency) && concurrency >= 0) rememberImageConcurrency(concurrency)
           renderActivePanel()
           renderRatioSelects()
           // 没配文本模型时不亮出按钮，省得点了才发现用不了
           const textModel = config?.promptOptimize?.textModel
           if (textModel) dom.freePromptOptimize.hidden = false
         })
-        .catch(() => {})
+        .catch(() => {
+          // 本会话读到过就沿用并说明；一次都没读到，开批时会被拦下并给重试
+          if (sessionImageConcurrency !== null) {
+            showToast('没读到服务端配置，并行上限沿用本会话上次读取的值')
+          }
+        })
     }
 
     /** 头像与菜单里的账号标识（名字取自 /api/auth/me 的实时结果） */
@@ -4730,9 +4885,11 @@ import { setupTablist } from '../lib/tabs.js'
     const ABOUT_LAST_CHECK_KEY = 'huajing.update.lastCheckAt'
 
     const aboutModal = document.querySelector('#about-modal')
+    const aboutClose = document.querySelector('#about-close')
     const aboutCurrent = document.querySelector('#about-current')
     const aboutStatus = document.querySelector('#about-status')
     const aboutNotesWrap = document.querySelector('#about-notes-wrap')
+    const aboutNotesTitle = document.querySelector('#about-notes-title')
     const aboutNotes = document.querySelector('#about-notes')
     const aboutMsg = document.querySelector('#about-msg')
     const aboutDownload = document.querySelector('#about-download')
@@ -4780,10 +4937,14 @@ import { setupTablist } from '../lib/tabs.js'
 
       if (aboutMsg) aboutMsg.textContent = info.error || ''
 
-      const notes = hasUpdate ? String(info.releaseNotes || '').trim() : ''
+      // 只要拿到了最新版本信息就展示它的更新日志，不只限于「有新版本」
       if (aboutNotesWrap && aboutNotes) {
-        aboutNotesWrap.hidden = !notes
-        aboutNotes.textContent = notes
+        aboutNotesWrap.hidden = !latest
+        if (aboutNotesTitle) {
+          aboutNotesTitle.textContent = latest ? `最新版本 ${latest} 的更新内容` : '更新内容'
+        }
+        // 纯文本写入：releaseNotes 来自外部源，不能当 HTML 解析
+        aboutNotes.textContent = String(info.releaseNotes || '').trim() || '这个版本没有提供更新说明'
       }
 
       if (aboutDownload) {
@@ -4836,14 +4997,14 @@ import { setupTablist } from '../lib/tabs.js'
     function openAboutModal() {
       if (!aboutModal) return
       aboutModal.classList.add('visible')
+      // 关闭时已经释放句柄，这里每次打开都重新登记：焦点才会重新落到关闭按钮上
       if (!aboutOverlayHandle) {
         aboutOverlayHandle = activateOverlay(aboutModal, {
           onRequestClose: closeAboutModal,
-          initialFocus: aboutRecheck,
+          // 「重新检查」在检查期间会被 disable，不能当初始焦点
+          initialFocus: aboutClose,
         })
       }
-      // 重开时 overlay 不会重新定焦点（handle 复用），这里补上
-      aboutRecheck?.focus()
       checkUpdate(false)
     }
 
