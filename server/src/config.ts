@@ -138,7 +138,7 @@ export const config = {
   /** 当前应用版本；桌面端安装包里会注入，留空时从 server/package.json 读取 */
   appVersion: process.env.APP_VERSION || '',
   /** 更新检查的 GitHub 仓库（owner/repo） */
-  updateRepo: process.env.UPDATE_REPO || 'ikun1946/huajing-image-web',
+  updateRepo: process.env.UPDATE_REPO || 'ikun1946/mpimage',
   /** 自定义更新源地址；非空时优先于 GitHub，桌面端可指向自己的发布接口 */
   updateFeedUrl: process.env.UPDATE_FEED_URL || '',
   /** 访问 GitHub 私有/限流时的令牌；公开仓库留空即可 */

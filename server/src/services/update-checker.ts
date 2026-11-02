@@ -38,7 +38,7 @@ const SUCCESS_TTL_MS = 10 * 60 * 1000
 const FAILURE_TTL_MS = 60 * 1000
 const REQUEST_TIMEOUT_MS = 8000
 const NOTES_LIMIT = 4000
-const USER_AGENT = 'huajing-image-web-update-checker'
+const USER_AGENT = 'mpimage-update-checker'
 
 const currentVersion = normalizeVersion(config.appVersion || readPackageVersion() || '0.0.0')
 

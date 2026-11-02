@@ -7,7 +7,7 @@
 ## 目录结构
 
 ```text
-huajing-image-web/
+mpimage/
 ├── server/                    后端：只提供 API，不托管页面
 │   ├── src/
 │   │   ├── index.ts           启动、路由装配、CORS、错误处理
@@ -625,7 +625,7 @@ ADMIN_SETUP_KEY           引导创建首个管理员的管理密钥，留空则
 CORS_ORIGINS              允许的前端来源（已改为自动放行回环与私有网段，此项保留兼容）
 
 APP_VERSION               当前版本号；桌面端注入 app.getVersion()，留空则读 server/package.json
-UPDATE_REPO               更新检查的 GitHub 仓库（owner/repo），默认 ikun1946/huajing-image-web
+UPDATE_REPO               更新检查的 GitHub 仓库（owner/repo），默认 ikun1946/mpimage
 UPDATE_FEED_URL           自定义更新源 JSON 地址；非空时优先于 GitHub，
                           格式 { version, notes?, downloadUrl?, pageUrl?, publishedAt? }
 UPDATE_TOKEN              访问 GitHub 的令牌；公开仓库留空即可，私有仓库或触发限流时再填
