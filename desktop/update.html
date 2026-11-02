@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'" />
-<title>画境 · 更新下载</title>
+<title>画境 · 更新</title>
 <style>
   :root {
     color-scheme: light;
@@ -65,14 +65,13 @@
     display: none !important;
   }
 
-  html,
-  body {
+  html {
     height: 100%;
-    margin: 0;
+    background: var(--paper);
   }
 
   body {
-    overflow: hidden;
+    margin: 0;
     background: var(--paper);
     color: var(--ink);
     font-family: var(--font-body);
@@ -86,11 +85,8 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    height: 100%;
-    min-height: 0;
     padding: 18px 22px 14px;
     overflow-x: hidden;
-    overflow-y: auto;
   }
 
   .head {
@@ -144,6 +140,14 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-width: 0;
+  }
+
+  .view {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
   }
 
   .gauge {
@@ -152,56 +156,77 @@
     gap: 14px;
   }
 
-  .track {
-    position: relative;
+  /**
+   * 原生 <progress>：确定态写 value，不确定态删掉 value，
+   * 两种状态语义一致——没有总大小就不编百分比。
+   */
+  progress.track {
+    container-type: inline-size;
+    --progress-bar-indeterminate-size: 34%;
+    --progress-bar-indeterminate-animation-duration: 1200ms;
+    appearance: none;
+    -webkit-appearance: none;
+    display: block;
     flex: 1 1 auto;
-    height: 8px;
+    min-width: 0;
+    inline-size: 100%;
+    block-size: 8px;
+    border: 0 solid;
     border-radius: var(--radius-pill);
     background: var(--surface-subtle);
     box-shadow: inset 0 0 0 1px var(--line-soft);
-    overflow: hidden;
+    overflow: clip;
   }
 
-  .fill {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 0;
-    border-radius: inherit;
+  progress.track::-webkit-progress-bar {
+    background: transparent;
+  }
+
+  progress.track::-webkit-progress-value {
     background: var(--moss);
-    transition: width 200ms linear;
+    border-radius: var(--radius-pill);
+    transition: inline-size 200ms linear;
+    animation: var(--progress-bar-animation, revert-rule);
   }
 
-  .track.is-indeterminate .fill {
-    width: 34%;
-    transition: none;
-    animation: slide 1200ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  progress.track::-moz-progress-bar {
+    background: var(--moss);
+    border-radius: var(--radius-pill);
+    transition: inline-size 200ms linear;
+    animation: var(--progress-bar-animation, revert-rule);
   }
 
-  @keyframes slide {
-    from {
-      transform: translateX(-110%);
-    }
+  progress.track:indeterminate {
+    --progress-bar-animation: progress-bar-indeterminate var(--progress-bar-indeterminate-animation-duration) infinite linear;
+  }
+
+  @keyframes progress-bar-indeterminate {
+    from,
     to {
-      transform: translateX(310%);
+      inline-size: var(--progress-bar-indeterminate-size);
+      margin-right: auto;
+    }
+
+    from {
+      translate: -100%;
+    }
+
+    to {
+      translate: 100cqi;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .track.is-indeterminate .fill {
-      width: 100%;
-      animation: pulse 1600ms ease-in-out infinite;
+    progress.track {
+      --progress-bar-indeterminate-animation-duration: 2400ms;
     }
 
-    @keyframes pulse {
-      0%,
-      100% {
-        opacity: 0.35;
-      }
-      50% {
-        opacity: 1;
-      }
+    progress.track::-webkit-progress-value {
+      transition: none;
+    }
+
+    progress.track::-moz-progress-bar {
+      transition: none;
     }
   }
 
@@ -218,32 +243,95 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .metrics {
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 8px 16px;
+    margin: 0;
+  }
+
+  .fact {
     display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 8px;
-    color: var(--ink-soft);
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
   }
 
-  .metrics .bytes {
-    color: var(--ink);
-    font-family: var(--font-mono);
-  }
-
-  .metrics .dot {
-    color: var(--ink-faint);
-  }
-
-  .meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
+  .fact dt {
     color: var(--ink-faint);
     font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .fact dd {
+    margin: 0;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  .fact dd.mono {
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .notes-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .notes-head {
+    color: var(--ink-faint);
+    font-size: 11px;
+  }
+
+  .notes {
+    max-height: 210px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px 10px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink-soft);
+    font-size: 12px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+    overscroll-behavior: contain;
+  }
+
+  .notes:focus-visible {
+    outline: none;
+    border-color: var(--moss);
+    box-shadow: 0 0 0 3px var(--moss-tint);
+  }
+
+  .lead {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .lead.is-error {
+    color: var(--danger);
+  }
+
+  .detail {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 12px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+    user-select: text;
   }
 
   .foot {
@@ -251,7 +339,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    margin-top: auto;
     padding-top: 4px;
   }
 
@@ -300,292 +387,661 @@
   .button.primary:hover:not(:disabled) {
     background: var(--moss-dark);
   }
+
+  .button.ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+
+  .button.ghost:hover:not(:disabled) {
+    border-color: var(--line);
+    background: var(--surface-subtle);
+    color: var(--ink);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
 </style>
 </head>
 <body>
-  <div class="shell">
+  <div class="shell" id="shell">
     <header class="head">
       <div class="head-text">
-        <h1 class="title" id="title">准备中…</h1>
+        <h1 class="title" id="title">画境 · 更新</h1>
         <p class="caption" id="caption" hidden></p>
       </div>
-      <span class="badge" id="badge" hidden>镜像</span>
+      <span class="badge" id="badge" hidden></span>
     </header>
 
     <section class="body">
-      <div class="gauge" id="gauge" hidden>
-        <div class="track" id="track" role="progressbar" aria-valuemin="0" aria-valuemax="100">
-          <div class="fill" id="fill"></div>
+      <div class="view" id="view-busy" hidden>
+        <div class="gauge">
+          <progress class="track" id="busy-progress" max="100" aria-label="任务进度"></progress>
+          <span class="percent" id="busy-percent">—</span>
         </div>
-        <span class="percent" id="percent">0%</span>
+        <dl class="facts">
+          <div class="fact">
+            <dt>状态</dt>
+            <dd id="busy-meta">—</dd>
+          </div>
+        </dl>
       </div>
 
-      <div class="metrics" id="metrics" hidden>
-        <span class="bytes" id="bytes"></span>
-        <span class="dot" id="dot-speed" hidden>·</span>
-        <span id="speed"></span>
-        <span class="dot" id="dot-eta" hidden>·</span>
-        <span id="eta"></span>
+      <div class="view" id="view-available" hidden>
+        <dl class="facts">
+          <div class="fact">
+            <dt>当前版本</dt>
+            <dd id="available-current">—</dd>
+          </div>
+          <div class="fact">
+            <dt>最新版本</dt>
+            <dd id="available-latest">—</dd>
+          </div>
+          <div class="fact">
+            <dt>发布时间</dt>
+            <dd id="available-published">—</dd>
+          </div>
+          <div class="fact">
+            <dt>安装包大小</dt>
+            <dd class="mono" id="available-size">—</dd>
+          </div>
+        </dl>
+        <div class="notes-wrap">
+          <div class="notes-head">更新说明</div>
+          <div class="notes" id="available-notes" tabindex="0" role="region" aria-label="更新说明"></div>
+        </div>
       </div>
 
-      <p class="meta" id="meta" hidden><span id="connections"></span></p>
+      <div class="view" id="view-latest" hidden>
+        <p class="lead" id="latest-lead">已是最新版本</p>
+        <dl class="facts">
+          <div class="fact">
+            <dt>当前版本</dt>
+            <dd id="latest-current">—</dd>
+          </div>
+          <div class="fact">
+            <dt>检查时间</dt>
+            <dd id="latest-checked">—</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="view" id="view-download" hidden>
+        <div class="gauge">
+          <progress class="track" id="download-progress" max="100" aria-label="下载进度"></progress>
+          <span class="percent" id="download-percent">—</span>
+        </div>
+        <dl class="facts">
+          <div class="fact">
+            <dt>已下载</dt>
+            <dd class="mono" id="download-received">—</dd>
+          </div>
+          <div class="fact">
+            <dt>总大小</dt>
+            <dd class="mono" id="download-total">—</dd>
+          </div>
+          <div class="fact">
+            <dt>速度</dt>
+            <dd class="mono" id="download-speed">—</dd>
+          </div>
+          <div class="fact">
+            <dt>预计剩余</dt>
+            <dd class="mono" id="download-eta">—</dd>
+          </div>
+          <div class="fact">
+            <dt>连接数</dt>
+            <dd id="download-connections">—</dd>
+          </div>
+          <div class="fact">
+            <dt>下载源</dt>
+            <dd id="download-mirror">—</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="view" id="view-done" hidden>
+        <p class="lead" id="done-lead">下载完成</p>
+        <dl class="facts">
+          <div class="fact">
+            <dt>版本</dt>
+            <dd id="done-version">—</dd>
+          </div>
+          <div class="fact">
+            <dt>文件</dt>
+            <dd id="done-file">—</dd>
+          </div>
+          <div class="fact">
+            <dt>大小</dt>
+            <dd class="mono" id="done-size">—</dd>
+          </div>
+          <div class="fact">
+            <dt>位置</dt>
+            <dd id="done-path">—</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="view" id="view-error" hidden>
+        <p class="lead is-error" id="error-lead">更新失败</p>
+        <p class="detail" id="error-detail"></p>
+      </div>
+
+      <div class="view" id="view-cancel" hidden>
+        <p class="lead" id="cancel-lead">下载已取消</p>
+        <p class="detail" id="cancel-detail"></p>
+      </div>
     </section>
 
     <footer class="foot">
-      <button type="button" class="button primary" id="install" hidden>立即安装</button>
-      <button type="button" class="button" id="folder" hidden>打开所在文件夹</button>
-      <button type="button" class="button" id="close" hidden>关闭</button>
-      <button type="button" class="button primary" id="retry" hidden>重试</button>
-      <button type="button" class="button" id="page" hidden>前往发布页</button>
-      <button type="button" class="button" id="cancel" hidden>取消</button>
+      <button class="button" type="button" id="action-primary" hidden></button>
+      <button class="button" type="button" id="action-secondary" hidden></button>
+      <button class="button ghost" type="button" id="action-tertiary" hidden></button>
     </footer>
   </div>
 
-<script>
-  const MIN_PAINT_MS = 200
+  <p class="sr-only" id="live" role="status" aria-live="polite"></p>
 
-  const api = window.updaterApi || null
-  const els = {
-    title: document.getElementById('title'),
-    caption: document.getElementById('caption'),
-    badge: document.getElementById('badge'),
-    gauge: document.getElementById('gauge'),
-    track: document.getElementById('track'),
-    fill: document.getElementById('fill'),
-    percent: document.getElementById('percent'),
-    metrics: document.getElementById('metrics'),
-    bytes: document.getElementById('bytes'),
-    dotSpeed: document.getElementById('dot-speed'),
-    speed: document.getElementById('speed'),
-    dotEta: document.getElementById('dot-eta'),
-    eta: document.getElementById('eta'),
-    meta: document.getElementById('meta'),
-    connections: document.getElementById('connections'),
-    install: document.getElementById('install'),
-    folder: document.getElementById('folder'),
-    close: document.getElementById('close'),
-    retry: document.getElementById('retry'),
-    page: document.getElementById('page'),
-    cancel: document.getElementById('cancel'),
-  }
+  <script>
+    (() => {
+      'use strict'
 
-  const BUTTONS = {
-    install: els.install,
-    folder: els.folder,
-    close: els.close,
-    retry: els.retry,
-    page: els.page,
-    cancel: els.cancel,
-  }
+      const api = window.updaterApi || null
 
-  let renderedPhase = 'idle'
-  let lastPaint = 0
-  let queued = null
-  let queuedTimer = 0
+      const VIEW_IDS = [
+        'view-busy',
+        'view-available',
+        'view-latest',
+        'view-download',
+        'view-done',
+        'view-error',
+        'view-cancel',
+      ]
+      const KNOWN_PHASES = ['checking', 'available', 'latest', 'resolve', 'download', 'done', 'error', 'cancel']
+      // 旧状态名也认一下，免得主进程换名字时窗口直接空掉
+      const PHASE_ALIAS = { cancelled: 'cancel', probe: 'resolve', probing: 'resolve' }
 
-  function text(node, value) {
-    if (node.textContent !== value) node.textContent = value
-  }
+      const $ = id => document.getElementById(id)
 
-  function show(node, visible) {
-    const hidden = !visible
-    if (node.hidden !== hidden) node.hidden = hidden
-  }
-
-  function mb(bytes) {
-    return `${(Math.max(0, Number(bytes) || 0) / 1048576).toFixed(1)} MB`
-  }
-
-  function perSecond(speed) {
-    return `${(Math.max(0, Number(speed) || 0) / 1048576).toFixed(1)} MB/s`
-  }
-
-  function etaText(received, total, speed) {
-    if (!total || !speed || speed <= 0) return ''
-    const rest = Math.ceil((total - received) / speed)
-    if (rest <= 0) return ''
-    if (rest > 60) return `剩余约 ${Math.round(rest / 60)} 分`
-    return `剩余约 ${rest} 秒`
-  }
-
-  function connText(count) {
-    const n = Math.max(0, Number(count) || 0)
-    return n > 1 ? `${n} 线程` : '单线程'
-  }
-
-  function setButtons(list, retryLabel) {
-    const active = Array.isArray(list) ? list : []
-    for (const name of Object.keys(BUTTONS)) {
-      show(BUTTONS[name], active.includes(name))
-    }
-    if (retryLabel) text(els.retry, retryLabel)
-  }
-
-  function render(state) {
-    lastPaint = Date.now()
-    const phase = state && state.phase ? String(state.phase) : 'idle'
-    renderedPhase = phase
-
-    const version = state && state.version ? String(state.version) : ''
-    const fileName = state && state.fileName ? String(state.fileName) : ''
-    const received = state ? Math.max(0, Number(state.received) || 0) : 0
-    const total = state ? Math.max(0, Number(state.total) || 0) : 0
-    const speed = state ? Math.max(0, Number(state.speed) || 0) : 0
-    const connections = state ? Number(state.connections) || 0 : 0
-    const mirror = Boolean(state && state.mirror)
-
-    show(els.badge, mirror && (phase === 'resolve' || phase === 'download'))
-    show(els.gauge, phase === 'resolve' || phase === 'download')
-    els.track.classList.toggle('is-indeterminate', phase === 'resolve')
-    els.caption.classList.toggle('is-error', phase === 'error')
-    show(els.metrics, phase === 'download')
-    show(els.meta, phase === 'download')
-
-    switch (phase) {
-      case 'resolve':
-        text(els.title, '正在获取下载地址…')
-        text(els.caption, version ? `目标版本 ${version}` : '')
-        show(els.caption, Boolean(version))
-        show(els.percent, false)
-        els.track.removeAttribute('aria-valuenow')
-        setButtons([])
-        break
-
-      case 'download': {
-        text(els.title, version ? `正在下载画境 ${version}` : '正在下载画境')
-        text(els.caption, fileName)
-        show(els.caption, Boolean(fileName))
-        const ratio = total > 0 ? Math.min(1, received / total) : 0
-        const percent = Math.floor(ratio * 100)
-        els.fill.style.width = `${(ratio * 100).toFixed(2)}%`
-        show(els.percent, total > 0)
-        text(els.percent, `${percent}%`)
-        els.track.setAttribute('aria-valuenow', String(percent))
-        text(els.bytes, total > 0 ? `${mb(received)} / ${mb(total)}` : mb(received))
-        const rate = speed > 0 ? perSecond(speed) : ''
-        text(els.speed, rate)
-        show(els.dotSpeed, Boolean(rate))
-        const eta = etaText(received, total, speed)
-        text(els.eta, eta)
-        show(els.dotEta, Boolean(eta))
-        text(els.connections, connText(connections))
-        setButtons(['cancel'])
-        break
+      const ui = {
+        title: $('title'),
+        caption: $('caption'),
+        badge: $('badge'),
+        busyProgress: $('busy-progress'),
+        busyPercent: $('busy-percent'),
+        busyMeta: $('busy-meta'),
+        availableCurrent: $('available-current'),
+        availableLatest: $('available-latest'),
+        availablePublished: $('available-published'),
+        availableSize: $('available-size'),
+        availableNotes: $('available-notes'),
+        latestCurrent: $('latest-current'),
+        latestChecked: $('latest-checked'),
+        downloadProgress: $('download-progress'),
+        downloadPercent: $('download-percent'),
+        downloadReceived: $('download-received'),
+        downloadTotal: $('download-total'),
+        downloadSpeed: $('download-speed'),
+        downloadEta: $('download-eta'),
+        downloadConnections: $('download-connections'),
+        downloadMirror: $('download-mirror'),
+        doneVersion: $('done-version'),
+        doneFile: $('done-file'),
+        doneSize: $('done-size'),
+        donePath: $('done-path'),
+        errorDetail: $('error-detail'),
+        cancelDetail: $('cancel-detail'),
+        live: $('live'),
       }
 
-      case 'done': {
-        text(els.title, '安装包已下载')
-        const size = total || received
-        text(els.caption, [fileName || '安装包', size > 0 ? mb(size) : ''].filter(Boolean).join(' · '))
-        show(els.caption, true)
-        setButtons(['install', 'folder', 'close'])
-        break
+      const buttons = [
+        { slot: 'primary', el: $('action-primary') },
+        { slot: 'secondary', el: $('action-secondary') },
+        { slot: 'tertiary', el: $('action-tertiary') },
+      ]
+
+      let state = { phase: 'checking' }
+      let lastPhase = ''
+      // 记录这一轮是否真的开过下载：状态里有时拿不到文件名，
+      // 但「解析/下载」出现过就说明已经有下载目标了
+      let downloadAttempted = false
+      const pending = new Set()
+
+      /* ---------- 取值与格式化 ---------- */
+
+      function toNumber(value) {
+        const n = Number(value)
+        return Number.isFinite(n) ? n : 0
       }
 
-      case 'error':
-        text(els.title, '下载失败')
-        text(els.caption, state && state.message ? String(state.message) : '下载过程出错，请重试')
-        show(els.caption, true)
-        setButtons(['retry', 'page'], '重试')
-        break
-
-      case 'cancelled':
-        text(els.title, '已取消')
-        text(els.caption, version ? `画境 ${version} 尚未下载完成` : '')
-        show(els.caption, Boolean(version))
-        setButtons(['retry'], '重新下载')
-        break
-
-      default:
-        text(els.title, '准备中…')
-        text(els.caption, '')
-        show(els.caption, false)
-        show(els.gauge, false)
-        show(els.metrics, false)
-        show(els.meta, false)
-        show(els.badge, false)
-        setButtons([])
-        break
-    }
-  }
-
-  // 主进程按 chunk 推送，这里限到每秒最多 5 次重绘；阶段切换立即生效
-  function receive(state) {
-    const phase = state && state.phase ? String(state.phase) : 'idle'
-    if (phase !== renderedPhase) {
-      if (queuedTimer) {
-        clearTimeout(queuedTimer)
-        queuedTimer = 0
+      function formatBytes(value, fallback) {
+        const empty = fallback === undefined ? '未知' : fallback
+        if (value === null || value === undefined || value === '') return empty
+        const n = Number(value)
+        if (!Number.isFinite(n) || n < 0) return empty
+        if (n === 0) return '0 B'
+        const units = ['B', 'KB', 'MB', 'GB', 'TB']
+        let size = n
+        let unit = 0
+        while (size >= 1024 && unit < units.length - 1) {
+          size /= 1024
+          unit += 1
+        }
+        const digits = unit === 0 || size >= 100 ? 0 : 1
+        return `${size.toFixed(digits)} ${units[unit]}`
       }
-      queued = null
-      render(state)
-      return
-    }
-    const wait = MIN_PAINT_MS - (Date.now() - lastPaint)
-    if (wait <= 0) {
-      if (queuedTimer) {
-        clearTimeout(queuedTimer)
-        queuedTimer = 0
+
+      function formatSpeed(value) {
+        const n = toNumber(value)
+        if (n <= 0) return '—'
+        return `${formatBytes(n)}/s`
       }
-      queued = null
-      render(state)
-      return
-    }
-    queued = state
-    if (!queuedTimer) {
-      queuedTimer = setTimeout(() => {
-        queuedTimer = 0
-        const last = queued
-        queued = null
-        if (last) render(last)
-      }, wait)
-    }
-  }
 
-  function call(name) {
-    if (!api || typeof api[name] !== 'function') return
-    try {
-      const result = api[name]()
-      if (result && typeof result.catch === 'function') result.catch(() => {})
-    } catch {
-      return
-    }
-  }
+      function formatEta(seconds) {
+        const n = Number(seconds)
+        if (!Number.isFinite(n) || n < 0) return '未知'
+        const total = Math.ceil(n)
+        if (total <= 0) return '即将完成'
+        if (total < 60) return `约 ${total} 秒`
+        const minutes = Math.floor(total / 60)
+        const rest = total % 60
+        if (minutes < 60) return rest ? `约 ${minutes} 分 ${rest} 秒` : `约 ${minutes} 分钟`
+        const hours = Math.floor(minutes / 60)
+        return `约 ${hours} 小时 ${minutes % 60} 分`
+      }
 
-  function lock(button, ms) {
-    button.disabled = true
-    setTimeout(() => {
-      button.disabled = false
-    }, ms)
-  }
+      function formatDateTime(value) {
+        if (!value) return '未知'
+        const date = new Date(value)
+        if (Number.isNaN(date.getTime())) return String(value)
+        const pad = n => String(n).padStart(2, '0')
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+      }
 
-  els.cancel.addEventListener('click', () => {
-    lock(els.cancel, 800)
-    call('cancel')
-  })
+      function phaseOf(source) {
+        const raw = String((source && source.phase) || '').toLowerCase()
+        const phase = PHASE_ALIAS[raw] || raw
+        return KNOWN_PHASES.includes(phase) ? phase : 'checking'
+      }
 
-  els.retry.addEventListener('click', () => {
-    lock(els.retry, 800)
-    call('retry')
-  })
+      function latestVersionOf(source) {
+        return String((source && source.latestVersion) || (source && source.version) || '')
+      }
 
-  els.install.addEventListener('click', () => {
-    lock(els.install, 1500)
-    call('install')
-  })
+      function currentVersionOf(source) {
+        return String((source && source.currentVersion) || '')
+      }
 
-  els.folder.addEventListener('click', () => call('openFolder'))
-  els.page.addEventListener('click', () => call('openPage'))
-  els.close.addEventListener('click', () => window.close())
+      function notesOf(source) {
+        return String((source && source.notes) || (source && source.releaseNotes) || '')
+      }
 
-  render(null)
+      function pageUrlOf(source) {
+        return String((source && source.pageUrl) || '')
+      }
 
-  if (api && typeof api.onState === 'function') {
-    const unsubscribe = api.onState(receive)
-    window.addEventListener('beforeunload', () => {
-      if (typeof unsubscribe === 'function') unsubscribe()
-    })
-  }
-</script>
+      /** 真实总大小：下载器报上来的优先，没有就用发布源给的预期值 */
+      function totalBytesOf(source) {
+        const total = toNumber(source && source.total)
+        return total > 0 ? total : 0
+      }
+
+      function expectedBytesOf(source) {
+        const expected = toNumber(source && source.expectedSize)
+        if (expected > 0) return expected
+        const size = toNumber(source && source.downloadSize)
+        return size > 0 ? size : 0
+      }
+
+      /** 有没有可下载的目标：决定错误页给「重试下载」还是「重新检查」 */
+      function hasDownloadTarget(source) {
+        if (!source) return false
+        if (typeof source.canRetryDownload === 'boolean') return source.canRetryDownload
+        if (source.downloadUrl || source.url || source.fileName || source.filePath) return true
+        if (expectedBytesOf(source) > 0) return true
+        if (totalBytesOf(source) > 0) return true
+        if (toNumber(source.received) > 0) return true
+        return downloadAttempted
+      }
+
+      /* ---------- 渲染 ---------- */
+
+      function showView(viewId) {
+        for (const id of VIEW_IDS) {
+          const view = $(id)
+          if (view) view.hidden = id !== viewId
+        }
+      }
+
+      /**
+       * 进度语义：有总大小才写 value（确定态），否则删掉 value（不确定态），
+       * 百分比只在确定态出现，避免把估算当成真数。
+       */
+      function renderProgress(progress, percent, received, total) {
+        if (total > 0) {
+          const ratio = Math.min(1, Math.max(0, received / total))
+          progress.max = 100
+          progress.value = ratio * 100
+          percent.textContent = `${Math.floor(ratio * 100)}%`
+        } else {
+          progress.removeAttribute('value')
+          percent.textContent = '—'
+        }
+      }
+
+      function renderHead(phase, source) {
+        const titles = {
+          checking: '正在检查更新',
+          available: '发现新版本',
+          latest: '已是最新版本',
+          resolve: '正在准备下载',
+          download: '正在下载更新',
+          done: '下载完成',
+          error: '更新失败',
+          cancel: '下载已取消',
+        }
+        ui.title.textContent = titles[phase]
+
+        const captions = {
+          checking: '正在连接更新源…',
+          available: latestVersionOf(source) ? `新版本 ${latestVersionOf(source)} 已就绪` : '新版本已就绪',
+          latest: '已经核对过更新源，当前没有新版本',
+          resolve: '正在获取下载地址与文件大小',
+          download: '',
+          done: '安装包已经下载完成，可以立即安装',
+          error: '',
+          cancel: '已取消下载，已下载的部分会保留，重试时可以接着来',
+        }
+        const message = source && source.message ? String(source.message) : ''
+        const caption = message || captions[phase] || ''
+        ui.caption.textContent = caption
+        ui.caption.hidden = !caption
+        ui.caption.classList.toggle('is-error', phase === 'error')
+
+        let badge = ''
+        if (phase === 'available') badge = '可更新'
+        else if (phase === 'latest') badge = '最新'
+        else if (phase === 'download' && source && source.mirror) badge = '镜像'
+        ui.badge.textContent = badge
+        ui.badge.hidden = !badge
+      }
+
+      function renderBusy(phase, source) {
+        const checking = phase === 'checking'
+        ui.busyProgress.setAttribute('aria-label', checking ? '检查更新进度' : '准备下载进度')
+        renderProgress(ui.busyProgress, ui.busyPercent, 0, 0)
+        if (checking) {
+          ui.busyMeta.textContent = '正在连接更新源…'
+        } else {
+          const expected = expectedBytesOf(source)
+          ui.busyMeta.textContent = expected ? `已知大小 ${formatBytes(expected)}` : '正在解析下载地址…'
+        }
+      }
+
+      function renderAvailable(source) {
+        ui.availableCurrent.textContent = currentVersionOf(source) || '未知'
+        ui.availableLatest.textContent = latestVersionOf(source) || '未知'
+        ui.availablePublished.textContent = formatDateTime(source && source.publishedAt)
+        ui.availableSize.textContent = formatBytes(expectedBytesOf(source))
+        const notes = notesOf(source)
+        ui.availableNotes.textContent = notes.trim() ? notes : '更新源没有提供更新说明。'
+      }
+
+      function renderLatest(source) {
+        ui.latestCurrent.textContent = currentVersionOf(source) || latestVersionOf(source) || '未知'
+        ui.latestChecked.textContent = formatDateTime(source && source.checkedAt)
+      }
+
+      function renderDownload(source) {
+        const total = totalBytesOf(source)
+        const received = toNumber(source && source.received)
+        renderProgress(ui.downloadProgress, ui.downloadPercent, received, total)
+
+        ui.downloadReceived.textContent = formatBytes(received, '0 B')
+        if (total > 0) {
+          ui.downloadTotal.textContent = formatBytes(total)
+        } else {
+          const expected = expectedBytesOf(source)
+          ui.downloadTotal.textContent = expected ? `预计 ${formatBytes(expected)}` : '未知'
+        }
+        ui.downloadSpeed.textContent = formatSpeed(source && source.speed)
+
+        const provided = source && source.etaSeconds
+        if (provided !== null && provided !== undefined && provided !== '') {
+          ui.downloadEta.textContent = formatEta(provided)
+        } else {
+          const speed = toNumber(source && source.speed)
+          ui.downloadEta.textContent = total > 0 && speed > 0 ? formatEta((total - received) / speed) : '未知'
+        }
+
+        const connections = toNumber(source && source.connections)
+        ui.downloadConnections.textContent = connections > 0 ? `${connections} 个` : '—'
+        ui.downloadMirror.textContent = source && source.mirror ? '镜像加速' : '官方源'
+      }
+
+      function renderDone(source) {
+        ui.doneVersion.textContent = latestVersionOf(source) || '未知'
+        ui.doneFile.textContent = String((source && source.fileName) || '—')
+        ui.doneSize.textContent = formatBytes(totalBytesOf(source) || expectedBytesOf(source))
+        ui.donePath.textContent = String((source && source.filePath) || '—')
+      }
+
+      function renderError(source) {
+        ui.errorDetail.textContent = String((source && source.message) || '更新失败，请稍后重试。')
+      }
+
+      function renderCancel(source) {
+        const message = String((source && source.message) || '')
+        ui.cancelDetail.textContent = message || '已取消下载，已下载的部分会保留，重试时可以接着来。'
+      }
+
+      /* ---------- 按钮 ---------- */
+
+      function planActions(phase, source) {
+        const actions = []
+        if (phase === 'checking' || phase === 'resolve') return actions
+
+        if (phase === 'available') {
+          actions.push({ slot: 'primary', label: '下载更新', kind: 'download' })
+          actions.push({ slot: 'secondary', label: '重新检查', kind: 'check' })
+        } else if (phase === 'latest') {
+          actions.push({ slot: 'primary', label: '重新检查', kind: 'check' })
+        } else if (phase === 'download') {
+          actions.push({ slot: 'primary', label: '取消下载', kind: 'cancel' })
+        } else if (phase === 'done') {
+          actions.push({ slot: 'primary', label: '立即安装', kind: 'install' })
+          actions.push({ slot: 'secondary', label: '打开目录', kind: 'openFolder' })
+        } else if (phase === 'error' || phase === 'cancel') {
+          if (hasDownloadTarget(source)) {
+            actions.push({ slot: 'primary', label: '重试下载', kind: 'retry' })
+            actions.push({ slot: 'secondary', label: '重新检查', kind: 'check' })
+          } else {
+            actions.push({ slot: 'primary', label: '重新检查', kind: 'check' })
+          }
+        }
+
+        if (pageUrlOf(source) && phase !== 'checking' && phase !== 'resolve' && phase !== 'download') {
+          actions.push({ slot: 'tertiary', label: '前往发布页', kind: 'openPage' })
+        }
+        return actions
+      }
+
+      function renderButtons() {
+        const phase = phaseOf(state)
+        const plan = planActions(phase, state)
+        const bySlot = {}
+        for (const action of plan) bySlot[action.slot] = action
+
+        for (const button of buttons) {
+          const action = bySlot[button.slot]
+          if (!action) {
+            button.el.hidden = true
+            button.el.textContent = ''
+            button.el.removeAttribute('data-kind')
+            button.el.classList.remove('primary')
+            button.el.disabled = false
+            continue
+          }
+          button.el.hidden = false
+          button.el.textContent = action.label
+          button.el.dataset.kind = action.kind
+          // 取消不是主行动，别用主色按钮装
+          button.el.classList.toggle('primary', action.kind !== 'cancel')
+          button.el.disabled = pending.has(action.kind)
+        }
+      }
+
+      /* ---------- 动作 ---------- */
+
+      const ACTION_HANDLERS = {
+        download: () => (api && api.download ? api.download() : undefined),
+        check: () => (api && api.check ? api.check() : undefined),
+        cancel: () => (api && api.cancel ? api.cancel() : undefined),
+        retry: () => (api && api.retry ? api.retry() : undefined),
+        install: () => (api && api.install ? api.install() : undefined),
+        openFolder: () => (api && api.openFolder ? api.openFolder() : undefined),
+        openPage: () => (api && api.openPage ? api.openPage() : undefined),
+      }
+
+      function showActionError(error) {
+        const message = error && error.message ? error.message : '操作失败，请重试。'
+        ui.caption.textContent = message
+        ui.caption.hidden = false
+        ui.caption.classList.add('is-error')
+      }
+
+      // 监听只在这里绑一次：状态更新只改按钮的文案与显隐，不重绑也不重建按钮
+      for (const button of buttons) {
+        button.el.addEventListener('click', () => {
+          const kind = button.el.dataset.kind
+          if (!kind || pending.has(kind)) return
+          const handler = ACTION_HANDLERS[kind]
+          if (!handler) return
+          pending.add(kind)
+          renderButtons()
+          Promise.resolve()
+            .then(handler)
+            .then(result => {
+              // 主进程会用 { ok: false, message } 回「没有可重试的下载」这类情况
+              if (result && result.ok === false && result.message) showActionError({ message: result.message })
+            })
+            .catch(showActionError)
+            .finally(() => {
+              pending.delete(kind)
+              renderButtons()
+            })
+        })
+      }
+
+      /* ---------- 窗口高度跟着内容走 ---------- */
+
+      const MIN_WINDOW_HEIGHT = 240
+      const MAX_WINDOW_HEIGHT = 900
+      let baseWidth = 0
+      let frameDelta = 0
+      let appliedHeight = 0
+
+      function contentHeight() {
+        const height = document.body.getBoundingClientRect().height
+        return Math.ceil(height) || MIN_WINDOW_HEIGHT
+      }
+
+      function syncWindowHeight() {
+        const content = contentHeight()
+        if (!baseWidth) {
+          baseWidth = window.outerWidth || window.innerWidth || 520
+          frameDelta = Math.max(0, (window.outerHeight || 0) - (window.innerHeight || 0))
+        }
+        // 主进程按窗口外框尺寸改高度，所以要把内容高度加上标题栏和边框
+        const target = Math.min(MAX_WINDOW_HEIGHT, Math.max(MIN_WINDOW_HEIGHT, content + frameDelta))
+        if (Math.abs(target - appliedHeight) < 4) return
+        appliedHeight = target
+        if (api && typeof api.resize === 'function') {
+          try {
+            Promise.resolve(api.resize(target)).catch(() => {})
+          } catch (error) {
+            // 主进程没有这个通道就退回到渲染进程自己改
+            if (typeof window.resizeTo === 'function') {
+              try {
+                window.resizeTo(baseWidth, target)
+              } catch (resizeError) {
+                // 窗口不允许调整大小时忽略：页面本身能滚动，内容一样看得到
+              }
+            }
+          }
+          return
+        }
+        // 没有 IPC 通道时退回到渲染进程自己改窗口大小
+        if (typeof window.resizeTo === 'function') {
+          try {
+            window.resizeTo(baseWidth, target)
+          } catch (error) {
+            // 窗口不允许调整大小时忽略：页面本身能滚动，内容一样看得到
+          }
+        }
+      }
+
+      /* ---------- 主流程 ---------- */
+
+      function render() {
+        const phase = phaseOf(state)
+        // 新一轮检查开始就清掉上一轮的下载痕迹
+        if (phase === 'resolve' || phase === 'download') downloadAttempted = true
+        else if (phase === 'checking' || phase === 'available') downloadAttempted = false
+        renderHead(phase, state)
+
+        if (phase === 'checking' || phase === 'resolve') {
+          showView('view-busy')
+          renderBusy(phase, state)
+        } else if (phase === 'available') {
+          showView('view-available')
+          renderAvailable(state)
+        } else if (phase === 'latest') {
+          showView('view-latest')
+          renderLatest(state)
+        } else if (phase === 'download') {
+          showView('view-download')
+          renderDownload(state)
+        } else if (phase === 'done') {
+          showView('view-done')
+          renderDone(state)
+        } else if (phase === 'error') {
+          showView('view-error')
+          renderError(state)
+        } else {
+          showView('view-cancel')
+          renderCancel(state)
+        }
+
+        renderButtons()
+
+        if (phase !== lastPhase) {
+          ui.live.textContent = ui.title.textContent
+          lastPhase = phase
+        }
+        syncWindowHeight()
+      }
+
+      if (api && typeof api.onState === 'function') {
+        api.onState(next => {
+          if (!next || typeof next !== 'object') return
+          state = next
+          render()
+        })
+      }
+
+      render()
+    })()
+  </script>
 </body>
 </html>

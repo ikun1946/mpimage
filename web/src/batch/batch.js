@@ -4128,35 +4128,168 @@ import { setupTablist } from '../lib/tabs.js'
     const FEEDBACK_APP_VERSION = typeof __APP_VERSION__ === 'undefined' ? 'dev' : __APP_VERSION__
     /* 服务端按 page 字段归类「哪个页面提的」，用文件名而不是完整 URL（带端口/域名没意义） */
     const FEEDBACK_PAGE = 'batch.html'
-    const FEEDBACK_MINE_LIMIT = 3
+    const FEEDBACK_MINE_LIMIT = 20
     const FEEDBACK_CATEGORY_LABEL = { bug: '缺陷', suggestion: '建议', other: '其他' }
     const FEEDBACK_CATEGORIES = Object.keys(FEEDBACK_CATEGORY_LABEL)
     const FEEDBACK_CONTENT_MIN = 5
+    /* 草稿与「没送达服务端」的记录都按账号存在本机，换账号自然隔离 */
+    const FEEDBACK_DRAFT_KEY = userId => `moying.feedback.draft.v1.${userId}`
+    const FEEDBACK_FAILED_KEY = userId => `moying.feedback.failed.v1.${userId}`
+    /* 失败记录最多留 5 条，多的从最旧的开始丢 */
+    const FEEDBACK_FAILED_MAX = 5
 
     const feedbackModal = document.querySelector('#feedback-modal')
-    const feedbackCompose = document.querySelector('#feedback-compose')
-    const feedbackDone = document.querySelector('#feedback-done')
+    const feedbackForm = document.querySelector('#feedback-form')
     const feedbackCategories = document.querySelector('#feedback-categories')
     const feedbackContent = document.querySelector('#feedback-content')
     const feedbackCount = document.querySelector('#feedback-count')
     const feedbackMsg = document.querySelector('#feedback-msg')
+    const feedbackStatus = document.querySelector('#feedback-status')
     const feedbackSubmit = document.querySelector('#feedback-submit')
     const feedbackList = document.querySelector('#feedback-list')
+    const feedbackHistoryStatus = document.querySelector('#feedback-history-status')
+    const feedbackHistoryPanel = document.querySelector('#feedback-history-panel')
+    const feedbackHistoryToggle = document.querySelector('#feedback-history-toggle')
+    const feedbackHistoryRefresh = document.querySelector('#feedback-history-refresh')
 
     let feedbackOverlayHandle = null
     let feedbackCategory = 'bug'
     let feedbackSubmitting = false
-    /* 非空即表示当前处于「已提交」视图：先放刚提交的那条，
-       /mine 拉不到时列表也不会空着 */
-    let feedbackJustSubmitted = null
+    /* 服务端返回的本人反馈，最新在前 */
+    let feedbackRecords = []
+    /* 没送达服务端的失败记录，存在本机，可以重试 */
+    let feedbackFailed = []
+    /* 展开了详情的记录 id，重新渲染后仍保持展开 */
+    let feedbackExpanded = new Set()
+    /* 列表请求序号：只认最后一次的结果，慢响应不覆盖新数据 */
+    let feedbackLoadSeq = 0
+    let feedbackDraftTimer = null
 
-    /** 同步弹窗视图（填写 / 已提交）与三档控件的选中态 */
+    /* ---------- 本机草稿与失败记录 ---------- */
+
+    function readFeedbackStorage(key) {
+      if (!key) return null
+      try {
+        const raw = localStorage.getItem(key)
+        if (!raw) return null
+        return JSON.parse(raw)
+      } catch {
+        // 隐私模式或被写坏的内容一律当作没有草稿
+        return null
+      }
+    }
+
+    function writeFeedbackStorage(key, value) {
+      if (!key) return false
+      try {
+        if (value === null) localStorage.removeItem(key)
+        else localStorage.setItem(key, JSON.stringify(value))
+        return true
+      } catch {
+        return false
+      }
+    }
+
+    function feedbackDraftKey() {
+      return currentUserId ? FEEDBACK_DRAFT_KEY(currentUserId) : ''
+    }
+
+    /** 保存草稿：内容 + 类型，按账号隔离；只有提交成功才会清除 */
+    function saveFeedbackDraft() {
+      if (!currentUserId) return
+      const content = feedbackContent?.value ?? ''
+      if (!content.trim()) {
+        writeFeedbackStorage(feedbackDraftKey(), null)
+        return
+      }
+      writeFeedbackStorage(feedbackDraftKey(), {
+        content,
+        category: feedbackCategory,
+        updatedAt: new Date().toISOString(),
+      })
+    }
+
+    function scheduleFeedbackDraftSave() {
+      if (feedbackDraftTimer) clearTimeout(feedbackDraftTimer)
+      feedbackDraftTimer = setTimeout(() => {
+        feedbackDraftTimer = null
+        saveFeedbackDraft()
+      }, 300)
+    }
+
+    function clearFeedbackDraft() {
+      if (feedbackDraftTimer) {
+        clearTimeout(feedbackDraftTimer)
+        feedbackDraftTimer = null
+      }
+      if (!currentUserId) return
+      writeFeedbackStorage(feedbackDraftKey(), null)
+    }
+
+    /** 打开弹窗时恢复本账号上次没提交完的草稿 */
+    function restoreFeedbackDraft() {
+      if (!currentUserId) return
+      const draft = readFeedbackStorage(feedbackDraftKey())
+      if (!draft || typeof draft.content !== 'string' || !draft.content) return
+      feedbackContent.value = draft.content
+      if (FEEDBACK_CATEGORIES.includes(draft.category)) feedbackCategory = draft.category
+    }
+
+    function loadFeedbackFailed() {
+      if (!currentUserId) {
+        feedbackFailed = []
+        return
+      }
+      const list = readFeedbackStorage(FEEDBACK_FAILED_KEY(currentUserId))
+      feedbackFailed = Array.isArray(list)
+        ? list.filter(item => item && typeof item.content === 'string' && item.content)
+        : []
+    }
+
+    function persistFeedbackFailed() {
+      if (!currentUserId) return
+      writeFeedbackStorage(FEEDBACK_FAILED_KEY(currentUserId), feedbackFailed)
+    }
+
+    /** 记一条「没送达服务端」的反馈：草稿留着，记录也能重试 */
+    function rememberFailedFeedback(entry) {
+      const same = feedbackFailed.find(item => item.content === entry.content)
+      if (same) {
+        same.reason = entry.reason
+        same.category = entry.category
+        same.createdAt = entry.createdAt
+      } else {
+        feedbackFailed.unshift(entry)
+      }
+      feedbackFailed = feedbackFailed.slice(0, FEEDBACK_FAILED_MAX)
+      persistFeedbackFailed()
+    }
+
+    function removeFailedFeedback(content) {
+      const next = feedbackFailed.filter(item => item.content !== content)
+      if (next.length === feedbackFailed.length) return
+      feedbackFailed = next
+      persistFeedbackFailed()
+    }
+
+    /** 折叠时优先用 hidden="until-found"：内容仍能被页内查找命中，老浏览器回落到普通 hidden */
+    const supportsHiddenUntilFound = 'onbeforematch' in (document.body || document.documentElement)
+
+    function setFeedbackPanelHidden(element, hidden) {
+      if (!element) return
+      if (!hidden) {
+        element.removeAttribute('hidden')
+        return
+      }
+      element.setAttribute('hidden', supportsHiddenUntilFound ? 'until-found' : '')
+    }
+
+    /** 同步弹窗视图：提交态、字数与三档控件的选中态 */
     function renderFeedbackModal() {
       if (!feedbackModal) return
-      feedbackCompose.hidden = Boolean(feedbackJustSubmitted)
-      feedbackDone.hidden = !feedbackJustSubmitted
       feedbackSubmit.disabled = feedbackSubmitting
       feedbackSubmit.textContent = feedbackSubmitting ? '提交中…' : '提交反馈'
+      feedbackForm?.setAttribute('aria-busy', String(feedbackSubmitting))
       feedbackCount.textContent = String(feedbackContent.value.length)
       /* aria-checked 表达选中，靠 roving tabindex 让 Tab 只停在当前档 */
       feedbackCategories.querySelectorAll('[data-feedback-category]').forEach(button => {
@@ -4167,16 +4300,49 @@ import { setupTablist } from '../lib/tabs.js'
       })
     }
 
+    function setFeedbackError(text) {
+      feedbackMsg.textContent = text
+      if (text) feedbackStatus.textContent = ''
+    }
+
+    function setFeedbackStatus(text) {
+      feedbackStatus.textContent = text
+      if (text) feedbackMsg.textContent = ''
+    }
+
+    function setFeedbackHistoryStatus(text) {
+      feedbackHistoryStatus.textContent = text
+    }
+
+    /** 展开/收起历史记录区；展开状态用 aria-expanded 表达 */
+    function setFeedbackHistoryOpen(open) {
+      if (!feedbackHistoryPanel || !feedbackHistoryToggle) return
+      setFeedbackPanelHidden(feedbackHistoryPanel, !open)
+      feedbackHistoryToggle.setAttribute('aria-expanded', String(open))
+      feedbackHistoryToggle.textContent = open ? '收起记录' : '展开记录'
+    }
+
+    /* 页内查找命中折叠内容时，浏览器会先移除 hidden="until-found"，
+       这里同步展开按钮的 aria-expanded，别让状态对不上 */
+    feedbackHistoryPanel?.addEventListener('beforematch', () => {
+      feedbackHistoryToggle?.setAttribute('aria-expanded', 'true')
+      if (feedbackHistoryToggle) feedbackHistoryToggle.textContent = '收起记录'
+    })
+
     function openFeedbackModal() {
       if (!feedbackModal) return
-      feedbackJustSubmitted = null
-      feedbackCategory = 'bug'
-      feedbackContent.value = ''
       feedbackMsg.textContent = ''
+      feedbackStatus.textContent = ''
       feedbackContent.classList.remove('invalid')
       feedbackContent.removeAttribute('aria-invalid')
-      feedbackList.innerHTML = ''
+      /* 先清空再恢复：上一个账号留下的文字不能串到当前账号 */
+      feedbackContent.value = ''
+      feedbackCategory = 'bug'
+      loadFeedbackFailed()
+      restoreFeedbackDraft()
+      feedbackExpanded = new Set()
       renderFeedbackModal()
+      renderFeedbackList()
       feedbackModal.classList.add('visible')
       if (!feedbackOverlayHandle) {
         feedbackOverlayHandle = activateOverlay(feedbackModal, {
@@ -4186,12 +4352,27 @@ import { setupTablist } from '../lib/tabs.js'
       }
       // 重开时 overlay 不会重新定焦点（handle 复用），这里补上
       feedbackContent.focus()
+      // 打开即加载本人最近记录
+      loadMyFeedback()
     }
 
     function closeFeedbackModal() {
+      // 关闭前先落盘草稿，刷新或换页后还能接着写
+      saveFeedbackDraft()
       feedbackOverlayHandle?.release()
       feedbackOverlayHandle = null
       feedbackModal?.classList.remove('visible')
+    }
+
+    /** 把失败原因翻译成人能看懂的一句话，顺带说明草稿还在 */
+    function describeFeedbackError(error) {
+      if (error?.status === 429 || error?.code === 'RATE_LIMITED') {
+        return '提交太频繁，请稍后再试（草稿已保留）'
+      }
+      if (error instanceof ApiRequestError) {
+        return `${error.message || '提交失败'}（草稿已保留）`
+      }
+      return '网络连接失败，请检查网络后重试（草稿已保留）'
     }
 
     async function submitFeedbackFromForm(event) {
@@ -4201,82 +4382,281 @@ import { setupTablist } from '../lib/tabs.js'
       // 先用 trim 后的长度判断，避免「只打了几个空格」通过校验
       const content = feedbackContent.value.trim()
       if (content.length < FEEDBACK_CONTENT_MIN) {
-        feedbackMsg.textContent = `请至少写 ${FEEDBACK_CONTENT_MIN} 个字，方便我们判断问题`
+        setFeedbackError(`请至少写 ${FEEDBACK_CONTENT_MIN} 个字，方便我们判断问题`)
         feedbackContent.classList.add('invalid')
         feedbackContent.setAttribute('aria-invalid', 'true')
         feedbackContent.focus()
         return
       }
 
-      feedbackMsg.textContent = ''
+      setFeedbackError('')
+      setFeedbackStatus('')
       feedbackContent.classList.remove('invalid')
       feedbackContent.removeAttribute('aria-invalid')
       feedbackSubmitting = true
       renderFeedbackModal()
       try {
-        const result = await submitFeedback({
+        await submitFeedback({
           category: feedbackCategory,
           content,
           page: FEEDBACK_PAGE,
           appVersion: FEEDBACK_APP_VERSION,
         })
+        // 只有真正送达服务端才清草稿
+        clearFeedbackDraft()
         feedbackContent.value = ''
-        feedbackJustSubmitted = result?.feedback || {
+        removeFailedFeedback(content)
+        setFeedbackStatus('已提交，感谢你的反馈，可以接着写下一条。')
+        showToast('反馈已提交，感谢你的建议')
+        // 提交完把焦点还给输入框，接着写下一条
+        feedbackContent.focus()
+      } catch (error) {
+        const reason = describeFeedbackError(error)
+        // 失败也要留底：草稿照旧，列表里多一条可重试的记录
+        rememberFailedFeedback({
+          id: randomId(),
           category: feedbackCategory,
           content,
           createdAt: new Date().toISOString(),
-          status: 'new',
-        }
-        showToast('反馈已提交，感谢你的建议')
-      } catch (error) {
-        feedbackMsg.textContent = error?.code === 'RATE_LIMITED'
-          ? '提交得有点频繁，请稍后再试'
-          : error?.message || '提交失败，请稍后重试'
-        feedbackContent.classList.add('invalid')
-        feedbackContent.setAttribute('aria-invalid', 'true')
-        feedbackContent.focus()
-        return
+          reason,
+        })
+        saveFeedbackDraft()
+        setFeedbackError(reason)
       } finally {
         feedbackSubmitting = false
         renderFeedbackModal()
       }
+      renderFeedbackList()
       await loadMyFeedback()
-      // 提交按钮随填写视图一起隐藏了，焦点要落到「已提交」视图里
-      document.querySelector('#feedback-done-close')?.focus()
     }
 
-    /** 「已提交」视图里的最近 3 条：接口失败时降级为只显示刚提交的那条 */
+    /** 重试一条没送达服务端的反馈 */
+    async function retryFailedFeedback(item) {
+      if (feedbackSubmitting) return
+      feedbackSubmitting = true
+      renderFeedbackModal()
+      renderFeedbackList()
+      try {
+        await submitFeedback({
+          category: item.category,
+          content: item.content,
+          page: FEEDBACK_PAGE,
+          appVersion: FEEDBACK_APP_VERSION,
+        })
+        removeFailedFeedback(item.content)
+        // 草稿内容与这条一致时一并清掉，否则用户改写过的内容要留下
+        if (feedbackContent.value.trim() === item.content.trim()) {
+          feedbackContent.value = ''
+          clearFeedbackDraft()
+        }
+        setFeedbackStatus('重试成功，这条反馈已经送达。')
+        showToast('反馈已提交，感谢你的建议')
+      } catch (error) {
+        const reason = describeFeedbackError(error)
+        rememberFailedFeedback({
+          id: item.key,
+          category: item.category,
+          content: item.content,
+          createdAt: item.createdAt,
+          reason,
+        })
+        setFeedbackError(reason)
+      } finally {
+        feedbackSubmitting = false
+        renderFeedbackModal()
+        renderFeedbackList()
+      }
+      await loadMyFeedback()
+    }
+
+    /** 打开弹窗即加载本人最近 20 条记录 */
     async function loadMyFeedback() {
-      let items = []
+      const seq = ++feedbackLoadSeq
+      if (feedbackHistoryRefresh) feedbackHistoryRefresh.disabled = true
+      setFeedbackHistoryStatus('正在加载最近反馈…')
       try {
         const result = await fetchMyFeedback(FEEDBACK_MINE_LIMIT)
-        items = Array.isArray(result?.feedback) ? result.feedback : []
+        // 慢响应不覆盖后发起的请求
+        if (seq !== feedbackLoadSeq) return
+        const items = Array.isArray(result?.feedback) ? result.feedback : []
+        feedbackRecords = items.map(normalizeFeedbackRecord)
+        setFeedbackHistoryStatus(`已加载 ${feedbackRecords.length} 条记录`)
       } catch {
-        items = feedbackJustSubmitted ? [feedbackJustSubmitted] : []
+        if (seq !== feedbackLoadSeq) return
+        // 拉取失败不清空已有记录，保留上次的内容让用户还能看
+        setFeedbackHistoryStatus('加载失败，点「刷新」重试')
       }
-      renderMyFeedback(items)
+      if (feedbackHistoryRefresh) feedbackHistoryRefresh.disabled = false
+      renderFeedbackList()
     }
 
-    function renderMyFeedback(items) {
+    /** 服务端返回的字段可能缺省（旧数据没有回复），统一成一份安全的结构 */
+    function normalizeFeedbackRecord(item) {
+      const record = item && typeof item === 'object' ? item : {}
+      const reply = typeof record.reply === 'string'
+        ? record.reply
+        : (typeof record.adminReply === 'string' ? record.adminReply : '')
+      return {
+        key: String(record.id || ''),
+        category: FEEDBACK_CATEGORIES.includes(record.category) ? record.category : 'other',
+        content: typeof record.content === 'string' ? record.content : '',
+        page: typeof record.page === 'string' ? record.page : '',
+        appVersion: typeof record.appVersion === 'string' ? record.appVersion : '',
+        createdAt: typeof record.createdAt === 'string' ? record.createdAt : '',
+        status: record.status === 'resolved' ? 'resolved' : 'new',
+        reply,
+        repliedAt: typeof record.repliedAt === 'string' ? record.repliedAt : '',
+        repliedBy: typeof record.repliedBy === 'string' ? record.repliedBy : '',
+        failed: false,
+        reason: '',
+      }
+    }
+
+    function normalizeFailedRecord(item) {
+      const record = item && typeof item === 'object' ? item : {}
+      return {
+        key: `failed-${record.id || record.createdAt || ''}`,
+        category: FEEDBACK_CATEGORIES.includes(record.category) ? record.category : 'other',
+        content: typeof record.content === 'string' ? record.content : '',
+        page: FEEDBACK_PAGE,
+        appVersion: FEEDBACK_APP_VERSION,
+        createdAt: typeof record.createdAt === 'string' ? record.createdAt : '',
+        status: 'new',
+        reply: '',
+        repliedAt: '',
+        repliedBy: '',
+        failed: true,
+        reason: typeof record.reason === 'string' ? record.reason : '',
+      }
+    }
+
+    function renderFeedbackList() {
       if (!feedbackList) return
+      // 失败记录排在最前面：那是用户还没拿到结果的条目
+      const items = [...feedbackFailed.map(normalizeFailedRecord), ...feedbackRecords]
+      feedbackList.textContent = ''
       if (!items.length) {
-        feedbackList.innerHTML = '<li class="feedback-empty">暂无历史反馈</li>'
+        const empty = document.createElement('li')
+        empty.className = 'feedback-empty'
+        empty.textContent = '还没有反馈记录'
+        feedbackList.append(empty)
         return
       }
-      feedbackList.innerHTML = items.slice(0, FEEDBACK_MINE_LIMIT).map(item => {
-        const resolved = item.status === 'resolved'
-        const categoryLabel = FEEDBACK_CATEGORY_LABEL[item.category] || FEEDBACK_CATEGORY_LABEL.other
-        return `
-          <li class="feedback-item">
-            <div class="feedback-item-top">
-              <span class="badge">${escapeHtml(categoryLabel)}</span>
-              <span class="status-pill ${resolved ? 'done' : 'queued'}">${resolved ? '已处理' : '未处理'}</span>
-            </div>
-            <p class="feedback-item-text">${escapeHtml(shorten(item.content, 60))}</p>
-            <span class="feedback-item-meta">${escapeHtml(formatDateTime(item.createdAt))}</span>
-          </li>
-        `
-      }).join('')
+      items.forEach((item, index) => {
+        feedbackList.append(buildFeedbackItem(item, index))
+      })
+    }
+
+    /** 一条记录：摘要常显，正文与管理员回复展开后可见 */
+    function buildFeedbackItem(item, index) {
+      const li = document.createElement('li')
+      li.className = 'feedback-item'
+
+      const top = document.createElement('div')
+      top.className = 'feedback-item-top'
+      const badge = document.createElement('span')
+      badge.className = 'badge'
+      badge.textContent = FEEDBACK_CATEGORY_LABEL[item.category] || FEEDBACK_CATEGORY_LABEL.other
+      const pill = document.createElement('span')
+      pill.className = `status-pill ${item.failed ? 'error' : item.status === 'resolved' ? 'done' : 'queued'}`
+      pill.textContent = item.failed ? '提交失败' : item.status === 'resolved' ? '已处理' : '未处理'
+      const time = document.createElement('span')
+      time.className = 'feedback-item-meta'
+      time.textContent = formatDateTime(item.createdAt)
+      top.append(badge, pill, time)
+
+      const summary = document.createElement('p')
+      summary.className = 'feedback-item-text'
+      summary.textContent = shorten(item.content, 60)
+
+      const facts = document.createElement('p')
+      facts.className = 'feedback-item-meta'
+      facts.textContent = [
+        item.appVersion ? `版本 ${item.appVersion}` : '',
+        item.page ? `页面 ${item.page}` : '',
+      ].filter(Boolean).join(' · ')
+
+      const detailId = `feedback-detail-${index}`
+      /* 外层只负责承载 hidden="until-found"：样式都放在内层，
+         免得 display 之类直接盖在隐藏元素上让页内查找失效 */
+      const detail = document.createElement('div')
+      detail.className = 'feedback-item-detail'
+      detail.id = detailId
+      const detailInner = document.createElement('div')
+      detailInner.className = 'feedback-item-detail-inner'
+
+      const full = document.createElement('p')
+      full.className = 'feedback-item-full'
+      full.textContent = item.content
+      detailInner.append(full)
+
+      if (item.failed) {
+        const reason = document.createElement('p')
+        reason.className = 'feedback-item-reason'
+        reason.textContent = item.reason ? `未送达：${item.reason}` : '未送达服务器'
+        detailInner.append(reason)
+      }
+
+      if (item.reply) {
+        const reply = document.createElement('div')
+        reply.className = 'feedback-item-reply'
+        const replyTitle = document.createElement('p')
+        replyTitle.className = 'feedback-item-reply-title'
+        replyTitle.textContent = '管理员回复'
+        const replyText = document.createElement('p')
+        replyText.className = 'feedback-item-reply-text'
+        replyText.textContent = item.reply
+        reply.append(replyTitle, replyText)
+        const replyMeta = document.createElement('p')
+        replyMeta.className = 'feedback-item-meta'
+        replyMeta.textContent = [
+          item.repliedAt ? `回复于 ${formatDateTime(item.repliedAt)}` : '',
+          item.repliedBy ? `处理人 ${item.repliedBy}` : '',
+        ].filter(Boolean).join(' · ')
+        if (replyMeta.textContent) reply.append(replyMeta)
+        detailInner.append(reply)
+      }
+      detail.append(detailInner)
+
+      const toggle = document.createElement('button')
+      toggle.type = 'button'
+      toggle.className = 'button ghost feedback-item-toggle'
+      toggle.setAttribute('aria-controls', detailId)
+      const expanded = feedbackExpanded.has(item.key)
+      toggle.setAttribute('aria-expanded', String(expanded))
+      toggle.textContent = expanded ? '收起详情' : '查看详情'
+      setFeedbackPanelHidden(detail, !expanded)
+      toggle.addEventListener('click', () => {
+        const open = toggle.getAttribute('aria-expanded') === 'true'
+        toggle.setAttribute('aria-expanded', String(!open))
+        toggle.textContent = open ? '查看详情' : '收起详情'
+        setFeedbackPanelHidden(detail, open)
+        if (open) feedbackExpanded.delete(item.key)
+        else feedbackExpanded.add(item.key)
+      })
+      /* 页内查找命中时浏览器会展开这块内容，按钮状态跟着改 */
+      detail.addEventListener('beforematch', () => {
+        toggle.setAttribute('aria-expanded', 'true')
+        toggle.textContent = '收起详情'
+        feedbackExpanded.add(item.key)
+      })
+
+      li.append(top, summary, facts, toggle, detail)
+
+      if (item.failed) {
+        const actions = document.createElement('div')
+        actions.className = 'feedback-item-actions'
+        const retry = document.createElement('button')
+        retry.type = 'button'
+        retry.className = 'button ghost feedback-item-retry'
+        retry.textContent = '重试提交'
+        retry.disabled = feedbackSubmitting
+        retry.addEventListener('click', () => retryFailedFeedback(item))
+        actions.append(retry)
+        li.append(actions)
+      }
+
+      return li
     }
 
     document.querySelector('#feedback-button')?.addEventListener('click', event => {
@@ -4287,19 +4667,19 @@ import { setupTablist } from '../lib/tabs.js'
 
     document.querySelector('#feedback-close')?.addEventListener('click', closeFeedbackModal)
     document.querySelector('#feedback-cancel')?.addEventListener('click', closeFeedbackModal)
-    document.querySelector('#feedback-done-close')?.addEventListener('click', closeFeedbackModal)
     feedbackModal?.addEventListener('click', event => {
       if (event.target === feedbackModal) closeFeedbackModal()
     })
 
     document.querySelector('#feedback-form')?.addEventListener('submit', submitFeedbackFromForm)
 
-    document.querySelector('#feedback-again')?.addEventListener('click', () => {
-      feedbackJustSubmitted = null
-      feedbackContent.value = ''
-      feedbackMsg.textContent = ''
-      renderFeedbackModal()
-      feedbackContent.focus()
+    document.querySelector('#feedback-history-refresh')?.addEventListener('click', () => {
+      loadMyFeedback()
+    })
+
+    feedbackHistoryToggle?.addEventListener('click', () => {
+      const open = feedbackHistoryToggle.getAttribute('aria-expanded') === 'true'
+      setFeedbackHistoryOpen(!open)
     })
 
     feedbackContent?.addEventListener('input', () => {
@@ -4309,6 +4689,7 @@ import { setupTablist } from '../lib/tabs.js'
         feedbackContent.classList.remove('invalid')
         feedbackContent.removeAttribute('aria-invalid')
       }
+      scheduleFeedbackDraftSave()
     })
 
     feedbackCategories?.addEventListener('click', event => {
@@ -4317,6 +4698,7 @@ import { setupTablist } from '../lib/tabs.js'
       if (!FEEDBACK_CATEGORIES.includes(next)) return
       feedbackCategory = next
       renderFeedbackModal()
+      scheduleFeedbackDraftSave()
     })
 
     /* radiogroup 的方向键：选中项跟着焦点走，和 aria-activedescendant 无关 */
@@ -4328,7 +4710,13 @@ import { setupTablist } from '../lib/tabs.js'
       const index = FEEDBACK_CATEGORIES.indexOf(feedbackCategory)
       feedbackCategory = FEEDBACK_CATEGORIES[(index + step + FEEDBACK_CATEGORIES.length) % FEEDBACK_CATEGORIES.length]
       renderFeedbackModal()
+      scheduleFeedbackDraftSave()
       feedbackCategories.querySelector(`[data-feedback-category="${feedbackCategory}"]`)?.focus()
+    })
+
+    /* 刷新或关页面前把草稿落盘，避免最后一次输入来不及存 */
+    window.addEventListener('pagehide', () => {
+      saveFeedbackDraft()
     })
 
     /* ===== 关于与更新 ===== */

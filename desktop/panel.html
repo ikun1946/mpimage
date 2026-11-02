@@ -830,9 +830,34 @@
 
   /* ---------- 反馈：紧凑列表 ---------- */
 
+  .fb-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin-bottom: 8px;
+  }
+
+  .fb-search {
+    flex: 1 1 140px;
+    min-width: 0;
+    min-height: 26px;
+    padding: 3px 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    background: var(--surface-raised);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 11.5px;
+    outline: none;
+  }
+
   .fb-list {
     display: flex;
     flex-direction: column;
+    max-height: 340px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .fb {
@@ -874,8 +899,74 @@
   .fb-side {
     display: flex;
     flex: none;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: 6px;
+  }
+
+  .fb-reply {
+    margin: 6px 0 0;
+    padding: 6px 8px;
+    border-left: 2px solid var(--moss-light);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--moss-tint);
+  }
+
+  .fb-reply-label {
+    margin: 0 0 2px;
+    color: var(--moss-dark);
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+
+  .fb-reply-text {
+    margin: 0;
+    color: var(--ink);
+    font-size: 11.5px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .fb-editor {
+    margin-top: 6px;
+  }
+
+  .fb-reply-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 56px;
+    padding: 5px 7px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-raised);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 11.5px;
+    line-height: 1.5;
+    outline: none;
+    resize: vertical;
+  }
+
+  .fb-reply-input:focus {
+    border-color: var(--moss);
+    box-shadow: 0 0 0 3px var(--moss-tint);
+  }
+
+  .fb-editor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 5px;
+  }
+
+  .fb-editor-error {
+    margin: 4px 0 0;
+    color: var(--danger);
+    font-size: 10.5px;
+    line-height: 1.45;
   }
 
   /* ---------- 统计 ---------- */
@@ -1346,6 +1437,23 @@
       </div>
     </div>
     <div class="notice" id="feedback-notice" hidden></div>
+    <div class="fb-toolbar">
+      <div class="segmented" role="group" aria-label="反馈类型">
+        <button class="seg" type="button" data-category="all" aria-pressed="true">全部类型</button>
+        <button class="seg" type="button" data-category="bug" aria-pressed="false">问题</button>
+        <button class="seg" type="button" data-category="suggestion" aria-pressed="false">建议</button>
+        <button class="seg" type="button" data-category="other" aria-pressed="false">其他</button>
+      </div>
+      <input
+        class="fb-search"
+        id="feedback-search"
+        type="search"
+        placeholder="搜索账号、昵称、正文或回复"
+        aria-label="搜索反馈"
+        autocomplete="off"
+      />
+      <button class="button mini" type="button" id="btn-feedback-refresh">刷新</button>
+    </div>
     <div class="fb-list" id="feedback-list"></div>
     <p class="empty" id="feedback-empty" hidden>没有反馈</p>
   </section>
@@ -1517,6 +1625,9 @@
     feedbackEmpty: $('feedback-empty'),
     feedbackCount: $('feedback-count'),
     feedbackFilters: Array.from(document.querySelectorAll('[data-filter]')),
+    feedbackCategoryFilters: Array.from(document.querySelectorAll('[data-category]')),
+    feedbackSearch: $('feedback-search'),
+    btnFeedbackRefresh: $('btn-feedback-refresh'),
     statsNotice: $('stats-notice'),
     btnStatsRefresh: $('btn-stats-refresh'),
     statTotal: $('stat-total'),
@@ -1574,6 +1685,11 @@
   const serviceBusy = new Set()
   let booted = false
   let feedbackFilter = 'all'
+  let feedbackCategory = 'all'
+  let feedbackKeyword = ''
+  let feedbackRequestId = 0
+  let feedbackSearchTimer = 0
+  let feedbackEntries = new Map()
   let trendRange = '7d'
   let usersCache = []
   let quotaCache = new Map()
@@ -2307,10 +2423,18 @@
   // ---------- 反馈 ----------
 
   const categoryLabels = { bug: '问题', suggestion: '建议', other: '其他' }
+  /** 管理员回复上限，与服务端保持一致 */
+  const FEEDBACK_REPLY_MAX = 1000
 
   function syncFeedbackFilters() {
     for (const button of dom.feedbackFilters) {
       button.setAttribute('aria-pressed', button.dataset.filter === feedbackFilter ? 'true' : 'false')
+    }
+    for (const button of dom.feedbackCategoryFilters) {
+      button.setAttribute(
+        'aria-pressed',
+        button.dataset.category === feedbackCategory ? 'true' : 'false',
+      )
     }
   }
 
@@ -2319,18 +2443,29 @@
     syncFeedbackFilters()
     clearNotice(dom.feedbackNotice)
 
-    const result = await api(`/api/admin/feedback?status=${encodeURIComponent(feedbackFilter)}&limit=200`)
+    // 请求序号：晚到的旧响应直接丢弃，避免覆盖用户刚改的新筛选
+    const requestId = ++feedbackRequestId
+    const params = new URLSearchParams()
+    params.set('status', feedbackFilter)
+    params.set('category', feedbackCategory)
+    params.set('limit', '200')
+    if (feedbackKeyword) params.set('q', feedbackKeyword)
+
+    const result = await api(`/api/admin/feedback?${params.toString()}`)
+    if (requestId !== feedbackRequestId) return
 
     if (isAuthFailure(result)) {
       dom.feedbackList.innerHTML = ''
       dom.feedbackEmpty.hidden = true
       dom.feedbackCount.textContent = ''
+      feedbackEntries = new Map()
       showNotice(dom.feedbackNotice, AUTH_HINT)
       return
     }
     if (!result.ok) {
       dom.feedbackList.innerHTML = ''
       dom.feedbackEmpty.hidden = true
+      feedbackEntries = new Map()
       showNotice(dom.feedbackNotice, result.error || '反馈列表读取失败')
       return
     }
@@ -2338,57 +2473,148 @@
     const data = result.data || {}
     const list = Array.isArray(data.feedback) ? data.feedback : []
     const counts = data.counts || {}
-    dom.feedbackCount.textContent = Number(counts.all)
-      ? `全部 ${counts.all} · 未处理 ${Number(counts.new) || 0} · 已处理 ${Number(counts.resolved) || 0}`
-      : ''
+    dom.feedbackCount.textContent =
+      `全部 ${Number(counts.all) || 0} · 未处理 ${Number(counts.new) || 0} · 已处理 ${Number(counts.resolved) || 0}`
+
+    feedbackEntries = new Map()
+    for (const entry of list) {
+      if (entry && entry.id) feedbackEntries.set(entry.id, entry)
+    }
 
     if (!list.length) {
       dom.feedbackList.innerHTML = ''
-      dom.feedbackEmpty.textContent = feedbackFilter === 'new'
-        ? '没有未处理的反馈'
-        : feedbackFilter === 'resolved' ? '还没有标记处理的反馈' : '还没有人提交反馈'
+      let emptyText = '还没有人提交反馈'
+      if (feedbackFilter === 'new') emptyText = '没有未处理的反馈'
+      else if (feedbackFilter === 'resolved') emptyText = '还没有标记处理的反馈'
+      else if (feedbackCategory !== 'all' || feedbackKeyword) emptyText = '没有符合条件的反馈'
+      dom.feedbackEmpty.textContent = emptyText
       dom.feedbackEmpty.hidden = false
       return
     }
 
     dom.feedbackEmpty.hidden = true
-    dom.feedbackList.innerHTML = list.map(entry => {
-      const resolved = entry.status === 'resolved'
-      const metaParts = []
-      if (entry.page) metaParts.push(`页面 ${entry.page}`)
-      if (entry.appVersion) metaParts.push(`版本 ${entry.appVersion}`)
-      if (resolved && entry.handledAt) metaParts.push(`处理于 ${formatTime(entry.handledAt)}`)
-      const who = entry.displayName || entry.username || '（未知）'
-      const meta = [
-        who,
-        entry.username && entry.username !== who ? entry.username : '',
-        categoryLabels[entry.category] || entry.category || '反馈',
-        formatTime(entry.createdAt),
-        ...metaParts,
-      ].filter(Boolean).join(' · ')
-      return `
-        <article class="fb" data-id="${escapeHtml(entry.id)}" data-status="${resolved ? 'resolved' : 'new'}">
-          <div class="fb-main">
-            <p class="fb-title">${escapeHtml(entry.content)}</p>
-            <p class="fb-meta">${escapeHtml(meta)}</p>
+    dom.feedbackList.innerHTML = list.map(renderFeedbackItem).join('')
+  }
+
+  function renderFeedbackItem(entry) {
+    const resolved = entry.status === 'resolved'
+    const metaParts = []
+    if (entry.page) metaParts.push(`页面 ${entry.page}`)
+    if (entry.appVersion) metaParts.push(`版本 ${entry.appVersion}`)
+    if (resolved && entry.handledAt) metaParts.push(`处理于 ${formatTime(entry.handledAt)}`)
+    const who = entry.displayName || entry.username || '（未知）'
+    const meta = [
+      who,
+      entry.username && entry.username !== who ? entry.username : '',
+      categoryLabels[entry.category] || entry.category || '反馈',
+      formatTime(entry.createdAt),
+      ...metaParts,
+    ].filter(Boolean).join(' · ')
+
+    const reply = typeof entry.reply === 'string' ? entry.reply.trim() : ''
+    const replyBlock = reply
+      ? `<div class="fb-reply">
+          <p class="fb-reply-label">管理员回复${entry.repliedAt ? ` · ${escapeHtml(formatTime(entry.repliedAt))}` : ''}</p>
+          <p class="fb-reply-text">${escapeHtml(reply)}</p>
+        </div>`
+      : ''
+
+    return `
+      <article class="fb" data-id="${escapeHtml(entry.id)}" data-status="${resolved ? 'resolved' : 'new'}">
+        <div class="fb-main">
+          <p class="fb-title">${escapeHtml(entry.content)}</p>
+          <p class="fb-meta">${escapeHtml(meta)}</p>
+          ${replyBlock}
+          <div class="fb-editor" hidden>
+            <textarea class="fb-reply-input" rows="3" maxlength="${FEEDBACK_REPLY_MAX}" aria-label="回复内容" placeholder="回复内容，最多 ${FEEDBACK_REPLY_MAX} 字"></textarea>
+            <div class="fb-editor-actions">
+              <button class="button mini primary" type="button" data-action="reply-save">保存回复</button>
+              <button class="button mini" type="button" data-action="reply-clear">清空回复</button>
+              <button class="button mini" type="button" data-action="reply-cancel">取消</button>
+            </div>
+            <p class="fb-editor-error" hidden></p>
           </div>
-          <div class="fb-side">
-            <span class="chip ${resolved ? 'ok' : 'warn'}">${resolved ? '已处理' : '未处理'}</span>
-            <button class="button mini" type="button" data-action="toggle">${resolved ? '改回未处理' : '标记处理'}</button>
-          </div>
-        </article>`
-    }).join('')
+        </div>
+        <div class="fb-side">
+          <span class="chip ${resolved ? 'ok' : 'warn'}">${resolved ? '已处理' : '未处理'}</span>
+          <button class="button mini" type="button" data-action="toggle">${resolved ? '改回未处理' : '标记处理'}</button>
+          <button class="button mini" type="button" data-action="reply-edit">${reply ? '编辑回复' : '回复'}</button>
+        </div>
+      </article>`
+  }
+
+  function feedbackItemOf(node) {
+    const item = node && node.closest ? node.closest('.fb[data-id]') : null
+    return item && item.dataset.id ? item : null
+  }
+
+  function feedbackEntryOf(item) {
+    if (!item) return null
+    return feedbackEntries.get(item.dataset.id) || null
+  }
+
+  /** 动作期间只禁用当前条目，其它条目照常可用 */
+  function setFeedbackItemBusy(item, busy) {
+    if (!item) return
+    item.dataset.busy = busy ? '1' : ''
+    for (const control of item.querySelectorAll('button, textarea')) {
+      control.disabled = busy
+    }
+  }
+
+  async function withFeedbackItemBusy(item, task) {
+    if (!item || item.dataset.busy === '1') return undefined
+    setFeedbackItemBusy(item, true)
+    try {
+      return await task()
+    } finally {
+      setFeedbackItemBusy(item, false)
+    }
+  }
+
+  function showFeedbackEditor(item) {
+    const editor = item.querySelector('.fb-editor')
+    const input = item.querySelector('.fb-reply-input')
+    const error = item.querySelector('.fb-editor-error')
+    if (!editor || !input) return
+    const entry = feedbackEntryOf(item)
+    input.value = entry && typeof entry.reply === 'string' ? entry.reply : ''
+    if (error) {
+      error.textContent = ''
+      error.hidden = true
+    }
+    editor.hidden = false
+    input.focus()
+  }
+
+  function hideFeedbackEditor(item) {
+    const editor = item.querySelector('.fb-editor')
+    const input = item.querySelector('.fb-reply-input')
+    const error = item.querySelector('.fb-editor-error')
+    if (editor) editor.hidden = true
+    if (input) input.value = ''
+    if (error) {
+      error.textContent = ''
+      error.hidden = true
+    }
+  }
+
+  function showFeedbackEditorError(item, message) {
+    const error = item.querySelector('.fb-editor-error')
+    if (!error) return
+    error.textContent = message
+    error.hidden = false
   }
 
   async function toggleFeedback(button) {
-    const item = button.closest('[data-id]')
-    const id = item && item.dataset.id
-    if (!id) return
+    const item = feedbackItemOf(button)
+    const entry = feedbackEntryOf(item)
+    if (!item || !entry) return
 
-    const nextStatus = button.dataset.next || 'resolved'
+    const nextStatus = entry.status === 'resolved' ? 'new' : 'resolved'
 
-    await withBusy(button, async () => {
-      const result = await api(`/api/admin/feedback/${encodeURIComponent(id)}`, {
+    await withFeedbackItemBusy(item, async () => {
+      const result = await api(`/api/admin/feedback/${encodeURIComponent(entry.id)}`, {
         method: 'PATCH',
         body: { status: nextStatus },
       })
@@ -2399,6 +2625,62 @@
       flash(nextStatus === 'resolved' ? '已标记为处理' : '已改回未处理')
       await loadFeedback()
     })
+  }
+
+  async function saveFeedbackReply(item) {
+    const entry = feedbackEntryOf(item)
+    if (!item || !entry) return
+    const input = item.querySelector('.fb-reply-input')
+    const text = input ? input.value : ''
+
+    if (text.length > FEEDBACK_REPLY_MAX) {
+      showFeedbackEditorError(item, `回复不能超过 ${FEEDBACK_REPLY_MAX} 个字符`)
+      return
+    }
+
+    await withFeedbackItemBusy(item, async () => {
+      const result = await api(`/api/admin/feedback/${encodeURIComponent(entry.id)}`, {
+        method: 'PATCH',
+        body: { status: entry.status === 'resolved' ? 'resolved' : 'new', reply: text },
+      })
+      if (!result.ok) {
+        // 失败保留输入，方便改完再试
+        showFeedbackEditorError(item, result.error || '回复保存失败')
+        flash(result.error || '回复保存失败', 'error')
+        return
+      }
+      flash('回复已保存')
+      await loadFeedback()
+    })
+  }
+
+  async function clearFeedbackReply(item) {
+    const entry = feedbackEntryOf(item)
+    if (!item || !entry) return
+
+    await withFeedbackItemBusy(item, async () => {
+      const result = await api(`/api/admin/feedback/${encodeURIComponent(entry.id)}`, {
+        method: 'PATCH',
+        body: { status: entry.status === 'resolved' ? 'resolved' : 'new', reply: '' },
+      })
+      if (!result.ok) {
+        showFeedbackEditorError(item, result.error || '回复清空失败')
+        flash(result.error || '回复清空失败', 'error')
+        return
+      }
+      flash('回复已清空')
+      await loadFeedback()
+    })
+  }
+
+  function scheduleFeedbackSearch() {
+    window.clearTimeout(feedbackSearchTimer)
+    feedbackSearchTimer = window.setTimeout(() => {
+      const value = dom.feedbackSearch.value.trim()
+      if (value === feedbackKeyword) return
+      feedbackKeyword = value
+      loadFeedback()
+    }, 300)
   }
 
   // ---------- 统计 ----------
@@ -2638,13 +2920,47 @@
     for (const button of dom.feedbackFilters) {
       button.addEventListener('click', () => loadFeedback(button.dataset.filter))
     }
+    for (const button of dom.feedbackCategoryFilters) {
+      button.addEventListener('click', () => {
+        if (button.dataset.category === feedbackCategory) return
+        feedbackCategory = button.dataset.category
+        loadFeedback()
+      })
+    }
+    dom.feedbackSearch.addEventListener('input', scheduleFeedbackSearch)
+    dom.feedbackSearch.addEventListener('keydown', event => {
+      if (event.key !== 'Enter') return
+      event.preventDefault()
+      window.clearTimeout(feedbackSearchTimer)
+      const value = dom.feedbackSearch.value.trim()
+      if (value === feedbackKeyword) return
+      feedbackKeyword = value
+      loadFeedback()
+    })
+    dom.btnFeedbackRefresh.addEventListener('click', () => loadFeedback())
     dom.feedbackList.addEventListener('click', event => {
-      const button = event.target.closest('button[data-action="toggle"]')
+      const button = event.target.closest('button[data-action]')
       if (!button) return
-      const item = button.closest('.fb')
+      const item = feedbackItemOf(button)
       if (!item) return
-      button.dataset.next = item.dataset.status === 'resolved' ? 'new' : 'resolved'
-      toggleFeedback(button)
+      const action = button.dataset.action
+      if (action === 'toggle') {
+        toggleFeedback(button)
+        return
+      }
+      if (action === 'reply-edit') {
+        showFeedbackEditor(item)
+        return
+      }
+      if (action === 'reply-save') {
+        saveFeedbackReply(item)
+        return
+      }
+      if (action === 'reply-clear') {
+        clearFeedbackReply(item)
+        return
+      }
+      if (action === 'reply-cancel') hideFeedbackEditor(item)
     })
 
     dom.btnStatsRefresh.addEventListener('click', () => loadStats())

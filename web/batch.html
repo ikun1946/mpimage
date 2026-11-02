@@ -446,8 +446,9 @@
     </div>
   </div>
 
-  <div class="modal" id="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
-    <div class="modal-sheet narrow">
+  <div class="modal" id="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-title"
+       aria-describedby="feedback-intro">
+    <div class="modal-sheet narrow feedback-sheet">
       <header class="modal-head">
         <div>
           <p class="modal-kicker">账号</p>
@@ -455,7 +456,10 @@
         </div>
         <button class="button secondary modal-close" id="feedback-close" type="button">关闭</button>
       </header>
-      <div class="modal-body narrow-body">
+      <div class="modal-body narrow-body feedback-body">
+        <p class="feedback-intro" id="feedback-intro">
+          写一条反馈，或展开下面的记录查看处理情况。未提交的草稿只保存在本机当前账号。
+        </p>
         <form class="feedback-form" id="feedback-form" novalidate>
           <div class="feedback-compose" id="feedback-compose">
             <span class="field-label" id="feedback-category-label">反馈类型</span>
@@ -471,24 +475,30 @@
             <div class="feedback-count-row">
               <span class="feedback-count"><span id="feedback-count">0</span> / 2000</span>
             </div>
-            <p class="feedback-hint" id="feedback-hint">至少 5 个字。说明当时在做什么、哪一步不对，能复现的步骤最有用；提交时会一并带上页面与版本号。</p>
+            <p class="feedback-hint" id="feedback-hint">至少 5 个字。说明当时在做什么、哪一步不对，能复现的步骤最有用；提交时会一并带上页面与版本号。没提交的内容会留在本机这个账号上，关掉弹窗或刷新后再来还在。</p>
             <p class="feedback-msg" id="feedback-msg" role="alert"></p>
+            <p class="feedback-status" id="feedback-status" role="status" aria-live="polite"></p>
             <div class="modal-actions">
               <button class="button primary" id="feedback-submit" type="submit">提交反馈</button>
-              <button class="button secondary" id="feedback-cancel" type="button">取消</button>
-            </div>
-          </div>
-
-          <div class="feedback-done" id="feedback-done" hidden>
-            <p class="feedback-done-title">已提交，感谢你的反馈</p>
-            <p class="feedback-done-hint">最近 3 条反馈的处理状态：</p>
-            <ul class="feedback-list" id="feedback-list"></ul>
-            <div class="modal-actions">
-              <button class="button secondary" id="feedback-again" type="button">再写一条</button>
-              <button class="button primary" id="feedback-done-close" type="button">关闭</button>
+              <button class="button secondary" id="feedback-cancel" type="button">稍后再写</button>
             </div>
           </div>
         </form>
+
+        <section class="feedback-history" id="feedback-history" aria-labelledby="feedback-history-title">
+          <div class="feedback-history-head">
+            <h4 class="feedback-history-title" id="feedback-history-title">我的最近反馈</h4>
+            <div class="feedback-history-actions">
+              <button class="button ghost" id="feedback-history-refresh" type="button">刷新</button>
+              <button class="button ghost" id="feedback-history-toggle" type="button"
+                      aria-expanded="true" aria-controls="feedback-history-panel">收起记录</button>
+            </div>
+          </div>
+          <p class="feedback-history-status" id="feedback-history-status" role="status" aria-live="polite"></p>
+          <div class="feedback-history-panel" id="feedback-history-panel">
+            <ul class="feedback-list" id="feedback-list"></ul>
+          </div>
+        </section>
       </div>
     </div>
   </div>

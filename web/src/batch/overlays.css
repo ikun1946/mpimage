@@ -19,6 +19,13 @@
   transition: opacity 200ms ease;
 }
 
+.modal.visible {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in 180ms ease both;
+}
+
 .lightbox.visible {
 
   display: grid;
@@ -198,7 +205,24 @@
   margin-top: 6px;
 }
 
-/* 意见反馈弹窗：复用窄版弹窗骨架，只补三档分段控件、字数行与已提交列表 */
+/* 意见反馈弹窗：撰写区 + 可展开的历史记录区 */
+.modal-sheet.feedback-sheet {
+  width: min(560px, 100%);
+}
+
+.modal-body.feedback-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.feedback-intro {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
 .feedback-form {
   display: flex;
   flex-direction: column;
@@ -286,42 +310,77 @@
   line-height: 1.5;
 }
 
+/* 成功提示走 status（礼貌播报），错误提示走上面的 alert */
+.feedback-status {
+  min-height: 17px;
+  margin: 0;
+  color: var(--success);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .feedback-form .modal-actions {
   margin-top: 6px;
 }
 
-/* 已提交视图：display 会盖掉 hidden 属性，显式补一条 */
-.feedback-done {
+/* 历史记录区：标题行 + 展开面板，面板内部自己滚动，弹窗不被撑长 */
+.feedback-history {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.feedback-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
 }
 
-.feedback-done[hidden] {
-  display: none;
-}
-
-.feedback-done-title {
+.feedback-history-title {
   margin: 0;
-  color: var(--moss);
-  font-size: var(--text-sm);
-  font-weight: 600;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.feedback-done-hint {
+.feedback-history-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.feedback-history-actions .button {
+  min-height: 26px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+}
+
+.feedback-history-status {
+  min-height: 15px;
   margin: 0;
   color: var(--ink-faint);
-  font-size: 11.5px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.feedback-history-panel[hidden]:not([hidden="until-found"]) {
+  display: none;
 }
 
 .feedback-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 220px;
+  max-height: min(38vh, 320px);
   margin: 0;
-  padding: 0;
+  padding: 2px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
 }
 
@@ -338,8 +397,12 @@
 .feedback-item-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.feedback-item-top .feedback-item-meta {
+  margin-left: auto;
 }
 
 .feedback-item-text {
@@ -359,6 +422,91 @@
   padding: 14px 0;
   list-style: none;
   text-align: center;
+}
+
+.feedback-item-toggle {
+  align-self: flex-start;
+  min-height: 24px;
+  padding: 2px 8px;
+  font-size: 11.5px;
+}
+
+/* 折叠的详情区：外层只承载 hidden="until-found"，样式放内层，
+   免得 display 之类直接盖在隐藏元素上让页内查找失效 */
+.feedback-item-detail[hidden]:not([hidden="until-found"]) {
+  display: none;
+}
+
+.feedback-item-detail-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: calc(var(--radius-sm) - 3px);
+  background: var(--surface-subtle);
+}
+
+.feedback-item-full {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.feedback-item-reason {
+  margin: 0;
+  color: var(--danger);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.feedback-item-reply {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--moss-light);
+  border-radius: 0 calc(var(--radius-sm) - 3px) calc(var(--radius-sm) - 3px) 0;
+  background: var(--moss-tint);
+}
+
+.feedback-item-reply-title {
+  margin: 0;
+  color: var(--moss);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.feedback-item-reply-text {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.feedback-item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.feedback-item-retry {
+  min-height: 26px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+}
+
+/* 减少动态效果：展开/收起不再有过渡 */
+@media (prefers-reduced-motion: reduce) {
+  .feedback-category,
+  .feedback-item-toggle,
+  .feedback-item-retry {
+    transition-duration: 1ms;
+  }
 }
 
 .modal-result {

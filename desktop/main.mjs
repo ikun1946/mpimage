@@ -6,7 +6,7 @@ import { basename, join } from 'node:path'
 import { appRoot, dataRoot } from './paths.mjs'
 import { loadConfig } from './config.mjs'
 import { desktopToken, initServer, restartServer, serverState, startServer, stopServer, waitForServer } from './server.mjs'
-import { checkForUpdate, downloadInstaller, launchInstaller } from './updater.mjs'
+import { checkForUpdate, downloadInstaller, findReadyInstaller, launchInstaller } from './updater.mjs'
 
 /* ===== 基础路径：数据一律写在数据根，绝不碰安装目录 ===== */
 const ROOT = appRoot()
@@ -32,6 +32,7 @@ let mainWindow = null
 let tray = null
 let quitting = false
 let serviceRunning = false
+let updateCheckBusy = false
 let updateBusy = false
 
 function log(message) {
@@ -329,27 +330,51 @@ function openLogWindow() {
   logWindow.on('closed', () => { logWindow = null })
 }
 
-/* ===== 更新下载窗口：进度条 / 取消 / 装 ===== */
+/* ===== 更新窗口：检查、下载、安装都在这一个窗口里 ===== */
 let updateWindow = null
-let updateTarget = { url: '', name: '', version: '', pageUrl: '' }
+let updateTarget = { url: '', name: '', version: '', pageUrl: '', expectedSize: null }
 let updateController = null
 let updateTimer = 0
 let updateDirty = false
 let updateState = {
-  phase: 'resolve',
+  phase: 'checking',
+  currentVersion: '',
+  latestVersion: '',
   version: '',
+  notes: '',
+  pageUrl: '',
+  publishedAt: '',
+  checkedAt: '',
+  expectedSize: null,
   fileName: '',
   received: 0,
   total: 0,
   speed: 0,
+  etaSeconds: null,
   connections: 1,
   mirror: false,
   message: '',
   filePath: '',
+  hasUpdate: false,
+  canRetryDownload: false,
+  disabled: false,
 }
 
 function updateView() {
   return updateWindow && !updateWindow.isDestroyed() ? updateWindow.webContents : null
+}
+
+/** 托盘和任务栏共用这一份真实状态，不自己编数字 */
+function updateIndicatorLabel() {
+  switch (updateState.phase) {
+    case 'checking': return '画境 · 正在检查更新…'
+    case 'available': return updateState.latestVersion ? `画境 · 有新版本 ${updateState.latestVersion}` : '画境 · 有新版本'
+    case 'latest': return '画境 · 已是最新版本'
+    case 'done': return '画境 · 更新已下载，可以安装'
+    case 'cancel': return '画境 · 更新下载已取消'
+    case 'error': return '画境 · 更新出错'
+    default: return ''
+  }
 }
 
 /** 进度每 120ms 才推一次：下载每个 chunk 都来一条，直接转发会把渲染进程压垮 */
@@ -365,6 +390,9 @@ function paintUpdate(patch) {
     trayTooltip(updateState.total > 0
       ? `画境 · 更新 ${Math.round((updateState.received / updateState.total) * 100)}%`
       : `画境 · 已下载 ${(updateState.received / 1048576).toFixed(1)} MB`)
+  } else {
+    const label = updateIndicatorLabel()
+    if (label) trayTooltip(label)
   }
   updateDirty = true
   if (updateTimer) return
@@ -386,11 +414,13 @@ function openUpdateWindow() {
 
   updateWindow = new BrowserWindow({
     width: 520,
-    height: 260,
-    resizable: false,
+    height: 320,
+    minWidth: 420,
+    minHeight: 240,
+    resizable: true,
     maximizable: false,
     fullscreenable: false,
-    title: '画境 · 更新下载',
+    title: '画境 · 更新',
     backgroundColor: '#f4f0e6',
     icon: iconPath(),
     show: false,
@@ -405,19 +435,23 @@ function openUpdateWindow() {
   updateWindow.loadFile(join(app.getAppPath(), 'desktop', 'update.html'))
   updateWindow.once('ready-to-show', () => updateWindow?.show())
   updateWindow.webContents.on('did-finish-load', () => updateView()?.send('update:state', updateState))
-  // 下载途中关窗只是收起来：要停请点「取消」，别让误触丢掉已经下好的进度
+  // 关窗口只是收起来，任务照跑：要停请点「取消」，别让误触丢掉已经下好的进度
   updateWindow.on('close', event => {
     if (quitting) return
-    if (updateState.phase === 'download' || updateState.phase === 'resolve') {
-      event.preventDefault()
-      updateWindow?.hide()
-    }
+    event.preventDefault()
+    updateWindow?.hide()
   })
   updateWindow.on('closed', () => { updateWindow = null })
 }
 
 async function startUpdateDownload() {
-  if (!updateTarget.url) return
+  if (!updateTarget.url) {
+    paintUpdate({ phase: 'error', message: '没有可下载的安装包，请先检查更新' })
+    openUpdateWindow()
+    return
+  }
+  if (updateBusy) return
+  updateBusy = true
   updateController = new AbortController()
   openUpdateWindow()
   paintUpdate({
@@ -425,12 +459,14 @@ async function startUpdateDownload() {
     version: updateTarget.version,
     fileName: updateTarget.name,
     received: 0,
-    total: 0,
+    total: updateTarget.expectedSize || 0,
     speed: 0,
+    etaSeconds: null,
     connections: 1,
     mirror: Boolean(config.UPDATE_DOWNLOAD_MIRROR),
     message: '',
     filePath: '',
+    canRetryDownload: true,
   })
 
   try {
@@ -438,43 +474,66 @@ async function startUpdateDownload() {
       url: updateTarget.url,
       name: updateTarget.name,
       signal: updateController.signal,
+      expectedSize: updateTarget.expectedSize,
+      version: updateTarget.version,
       // 探测阶段也是「还没开始下」，页面上归到 resolve 态
       onProgress: event => paintUpdate(event.phase === 'probe' ? { ...event, phase: 'resolve' } : event),
     })
     paintUpdate({
       phase: 'done',
       filePath: result.file,
+      fileName: basename(result.file),
       received: result.size,
       total: result.size,
       connections: result.connections,
+      etaSeconds: 0,
+      message: '下载完成，可以安装',
     })
-    openUpdateWindow()
-    trayTooltip('画境 · 更新已下载，可以安装')
   } catch (error) {
     if (error?.name === 'AbortError') {
       log('更新下载已取消')
-      paintUpdate({ phase: 'cancelled', message: '已取消下载' })
+      paintUpdate({ phase: 'cancel', message: '已取消下载，已下好的部分留着，重试会接着下' })
     } else {
       log(`下载安装包失败：${error?.message || error}`)
       paintUpdate({ phase: 'error', message: error?.message || '下载失败' })
-      openUpdateWindow()
     }
+    openUpdateWindow()
   } finally {
     updateController = null
     updateBusy = false
-    if (!['download', 'resolve'].includes(updateState.phase)) {
-      setTimeout(() => trayTooltip(`画境 · 服务${serviceStatusLabel()}`), 3000)
-    }
   }
 }
 
 ipcMain.handle('update:cancel', () => {
   updateController?.abort()
+  return { ok: true }
+})
+
+ipcMain.handle('update:check', () => {
+  void checkUpdates()
+  return { ok: true }
+})
+
+ipcMain.handle('update:download', () => {
+  void startUpdateDownload()
+  return { ok: true }
 })
 
 ipcMain.handle('update:retry', () => {
-  if (updateBusy) return { ok: false }
+  if (updateBusy) return { ok: false, message: '下载正在进行中' }
+  // 重试只针对已经定下来的下载目标，没有目标就别硬来
+  if (!updateTarget.url) return { ok: false, message: '没有可重试的下载，请先检查更新' }
   void startUpdateDownload()
+  return { ok: true }
+})
+
+/** 更新窗口按内容调高度：说明越长窗口越高，但不许高过屏幕 */
+ipcMain.handle('update:resize', (_event, height) => {
+  if (!updateWindow || updateWindow.isDestroyed()) return { ok: false }
+  const value = Number(height)
+  if (!Number.isFinite(value)) return { ok: false }
+  const next = Math.round(Math.min(Math.max(value, 240), 900))
+  updateWindow.setSize(updateWindow.getSize()[0], next)
   return { ok: true }
 })
 
@@ -485,6 +544,8 @@ ipcMain.handle('update:install', async () => {
     await launchInstaller(file)
   } catch (error) {
     log(`打开安装包失败：${error.message}`)
+    // 安装失败回到可重试的错误状态，文件还在，可以再试一次
+    paintUpdate({ phase: 'error', message: error.message })
     return { ok: false, message: error.message }
   }
   // 安装器接管后本进程就该退了，留一点时间让窗口显示「正在启动安装程序」
@@ -667,107 +728,144 @@ async function runServiceAction(label, action) {
   }
 }
 
-/* ===== 检查更新 ===== */
-function trimNotes(notes) {
-  const text = String(notes || '').trim()
-  return text.length > 1200 ? `${text.slice(0, 1200)}…` : text
-}
-
-function publishedLabel(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-CN')
+/* ===== 检查更新：结果一律落到更新窗口，不再用阻塞式系统弹窗 ===== */
+/** 出错或源被禁用时别留着上一次的下载目标，免得错误页给出下载旧版本的重试按钮 */
+function clearStaleUpdateTarget() {
+  if (updateBusy) return false
+  updateTarget = { url: '', name: '', version: '', pageUrl: '', expectedSize: null }
+  return true
 }
 
 async function checkUpdates() {
-  if (updateBusy) return
-  updateBusy = true
-  trayTooltip('画境 · 正在检查更新…')
+  // 重复点击不另起一个任务，窗口里显示的就是正在进行的那一次
+  if (updateCheckBusy) {
+    openUpdateWindow()
+    return
+  }
+  // 解析或下载进行中：只把窗口亮出来，不打断任务也不覆盖下载进度
+  if (updateBusy) {
+    openUpdateWindow()
+    return
+  }
+  updateCheckBusy = true
+
+  openUpdateWindow()
+  paintUpdate({
+    phase: 'checking',
+    message: '正在检查更新…',
+    received: 0,
+    total: 0,
+    speed: 0,
+    etaSeconds: null,
+    connections: 1,
+  })
 
   try {
     const info = await checkForUpdate()
 
-    if (info.error) {
-      const buttons = info.pageUrl ? ['前往发布页', '关闭'] : ['关闭']
-      const choice = dialog.showMessageBoxSync({
-        type: 'warning',
-        title: '检查更新失败',
-        message: info.error,
-        detail: `当前版本 ${info.currentVersion || app.getVersion()}`,
-        buttons,
-        defaultId: 0,
-        cancelId: buttons.length - 1,
+    if (!info || typeof info !== 'object') {
+      const cleared = clearStaleUpdateTarget()
+      paintUpdate({
+        phase: 'error',
+        message: '检查更新失败：主服务没有返回有效结果',
+        ...(cleared ? { filePath: '', fileName: '', canRetryDownload: false } : {}),
       })
-      if (info.pageUrl && choice === 0) await shell.openExternal(info.pageUrl)
+      return
+    }
+    if (info.error) {
+      const cleared = clearStaleUpdateTarget()
+      paintUpdate({
+        phase: 'error',
+        message: info.error,
+        ...(cleared ? { filePath: '', fileName: '', canRetryDownload: false } : {}),
+      })
+      return
+    }
+    if (info.disabled) {
+      const cleared = clearStaleUpdateTarget()
+      paintUpdate({
+        phase: 'error',
+        disabled: true,
+        currentVersion: info.currentVersion || app.getVersion(),
+        message: '未配置更新来源，暂时无法检查新版本',
+        ...(cleared ? { filePath: '', fileName: '', canRetryDownload: false } : {}),
+      })
       return
     }
 
-    if (info.disabled) {
-      await dialog.showMessageBox({
-        type: 'info',
-        title: '检查更新',
-        message: '未配置更新来源，暂时无法检查新版本',
-        detail: `当前版本 ${info.currentVersion || app.getVersion()}`,
-      })
-      return
+    const currentVersion = info.currentVersion || app.getVersion()
+    const latestVersion = info.latestVersion || ''
+    const expectedSize = Number.isSafeInteger(info.downloadSize) && info.downloadSize > 0
+      ? info.downloadSize
+      : null
+    const base = {
+      currentVersion,
+      latestVersion,
+      version: latestVersion,
+      notes: info.releaseNotes || '',
+      pageUrl: info.pageUrl || '',
+      publishedAt: info.publishedAt || '',
+      checkedAt: info.checkedAt || new Date().toISOString(),
+      expectedSize,
+      hasUpdate: Boolean(info.hasUpdate),
+      disabled: false,
+      filePath: '',
+      canRetryDownload: false,
     }
 
     if (!info.hasUpdate) {
-      await dialog.showMessageBox({
-        type: 'info',
-        title: '检查更新',
-        message: `已是最新版本 ${info.currentVersion || app.getVersion()}`,
-      })
-      return
-    }
-
-    const detail = [
-      `当前版本：${info.currentVersion || app.getVersion()}`,
-      info.publishedAt ? `发布时间：${publishedLabel(info.publishedAt)}` : '',
-      info.releaseNotes ? `\n${trimNotes(info.releaseNotes)}` : '',
-    ].filter(Boolean).join('\n')
-
-    const choice = dialog.showMessageBoxSync({
-      type: 'info',
-      title: '发现新版本',
-      message: `发现新版本 ${info.latestVersion || ''}`.trim(),
-      detail,
-      buttons: ['下载安装包', '前往发布页', '稍后'],
-      defaultId: 0,
-      cancelId: 2,
-    })
-
-    if (choice === 1) {
-      if (info.pageUrl) await shell.openExternal(info.pageUrl)
-      return
-    }
-    if (choice !== 0) return
-
-    if (!info.downloadUrl) {
-      const fallback = dialog.showMessageBoxSync({
-        type: 'info',
-        title: '暂无安装包',
-        message: '这次更新没有提供安装包下载地址',
-        detail: '可以去发布页手动下载。',
-        buttons: info.pageUrl ? ['前往发布页', '关闭'] : ['关闭'],
-        defaultId: 0,
-        cancelId: info.pageUrl ? 1 : 0,
-      })
-      if (info.pageUrl && fallback === 0) await shell.openExternal(info.pageUrl)
+      clearStaleUpdateTarget()
+      paintUpdate({ ...base, phase: 'latest', message: `已是最新版本 ${currentVersion}` })
       return
     }
 
     updateTarget = {
-      url: info.downloadUrl,
+      url: info.downloadUrl || '',
       name: info.downloadName || '',
-      version: info.latestVersion || '',
+      version: latestVersion,
       pageUrl: info.pageUrl || '',
+      expectedSize,
     }
-    // 进度条、取消、重试、立即安装都在下载窗口里，不再用阻塞式对话框问安装
-    await startUpdateDownload()
+
+    if (!updateTarget.url) {
+      paintUpdate({
+        ...base,
+        phase: 'available',
+        message: '这次更新没有提供安装包下载地址，可以去发布页手动下载',
+      })
+      return
+    }
+
+    // 同一版本已经完整下过就直接复用：文件在、大小对得上、版本也对得上
+    const ready = await findReadyInstaller({
+      url: updateTarget.url,
+      name: updateTarget.name,
+      version: latestVersion,
+      expectedSize,
+    })
+    if (ready) {
+      paintUpdate({
+        ...base,
+        phase: 'done',
+        filePath: ready.file,
+        received: ready.size,
+        total: ready.size,
+        etaSeconds: 0,
+        message: '这个版本已经下载好了，可以直接安装',
+      })
+      return
+    }
+
+    paintUpdate({ ...base, phase: 'available', message: '发现新版本，可以下载安装包' })
+  } catch (error) {
+    const cleared = clearStaleUpdateTarget()
+    paintUpdate({
+      phase: 'error',
+      message: `检查更新失败：${error?.message || error}`,
+      ...(cleared ? { filePath: '', fileName: '', canRetryDownload: false } : {}),
+    })
   } finally {
-    updateBusy = false
-    trayTooltip(`画境 · 服务${serviceStatusLabel()}`)
+    updateCheckBusy = false
   }
 }
 

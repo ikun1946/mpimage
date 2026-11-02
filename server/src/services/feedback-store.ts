@@ -28,6 +28,12 @@ export interface FeedbackEntry {
   handledAt: string
   /** 最后标记处理的账号 id；status 回到 new 时清空 */
   handledBy: string
+  /** 管理员回复；旧记录为空串 */
+  reply: string
+  /** 回复时间；清空回复时一并清空 */
+  repliedAt: string
+  /** 回复人账号 id；清空回复时一并清空 */
+  repliedBy: string
 }
 
 export interface FeedbackDatabase {
@@ -45,6 +51,22 @@ export interface FeedbackInput {
 }
 
 export type FeedbackStatusFilter = 'all' | FeedbackStatus
+export type FeedbackCategoryFilter = 'all' | FeedbackCategory
+
+/** 列表筛选条件：状态、类型与关键词可任意组合。 */
+export interface FeedbackListOptions {
+  status?: FeedbackStatusFilter
+  category?: FeedbackCategoryFilter
+  /** 关键词，覆盖账号、昵称、正文、回复与页面 */
+  q?: string
+  limit?: number
+}
+
+/** 管理员对一条反馈的更新：状态必填，回复可选（缺省表示保留原回复）。 */
+export interface FeedbackUpdate {
+  status: FeedbackStatus
+  reply?: string
+}
 
 /** 保留上限：超出后从最旧的开始丢，防止单文件无限增长（写入追加在尾部） */
 const MAX_ENTRIES = 2000
@@ -99,6 +121,9 @@ export class FeedbackStore {
       status: 'new',
       handledAt: '',
       handledBy: '',
+      reply: '',
+      repliedAt: '',
+      repliedBy: '',
     }
 
     const database = await this.enqueueWrite(current => ({
@@ -107,29 +132,60 @@ export class FeedbackStore {
     return database.feedback.find(item => item.id === entry.id) ?? entry
   }
 
-  /** 按时间倒序返回；status 传 all 表示不筛选。limit 取库容量即「全部」。 */
-  async list(options: { status?: FeedbackStatusFilter; limit?: number } = {}): Promise<FeedbackEntry[]> {
+  /**
+   * 按时间倒序返回；status/category 传 all 表示不筛选，q 为空表示不按关键词过滤。
+   * limit 取库容量即「全部」。
+   */
+  async list(options: FeedbackListOptions = {}): Promise<FeedbackEntry[]> {
     const status = options.status ?? 'all'
+    const category = options.category ?? 'all'
+    const keyword = (options.q ?? '').trim().toLowerCase()
     const limit = clampLimit(options.limit)
     // 写入追加在尾部，倒序即「最新在前」；同毫秒写入也保持后写在前
     const ordered = [...this.cache.feedback].reverse()
-    const filtered = status === 'all' ? ordered : ordered.filter(entry => entry.status === status)
+    let filtered = ordered
+    if (status !== 'all') filtered = filtered.filter(entry => entry.status === status)
+    if (category !== 'all') filtered = filtered.filter(entry => entry.category === category)
+    if (keyword) filtered = filtered.filter(entry => matchesKeyword(entry, keyword))
     return filtered.slice(0, limit)
   }
 
   /**
-   * 更新处理状态。找不到返回 undefined（路由据此回 404）。
-   * 退回 new 时一并清空处理痕迹，避免后台把未处理条目显示成已处理。
+   * 管理员更新：状态必填，回复可选。
+   * 回复缺省表示保留；空串清空回复及其时间与处理人；非空回复记录回复时间与处理人。
+   * 退回 new 只清 handledAt/handledBy，回复内容保留。
+   * 找不到返回 undefined（路由据此回 404）。
    */
-  async setStatus(id: string, status: FeedbackStatus, adminId: string): Promise<FeedbackEntry | undefined> {
+  async update(id: string, change: FeedbackUpdate, adminId: string): Promise<FeedbackEntry | undefined> {
     let updated: FeedbackEntry | undefined
     await this.enqueueWrite(current => ({
       feedback: current.feedback.map(entry => {
         if (entry.id !== id) return entry
-        updated = status === 'resolved'
-          ? { ...entry, status, handledAt: new Date().toISOString(), handledBy: adminId }
-          : { ...entry, status, handledAt: '', handledBy: '' }
-        return updated
+        let next: FeedbackEntry = { ...entry, status: change.status }
+        if (change.status === 'resolved') {
+          // 已经处理过就保留原来的处理时间，避免只是补一条回复就把处理时间刷新掉
+          if (entry.status !== 'resolved' || !entry.handledAt) {
+            next.handledAt = new Date().toISOString()
+            next.handledBy = adminId
+          }
+        } else {
+          next.handledAt = ''
+          next.handledBy = ''
+        }
+        if (change.reply !== undefined) {
+          const text = change.reply.trim()
+          if (text) {
+            next.reply = text
+            next.repliedAt = new Date().toISOString()
+            next.repliedBy = adminId
+          } else {
+            next.reply = ''
+            next.repliedAt = ''
+            next.repliedBy = ''
+          }
+        }
+        updated = next
+        return next
       }),
     }))
     return updated
@@ -181,5 +237,21 @@ function normalizeEntry(entry: FeedbackEntry): FeedbackEntry {
     status: entry.status === 'resolved' ? 'resolved' : 'new',
     handledAt: String(entry.handledAt || ''),
     handledBy: String(entry.handledBy || ''),
+    reply: String(entry.reply || ''),
+    repliedAt: String(entry.repliedAt || ''),
+    repliedBy: String(entry.repliedBy || ''),
   }
+}
+
+/** 关键词匹配账号、昵称、正文、回复与页面；各字段之间不跨字段命中。 */
+function matchesKeyword(entry: FeedbackEntry, keyword: string): boolean {
+  const fields = [
+    entry.userId,
+    entry.username,
+    entry.displayName,
+    entry.content,
+    entry.reply,
+    entry.page,
+  ]
+  return fields.some(field => field.toLowerCase().includes(keyword))
 }

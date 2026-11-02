@@ -3,6 +3,7 @@ import { ApiError } from '../lib/errors.js'
 import { requireAdmin, requireAuth } from './auth.js'
 import type {
   FeedbackCategory,
+  FeedbackCategoryFilter,
   FeedbackEntry,
   FeedbackStatus,
   FeedbackStatusFilter,
@@ -22,6 +23,10 @@ const CONTENT_MIN = 5
 const CONTENT_MAX = 2000
 const PAGE_MAX = 64
 const APP_VERSION_MAX = 32
+/** 管理员回复上限 */
+const REPLY_MAX = 1000
+/** 后台关键词上限 */
+const QUERY_MAX = 64
 /** 节流：同一账号 60 秒内最多 3 条，第 4 条回 429 */
 const THROTTLE_WINDOW_MS = 60_000
 const THROTTLE_MAX = 3
@@ -89,41 +94,71 @@ export function registerFeedbackRoutes(app: FastifyInstance, deps: { feedback: F
   app.get('/api/admin/feedback', async request => {
     requireAdmin(request)
 
-    const query = request.query as { status?: unknown; limit?: unknown } | undefined
+    const query = request.query as
+      | { status?: unknown; limit?: unknown; category?: unknown; q?: unknown }
+      | undefined
     const rawStatus = typeof query?.status === 'string' && query.status ? query.status : 'all'
     if (rawStatus !== 'all' && !STATUSES.includes(rawStatus as FeedbackStatus)) {
       throw new ApiError('FEEDBACK_INVALID', '筛选状态无效', 400)
     }
+    const rawCategory =
+      typeof query?.category === 'string' && query.category ? query.category : 'all'
+    if (rawCategory !== 'all' && !CATEGORIES.includes(rawCategory as FeedbackCategory)) {
+      throw new ApiError('FEEDBACK_INVALID', '筛选类型无效', 400)
+    }
+    const keyword = readQueryText(query?.q, QUERY_MAX, '关键词')
 
     const limit = readLimit(request, ADMIN_LIMIT_DEFAULT, ADMIN_LIMIT_MAX)
     const feedback = await deps.feedback.list({
       status: rawStatus as FeedbackStatusFilter,
+      category: rawCategory as FeedbackCategoryFilter,
+      q: keyword,
       limit,
     })
 
+    // counts 始终是全局状态计数，不随状态、类型、关键词筛选变化
     return { feedback, counts: deps.feedback.counts() }
   })
 
   app.patch('/api/admin/feedback/:id', async request => {
     const admin = requireAdmin(request)
     const id = (request.params as { id?: string }).id ?? ''
-    const body = (request.body ?? {}) as { status?: unknown }
+    const body = (request.body ?? {}) as { status?: unknown; reply?: unknown }
 
     const status = body.status
     if (typeof status !== 'string' || !STATUSES.includes(status as FeedbackStatus)) {
       throw new ApiError('FEEDBACK_INVALID', '处理状态无效，只能是 new 或 resolved', 400)
     }
 
-    const feedback = await deps.feedback.setStatus(id, status as FeedbackStatus, admin.userId)
+    // reply 缺省表示保留原回复；空串清空回复及其时间与处理人
+    let reply: string | undefined
+    if (body.reply !== undefined && body.reply !== null) {
+      if (typeof body.reply !== 'string') {
+        throw new ApiError('FEEDBACK_INVALID', '回复格式无效', 400)
+      }
+      if (body.reply.trim().length > REPLY_MAX) {
+        throw new ApiError('FEEDBACK_INVALID', `回复不能超过 ${REPLY_MAX} 个字符`, 400)
+      }
+      reply = body.reply.trim()
+    }
+
+    const feedback = await deps.feedback.update(
+      id,
+      { status: status as FeedbackStatus, reply },
+      admin.userId,
+    )
     // 契约里「找不到」用 404；错误码只有 FEEDBACK_INVALID 一种，沿用它的默认 400 之外的显式状态码
     if (!feedback) throw new ApiError('FEEDBACK_INVALID', '反馈不存在', 404)
 
-    request.log.info({ adminId: admin.userId, feedbackId: feedback.id, status }, '管理员更新了反馈状态')
+    request.log.info(
+      { adminId: admin.userId, feedbackId: feedback.id, status, replied: reply !== undefined },
+      '管理员更新了反馈',
+    )
     return { feedback }
   })
 }
 
-/** 登录用户看到的自己那条反馈：不含账号信息。 */
+/** 登录用户看到的自己那条反馈：不含账号信息，但含管理员回复。 */
 function toOwnSummary(entry: FeedbackEntry): {
   id: string
   category: FeedbackCategory
@@ -132,6 +167,8 @@ function toOwnSummary(entry: FeedbackEntry): {
   appVersion: string
   createdAt: string
   status: FeedbackStatus
+  reply: string
+  repliedAt: string
 } {
   return {
     id: entry.id,
@@ -141,6 +178,8 @@ function toOwnSummary(entry: FeedbackEntry): {
     appVersion: entry.appVersion,
     createdAt: entry.createdAt,
     status: entry.status,
+    reply: entry.reply,
+    repliedAt: entry.repliedAt,
   }
 }
 
@@ -150,6 +189,20 @@ function readOptionalText(value: unknown, max: number, label: string): string {
     throw new ApiError('FEEDBACK_INVALID', `${label}格式无效`, 400)
   }
   const text = value.trim()
+  if (text.length > max) {
+    throw new ApiError('FEEDBACK_INVALID', `${label}不能超过 ${max} 个字符`, 400)
+  }
+  return text
+}
+
+/** 读取查询串里的关键词：重复传参时取第一个，未传返回空串。 */
+function readQueryText(value: unknown, max: number, label: string): string {
+  if (value === undefined || value === null) return ''
+  const raw = Array.isArray(value) ? value[0] : value
+  if (typeof raw !== 'string') {
+    throw new ApiError('FEEDBACK_INVALID', `${label}格式无效`, 400)
+  }
+  const text = raw.trim()
   if (text.length > max) {
     throw new ApiError('FEEDBACK_INVALID', `${label}不能超过 ${max} 个字符`, 400)
   }

@@ -17,6 +17,8 @@ export interface UpdateStatus {
   pageUrl: string | null
   downloadUrl: string | null
   downloadName: string | null
+  /** 安装包字节数：GitHub 取资产 size，自定义源可显式给出；拿不到就是 null */
+  downloadSize: number | null
   publishedAt: string | null
   checkedAt: string
   source: 'github' | 'custom' | 'none'
@@ -30,6 +32,7 @@ interface ReleaseInfo {
   pageUrl: string | null
   downloadUrl: string | null
   downloadName: string | null
+  downloadSize: number | null
   publishedAt: string | null
   source: 'github' | 'custom'
 }
@@ -101,17 +104,33 @@ function nullableTextFrom(value: unknown): string | null {
   return text || null
 }
 
+/** 字节数只认非负整数：数字或纯数字字符串，其余（小数、负数、null、布尔）一律当成“没给” */
+function normalizeSize(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isSafeInteger(value) && value >= 0 ? value : null
+  }
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (!/^\d+$/.test(text)) return null
+    const size = Number.parseInt(text, 10)
+    return Number.isSafeInteger(size) ? size : null
+  }
+  return null
+}
+
 /** GitHub release 的资产：.exe 里优先名字含 Setup 的（安装包），其次 portable（免安装） */
-function pickAsset(assets: unknown): { name: string; url: string } | null {
+function pickAsset(assets: unknown): { name: string; url: string; size: number | null } | null {
   if (!Array.isArray(assets)) return null
   const exes = assets
     .map(asset => {
-      const record = (asset ?? {}) as { name?: unknown; browser_download_url?: unknown }
+      const record = (asset ?? {}) as { name?: unknown; browser_download_url?: unknown; size?: unknown }
       const name = textFrom(record.name)
       const url = textFrom(record.browser_download_url)
-      return name && url && name.toLowerCase().endsWith('.exe') ? { name, url } : null
+      return name && url && name.toLowerCase().endsWith('.exe')
+        ? { name, url, size: normalizeSize(record.size) }
+        : null
     })
-    .filter((asset): asset is { name: string; url: string } => asset !== null)
+    .filter((asset): asset is { name: string; url: string; size: number | null } => asset !== null)
   const setup = exes.find(asset => asset.name.toLowerCase().includes('setup'))
   const portable = exes.find(asset => asset.name.toLowerCase().includes('portable'))
   return setup ?? portable ?? null
@@ -126,7 +145,7 @@ async function requestJson(url: string, headers: Record<string, string>): Promis
   return response.json()
 }
 
-/** 自定义更新源：约定返回 { version, notes?, downloadUrl?, pageUrl?, publishedAt? } */
+/** 自定义更新源：约定返回 { version, notes?, downloadUrl?, pageUrl?, publishedAt?, downloadSize? } */
 async function fetchCustom(feedUrl: string): Promise<ReleaseInfo> {
   const payload = (await requestJson(feedUrl, {
     Accept: 'application/json',
@@ -140,6 +159,7 @@ async function fetchCustom(feedUrl: string): Promise<ReleaseInfo> {
     pageUrl: nullableTextFrom(payload?.pageUrl),
     downloadUrl: nullableTextFrom(payload?.downloadUrl),
     downloadName: null,
+    downloadSize: normalizeSize(payload?.downloadSize),
     publishedAt: nullableTextFrom(payload?.publishedAt),
     source: 'custom',
   }
@@ -166,6 +186,7 @@ async function fetchGitHub(repo: string, token: string): Promise<ReleaseInfo> {
     pageUrl: nullableTextFrom(payload?.html_url),
     downloadUrl: asset?.url ?? null,
     downloadName: asset?.name ?? null,
+    downloadSize: asset?.size ?? null,
     publishedAt: nullableTextFrom(payload?.published_at),
     source: 'github',
   }
@@ -200,6 +221,7 @@ export class UpdateChecker {
         pageUrl: null,
         downloadUrl: null,
         downloadName: null,
+        downloadSize: null,
         publishedAt: null,
         checkedAt: new Date().toISOString(),
         source: 'none',
@@ -233,6 +255,7 @@ export class UpdateChecker {
         pageUrl: info.pageUrl,
         downloadUrl: info.downloadUrl,
         downloadName: info.downloadName,
+        downloadSize: info.downloadSize,
         publishedAt: info.publishedAt,
         checkedAt,
         source: info.source,
@@ -251,6 +274,7 @@ export class UpdateChecker {
         pageUrl: null,
         downloadUrl: null,
         downloadName: null,
+        downloadSize: null,
         publishedAt: null,
         checkedAt,
         source: feedUrl ? 'custom' : 'github',
