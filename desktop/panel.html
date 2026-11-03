@@ -672,6 +672,16 @@
     width: 96px;
   }
 
+  /* 模型 ID 可能很长，下拉里要截断，不然会把「上游」这张卡撑宽 */
+  .model-select {
+    /* 宽度跟着容器走：select 的固有宽度取决于最长的那条选项，
+       不写死 100% 就会把卡片撑出横向滚动条 */
+    width: 100%;
+    min-width: 220px;
+    max-width: 100%;
+    text-overflow: ellipsis;
+  }
+
   /* ---------- 徽标 ---------- */
 
   .chip {
@@ -1478,12 +1488,16 @@
       </div>
       <div class="form-row">
         <label class="grow">提示词优化模型
-          <input type="text" id="upstream-text-model" list="upstream-model-options" placeholder="auto/deepseek-v4.1-flash" spellcheck="false" autocomplete="off" aria-describedby="upstream-model-status" />
+          <select id="upstream-text-model" class="model-select" aria-describedby="upstream-model-status"></select>
         </label>
         <button class="button" type="button" id="upstream-models-refresh">获取模型</button>
       </div>
-      <datalist id="upstream-model-options"></datalist>
-      <p class="current" id="upstream-model-status" role="status" aria-live="polite">还没获取模型列表。点「获取模型」从上游拉取，也可以直接手填模型 ID 或别名。</p>
+      <div class="form-row" id="upstream-text-model-custom-row" hidden>
+        <label class="grow">自定义模型 ID
+          <input type="text" id="upstream-text-model-custom" placeholder="auto/deepseek-v4.1-flash" spellcheck="false" autocomplete="off" aria-describedby="upstream-model-status" />
+        </label>
+      </div>
+      <p class="current" id="upstream-model-status" role="status" aria-live="polite">还没获取模型列表。打开控制台会自动拉一次，也可以点「获取模型」强制刷新。</p>
       <p class="hint">用于自由创作的 AI 优化提示词，需与上面地址是同一个网关；留空表示使用环境变量默认值。</p>
       <p class="current" id="upstream-meta">读取中…</p>
       <p class="current" id="upstream-result"></p>
@@ -1718,7 +1732,8 @@
     btnUpstreamRefresh: $('btn-upstream-refresh'),
     upstreamUrl: $('upstream-url'),
     upstreamTextModel: $('upstream-text-model'),
-    upstreamModelOptions: $('upstream-model-options'),
+    upstreamTextModelCustomRow: $('upstream-text-model-custom-row'),
+    upstreamTextModelCustom: $('upstream-text-model-custom'),
     upstreamModelsRefresh: $('upstream-models-refresh'),
     upstreamModelStatus: $('upstream-model-status'),
     upstreamTest: $('upstream-test'),
@@ -1804,6 +1819,25 @@
   let usersCache = []
   let quotaCache = new Map()
   let flashTimer = 0
+
+  // ---------- 上游模型下拉 ----------
+  /** 下拉里代表「手填模型 ID」的哨兵值，真正的模型 ID 不可能撞上它 */
+  const CUSTOM_MODEL_VALUE = '__custom__'
+  /** 上游返回的模型列表，每项 { id, capabilities } */
+  let upstreamModels = []
+  /** 已保存的模型覆写值；下拉里找不到它时补一条「xxx · 已保存」 */
+  let upstreamSavedTextModel = ''
+  /** 当前生效的优化模型，用来写「跟随环境变量默认（…）」的文案 */
+  let upstreamEffectiveTextModel = ''
+  /** 用户在下拉里选中的值；null 表示还没动过，跟随已保存值 */
+  let upstreamModelSelection = null
+  /** 自动拉取只做一次，避免每次刷新都打上游 */
+  let upstreamModelsAutoLoaded = false
+  /** 状态行的固定说明（模型数量、能力、拉取时间） */
+  let upstreamModelStatusNotes = []
+  /** 状态行当前的语气，重新渲染时沿用，别把报错刷成成功 */
+  let upstreamModelStatusTone = ''
+  const UPSTREAM_MODEL_STATUS_DEFAULT = '还没获取模型列表。打开控制台会自动拉一次，也可以点「获取模型」强制刷新。'
 
   // ---------- 小工具 ----------
 
@@ -2056,9 +2090,12 @@
       loadUpstream(),
       loadFeedback(feedbackFilter),
       loadStats(),
-    ]).catch(error => {
-      flash(`刷新失败：${errorText(error)}`, 'error')
-    })
+    ])
+      // 打开控制台就自动拉一次模型列表，让下拉不是空的
+      .then(() => autoLoadUpstreamModels())
+      .catch(error => {
+        flash(`刷新失败：${errorText(error)}`, 'error')
+      })
   }
 
   function setPendingOpen(open) {
@@ -2472,7 +2509,9 @@
 
     const data = result.data || {}
     dom.upstreamUrl.value = data.baseUrl || ''
-    dom.upstreamTextModel.value = data.textModelOverride || ''
+    upstreamSavedTextModel = String(data.textModelOverride || '').trim()
+    upstreamEffectiveTextModel = String(data.textModel || '').trim()
+    renderUpstreamModelOptions()
     setCurrent(
       dom.upstreamMeta,
       `当前模型：${data.model || '—'} · 地址来源：${data.fromSettings ? '后台设置（settings.json）' : '环境变量默认值'} · 优化模型：${data.textModel || '未设置'}（${data.textModelFromSettings ? '后台设置' : '环境变量默认值'}）`,
@@ -2480,19 +2519,88 @@
     setCurrent(dom.upstreamResult, '')
   }
 
-  // 模型自动发现：结果只填 datalist，输入框仍允许手填别名
-  async function loadUpstreamModels() {
-    await withBusy(dom.upstreamModelsRefresh, async () => {
+  /**
+   * 重画「提示词优化模型」下拉：空值项 → 上游模型 → 已保存但上游没列出来的值 → 自定义。
+   * 能力标注只看上游显式声明，没声明就不写，绝不按名字猜。
+   */
+  function renderUpstreamModelOptions() {
+    const options = [{
+      value: '',
+      label: upstreamEffectiveTextModel
+        ? `跟随环境变量默认（${upstreamEffectiveTextModel}）`
+        : '跟随环境变量默认',
+    }]
+
+    for (const model of upstreamModels) {
+      const vision = model.capabilities ? model.capabilities.vision : null
+      const suffix = vision === true ? ' · 支持看图' : vision === false ? ' · 仅文本' : ''
+      options.push({ value: model.id, label: `${model.id}${suffix}` })
+    }
+
+    // 已保存的模型上游这次没列出来：补一条，免得保存值被下拉悄悄吞掉
+    if (upstreamSavedTextModel && !upstreamModels.some(model => model.id === upstreamSavedTextModel)) {
+      options.push({ value: upstreamSavedTextModel, label: `${upstreamSavedTextModel} · 已保存` })
+    }
+    options.push({ value: CUSTOM_MODEL_VALUE, label: '自定义模型 ID…' })
+
+    dom.upstreamTextModel.innerHTML = options
+      .map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+      .join('')
+
+    const wanted = upstreamModelSelection === null ? upstreamSavedTextModel : upstreamModelSelection
+    dom.upstreamTextModel.value = options.some(option => option.value === wanted) ? wanted : ''
+    syncCustomModelInput()
+  }
+
+  /** 只有选中「自定义模型 ID…」才露出输入框，并把已保存的值填进去 */
+  function syncCustomModelInput() {
+    const custom = dom.upstreamTextModel.value === CUSTOM_MODEL_VALUE
+    dom.upstreamTextModelCustomRow.hidden = !custom
+    if (custom && !dom.upstreamTextModelCustom.value.trim()) {
+      dom.upstreamTextModelCustom.value = upstreamSavedTextModel
+    }
+  }
+
+  /** 当前要保存的模型 ID：选了自定义就取输入框的值 */
+  function currentTextModelValue() {
+    const selected = dom.upstreamTextModel.value
+    if (selected === CUSTOM_MODEL_VALUE) return dom.upstreamTextModelCustom.value.trim()
+    return selected.trim()
+  }
+
+  /** 状态行 = 拉取说明 + 当前选中模型的能力提示 */
+  function renderUpstreamModelStatus(tone, overrideText) {
+    if (tone !== undefined) upstreamModelStatusTone = tone
+    const notes = [...upstreamModelStatusNotes]
+    const selected = currentTextModelValue()
+    const model = upstreamModels.find(item => item.id === selected)
+    // 自由创作的「改图先看参考图」依赖多模态模型，选到纯文本模型要提醒一句
+    if (model && model.capabilities && model.capabilities.vision === false) {
+      notes.push('该模型不支持读取图片，改图时会退化成纯文本优化')
+    }
+    const text = overrideText || (notes.length ? notes.join(' · ') : UPSTREAM_MODEL_STATUS_DEFAULT)
+    setCurrent(dom.upstreamModelStatus, text, upstreamModelStatusTone)
+  }
+
+  /**
+   * 拉取上游模型列表。
+   * refresh=true 跳过服务端 60 秒缓存（手动点「获取模型」或改完地址保存后）；
+   * 自动拉取走缓存，失败只写状态行、不弹错。
+   */
+  async function loadUpstreamModels({ refresh = true, busy = true } = {}) {
+    const run = async () => {
       setCurrent(dom.upstreamModelStatus, '正在获取上游模型列表…')
-      const result = await api('/api/admin/upstream/models?refresh=1')
+      const result = await api(`/api/admin/upstream/models${refresh ? '?refresh=1' : ''}`)
 
       if (isAuthFailure(result)) {
-        setCurrent(dom.upstreamModelStatus, AUTH_HINT, 'error')
-        return
+        upstreamModelStatusNotes = []
+        renderUpstreamModelStatus('error', AUTH_HINT)
+        return false
       }
       if (!result.ok) {
-        setCurrent(dom.upstreamModelStatus, result.error || '获取模型列表失败', 'error')
-        return
+        upstreamModelStatusNotes = []
+        renderUpstreamModelStatus('error', result.error || '获取模型列表失败')
+        return false
       }
 
       const data = result.data || {}
@@ -2501,13 +2609,13 @@
         .filter(model => typeof model.id === 'string' && model.id.trim())
         .map(model => ({ id: model.id.trim(), capabilities: model.capabilities || {} }))
 
-      dom.upstreamModelOptions.innerHTML = models
-        .map(model => `<option value="${escapeHtml(model.id)}" label="${escapeHtml(model.id)}"></option>`)
-        .join('')
+      upstreamModels = models
+      renderUpstreamModelOptions()
 
       if (!models.length) {
-        setCurrent(dom.upstreamModelStatus, '上游返回的模型列表是空的，可以直接手填模型 ID 或别名')
-        return
+        upstreamModelStatusNotes = []
+        renderUpstreamModelStatus('', '上游返回的模型列表是空的，可以在「自定义模型 ID…」里手填')
+        return true
       }
 
       const notes = [`已获取 ${models.length} 个模型（来源：${data.source === 'cache' ? '缓存' : '上游'}）`]
@@ -2517,8 +2625,22 @@
       else notes.push(`${textCapable} 个标注支持对话`)
       const fetchedAt = formatTime(data.fetchedAt)
       if (fetchedAt !== '—') notes.push(`拉取于 ${fetchedAt}`)
-      setCurrent(dom.upstreamModelStatus, notes.join(' · '), 'ok')
-    })
+      upstreamModelStatusNotes = notes
+      renderUpstreamModelStatus('ok')
+      return true
+    }
+
+    if (busy) return withBusy(dom.upstreamModelsRefresh, run)
+    return run()
+  }
+
+  /** 打开控制台时自动拉一次模型列表：吃服务端 60 秒缓存，同一会话只做一次 */
+  async function autoLoadUpstreamModels() {
+    if (upstreamModelsAutoLoaded) return
+    upstreamModelsAutoLoaded = true
+    const ok = await loadUpstreamModels({ refresh: false, busy: false })
+    // 拉失败（比如服务还没起来）不算数，等下次刷新再来一次
+    if (!ok) upstreamModelsAutoLoaded = false
   }
 
   async function testUpstream() {
@@ -2556,7 +2678,7 @@
     }
 
     // 留空表示清除后台覆写、回落到环境变量默认值，所以这里不拦空值
-    const textModel = dom.upstreamTextModel.value.trim()
+    const textModel = currentTextModelValue()
     if (textModel.length > 120) {
       setCurrent(dom.upstreamResult, '提示词优化模型最多 120 个字符', 'error')
       return
@@ -2583,6 +2705,8 @@
         `上游地址已保存：${saved} · 提示词优化模型：${effectiveModel}（${fromSettings ? '后台设置' : '环境变量默认值'}）`,
       )
       await loadUpstream()
+      // 地址可能换过，上游可用的模型也跟着换，保存后强制回源一次
+      await loadUpstreamModels({ refresh: true })
     })
   }
 
@@ -3123,7 +3247,13 @@
     dom.ccSave.addEventListener('click', saveConcurrency)
 
     dom.btnUpstreamRefresh.addEventListener('click', () => loadUpstream())
-    dom.upstreamModelsRefresh.addEventListener('click', () => loadUpstreamModels())
+    dom.upstreamModelsRefresh.addEventListener('click', () => loadUpstreamModels({ refresh: true }))
+    dom.upstreamTextModel.addEventListener('change', () => {
+      upstreamModelSelection = dom.upstreamTextModel.value
+      syncCustomModelInput()
+      renderUpstreamModelStatus()
+    })
+    dom.upstreamTextModelCustom.addEventListener('input', () => renderUpstreamModelStatus())
     dom.upstreamTest.addEventListener('click', testUpstream)
     dom.upstreamSave.addEventListener('click', saveUpstream)
 

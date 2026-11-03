@@ -3049,10 +3049,14 @@ import { setupTablist } from '../lib/tabs.js'
         }
         freePromptBeforeOptimize = dom.freePrompt.value
         applyFreePrompt(next)
-        showToast('提示词已优化', false, {
-          label: '撤销',
-          onClick: () => applyFreePrompt(freePromptBeforeOptimize),
-        })
+        showToast(
+          result?.mode === 'edit' ? '已按参考图改写，只改你指定的地方' : '提示词已优化',
+          false,
+          {
+            label: '撤销',
+            onClick: () => applyFreePrompt(freePromptBeforeOptimize),
+          },
+        )
       } catch (error) {
         showToast(error.message || '提示词优化失败，请稍后重试', true)
       } finally {
@@ -3244,6 +3248,13 @@ import { setupTablist } from '../lib/tabs.js'
       if (dom.freeForm) dom.freeForm.classList.toggle('has-ref', hasRef)
       stack.hidden = !hasRef
       if (dom.freeRefBusy) dom.freeRefBusy.hidden = !state.freeRefUploading
+
+      // 有参考图时优化会先调一次视觉模型看图，按钮提示要提前说明，免得以为卡住
+      if (dom.freePromptOptimize) {
+        const optimizeLabel = hasRef ? 'AI 优化（会先分析参考图）' : 'AI 优化提示词'
+        dom.freePromptOptimize.title = optimizeLabel
+        dom.freePromptOptimize.setAttribute('aria-label', optimizeLabel)
+      }
 
       stack.innerHTML = refs
         .map((ref, index) => {
