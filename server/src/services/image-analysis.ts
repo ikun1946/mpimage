@@ -136,6 +136,8 @@ async function requestObservations(
       },
     ],
     maxTokens: 700,
+    // 观察要的是稳定可解析的 JSON，温度压到最低
+    temperature: 0.2,
   })
 
   const parsed = parseObservations(result.content)

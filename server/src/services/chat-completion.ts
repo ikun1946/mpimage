@@ -15,13 +15,20 @@ export interface ChatTokens {
 export interface ChatCallParams {
   messages: unknown
   maxTokens: number
+  /** 采样温度；扩写要发散所以偏高，观察/自检要稳定所以偏低。默认 0.8 */
+  temperature?: number
 }
 
 export interface ChatCallResult {
   content: string
   model: string
   tokens: ChatTokens
+  /** 上游给出的结束原因；length 表示输出被 max_tokens 截断 */
+  finishReason?: string
 }
+
+/** 采样温度：默认 0.8，扩写偏发散；观察与自检要稳定，传更低的 0.2 */
+const DEFAULT_TEMPERATURE = 0.8
 
 /**
  * OpenAI 兼容的对话调用：提示词优化与参考图观察共用。
@@ -42,6 +49,7 @@ export async function callChatCompletion(
         stream: false,
         // 推理模型默认会先输出思考过程，关掉才会把正文放进 content
         reasoning: { effort: 'none' },
+        temperature: params.temperature ?? DEFAULT_TEMPERATURE,
         max_tokens: params.maxTokens,
       }),
       signal: AbortSignal.timeout(options.timeoutMs),
@@ -76,10 +84,21 @@ export async function callChatCompletion(
     throw new ApiError('UPSTREAM_BAD_RESPONSE', '模型没有返回提示词', 502)
   }
 
+  const finishReason = extractFinishReason(payload)
+  // 撞上 max_tokens 时 content 是半句话，当成功返回会写进用户的输入框
+  if (finishReason === 'length') {
+    throw new ApiError(
+      'UPSTREAM_TRUNCATED',
+      '模型输出被截断，请重试或把描述写短一点',
+      502,
+    )
+  }
+
   return {
     content,
     model: extractModel(payload) || options.model,
     tokens: extractTokens(payload),
+    finishReason,
   }
 }
 
@@ -104,6 +123,14 @@ function extractContent(payload: unknown): string | undefined {
   if (!message || typeof message !== 'object') return undefined
   const content = (message as { content?: unknown }).content
   return typeof content === 'string' && content.trim() ? content : undefined
+}
+
+function extractFinishReason(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  const choices = (payload as { choices?: unknown }).choices
+  if (!Array.isArray(choices) || choices.length === 0) return undefined
+  const reason = (choices[0] as { finish_reason?: unknown })?.finish_reason
+  return typeof reason === 'string' && reason ? reason : undefined
 }
 
 function extractModel(payload: unknown): string | undefined {
