@@ -1411,6 +1411,8 @@
     <div class="url-actions">
       <button class="button mini" type="button" id="btn-copy-url">复制地址</button>
       <button class="button mini" type="button" id="btn-open-client">在浏览器打开</button>
+      <button class="button mini" type="button" id="btn-lan-check">局域网自检</button>
+      <button class="button mini" type="button" id="btn-lan-allow">放行端口</button>
     </div>
     <div class="setup" id="setup-hint" hidden>
       <span>账号库还是空的，先去浏览器完成初始化。</span>
@@ -1703,6 +1705,8 @@
     urlLabel: $('url-label'),
     btnOpenClient: $('btn-open-client'),
     btnCopyUrl: $('btn-copy-url'),
+    btnLanCheck: $('btn-lan-check'),
+    btnLanAllow: $('btn-lan-allow'),
     setupHint: $('setup-hint'),
     btnSetup: $('btn-setup'),
     adminFlash: $('admin-flash'),
@@ -1797,6 +1801,7 @@
     port: 0,
     uptimeMs: 0,
     lanUrl: '',
+    lanUrls: [],
     clientUrl: '',
     loginUrl: '',
     needsSetup: false,
@@ -1816,6 +1821,8 @@
   let trendInflightRange = ''
   let trendLoadedRange = ''
   let statsInflight = null
+  /** 服务端进程启动时刻（毫秒），运行时间靠它每秒自走 */
+  let monitorStartedAtMs = 0
   let usersCache = []
   let quotaCache = new Map()
   let flashTimer = 0
@@ -1966,6 +1973,7 @@
     state.port = Number(next.port) || 0
     state.uptimeMs = Number(next.uptimeMs) || 0
     state.lanUrl = typeof next.lanUrl === 'string' ? next.lanUrl : ''
+    state.lanUrls = Array.isArray(next.lanUrls) ? next.lanUrls.filter(url => typeof url === 'string') : []
     state.clientUrl = typeof next.clientUrl === 'string' ? next.clientUrl : ''
     state.loginUrl = typeof next.loginUrl === 'string' ? next.loginUrl : ''
     state.needsSetup = Boolean(next.needsSetup)
@@ -1984,10 +1992,13 @@
     const url = state.lanUrl || state.clientUrl
     setText(dom.clientUrl, url || '服务启动后在这里显示客户端地址')
     dom.clientUrl.classList.toggle('is-empty', !url)
+    // 悬停能看到全部候选地址：多网卡时同事可能拿到不对的那一个
+    dom.clientUrl.title = state.lanUrls.join('\n')
+    const extraUrls = state.lanUrls.length > 1 ? ` · 另有 ${state.lanUrls.length - 1} 个备用地址` : ''
     setText(
       dom.urlLabel,
       url
-        ? (state.lanUrl ? '局域网地址：同一网段的设备都能用' : '本机地址：只有这台电脑能用')
+        ? (state.lanUrl ? `局域网地址：同一网段的设备都能用${extraUrls}` : '本机地址：只有这台电脑能用')
         : '还没有可用的地址',
     )
     dom.setupHint.hidden = !state.needsSetup
@@ -3037,9 +3048,24 @@
     setStat(dom.statTokens, dom.statTokensSub, formatNumber(data.totalTokens), '输入 + 输出')
   }
 
+  /**
+   * 服务端只在拉取时给一次运行时间快照，页面自己按 startedAt 往上走，
+   * 否则数字要等用户点「刷新」才动。
+   */
+  function formatClock(ms) {
+    const total = Math.max(0, Math.floor(Number(ms) / 1000))
+    const days = Math.floor(total / 86_400)
+    const hours = String(Math.floor((total % 86_400) / 3600)).padStart(2, '0')
+    const minutes = String(Math.floor((total % 3600) / 60)).padStart(2, '0')
+    const seconds = String(total % 60).padStart(2, '0')
+    const clock = `${hours}:${minutes}:${seconds}`
+    return days > 0 ? `${days} 天 ${clock}` : clock
+  }
+
   function renderMonitor(result) {
     const cells = [dom.monRequests, dom.monTraffic, dom.monUptime, dom.monRate, dom.monQueue, dom.monHost]
     if (!result || !result.ok || !result.data) {
+      monitorStartedAtMs = 0
       for (const cell of cells) cell.textContent = '—'
       return
     }
@@ -3051,9 +3077,18 @@
     const queue = data.queue || {}
     const config = (data.rateLimit && data.rateLimit.config) || {}
 
+    // startedAt 是服务端进程启动时刻；缺失时退回「现在 - 已运行毫秒」反推
+    const startedAtMs = Date.parse(uptime.startedAt || '')
+    const uptimeSnapshot = Number(uptime.uptimeMs)
+    monitorStartedAtMs = Number.isFinite(startedAtMs)
+      ? startedAtMs
+      : Number.isFinite(uptimeSnapshot) ? Date.now() - uptimeSnapshot : 0
+
     dom.monRequests.textContent = `${formatNumber(total.requests)} 次`
     dom.monTraffic.textContent = `${formatBytes((Number(total.bytesIn) || 0) + (Number(total.bytesOut) || 0))}（出 ${formatBytes(total.bytesOut)} · 入 ${formatBytes(total.bytesIn)}）`
-    dom.monUptime.textContent = uptime.uptimeText || formatDuration(uptime.uptimeMs)
+    dom.monUptime.textContent = monitorStartedAtMs
+      ? formatClock(Date.now() - monitorStartedAtMs)
+      : (uptime.uptimeText || formatDuration(uptime.uptimeMs))
     dom.monRate.textContent = config.enabled && Number(config.maxRequests) > 0
       ? `每 ${Math.max(1, Math.round((Number(config.windowMs) || 0) / 1000))} 秒最多 ${config.maxRequests} 次`
       : '未启用（不限流）'
@@ -3064,6 +3099,21 @@
     dom.monHost.textContent = data.host && data.host.hostname
       ? `${data.host.hostname} · ${data.host.platform || ''}`
       : '—'
+  }
+
+  function tickMonitorClock() {
+    if (!monitorStartedAtMs) return
+    if (document.hidden) return
+    dom.monUptime.textContent = formatClock(Date.now() - monitorStartedAtMs)
+  }
+
+  /** 只重拉监控块：累计流量、生图队列会自己动，统计卡和趋势不用跟着重算 */
+  async function refreshMonitorOnly() {
+    if (statsInflight) return
+    const result = await api('/api/admin/monitor')
+    if (isAuthFailure(result)) return
+    renderMonitor(result)
+    renderStatsScope(result)
   }
 
   function syncTrendRanges() {
@@ -3206,6 +3256,12 @@
     })
     dom.btnCopyUrl.addEventListener('click', () => {
       runOpenAction('copy-lan', '复制地址', dom.btnCopyUrl, { url: state.lanUrl || state.clientUrl })
+    })
+    dom.btnLanCheck.addEventListener('click', () => {
+      runOpenAction('lan-check', '局域网自检', dom.btnLanCheck)
+    })
+    dom.btnLanAllow.addEventListener('click', () => {
+      runOpenAction('lan-allow', '放行端口', dom.btnLanAllow)
     })
     dom.btnSetup.addEventListener('click', () => {
       runOpenAction('open-client', '打开初始化页面', dom.btnSetup)
@@ -3363,6 +3419,13 @@
     }
 
     bridge.onState(onState)
+
+    // 运行时间每秒自走一格；监控块每 30 秒回一次服务端（管理端接口不计入统计口径）
+    setInterval(tickMonitorClock, 1000)
+    setInterval(() => {
+      if (document.hidden) return
+      void refreshMonitorOnly()
+    }, 30_000)
   }
 
   boot()

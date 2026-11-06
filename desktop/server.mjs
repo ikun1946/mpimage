@@ -133,6 +133,7 @@ export async function startServer({ timeoutMs = START_TIMEOUT_MS } = {}) {
 
   if (child && (await portOpen())) {
     running = true
+    startedAt = startedAt || new Date().toISOString()
     return { adopted: false, running: true }
   }
 

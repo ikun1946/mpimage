@@ -364,6 +364,12 @@ app.addHook('onClose', async () => {
 
 await app.listen({ host: config.host, port: config.port })
 
+// 局域网排查第一条线索：监听地址决定别人能不能连，回环时直接点出来
+app.log.info(`监听地址: ${config.host}:${config.port}`)
+if (config.host === '127.0.0.1' || config.host === 'localhost' || config.host === '::1') {
+  app.log.warn('当前只监听本机回环，局域网设备无法访问；需要共享时把 HOST 改成 0.0.0.0 再重启')
+}
+
 app.log.info(`Magpie 图片 API: ${await settings.getBaseUrl()}/v1/images/generations`)
 app.log.info(`模型: ${settings.getModel()}`)
 app.log.info(`存储目录: ${storageDirectory}`)

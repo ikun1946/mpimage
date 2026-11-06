@@ -1,8 +1,10 @@
 import { app, BrowserWindow, Menu, Tray, clipboard, dialog, ipcMain, nativeImage, shell } from 'electron'
+import { execFile } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs'
 import { open, readdir, stat } from 'node:fs/promises'
 import os from 'node:os'
 import { basename, join } from 'node:path'
+import { promisify } from 'node:util'
 import { appRoot, dataRoot } from './paths.mjs'
 import { loadConfig } from './config.mjs'
 import { desktopToken, initServer, restartServer, serverState, startServer, stopServer, waitForServer } from './server.mjs'
@@ -192,6 +194,17 @@ ipcMain.handle('panel:action', async (_event, name) => {
       clipboard.writeText(address)
       return { ok: true, message: `已复制客户端地址：${address}` }
     }
+    case 'lan-check':
+      return lanReport()
+    case 'lan-allow': {
+      if (process.platform !== 'win32') return { ok: false, message: '只有 Windows 需要单独放行端口' }
+      try {
+        await allowPortThroughFirewall(SERVER_PORT)
+        return { ok: true, message: `已提交放行 TCP ${SERVER_PORT} 的请求，在系统弹窗里点“是”后生效` }
+      } catch (error) {
+        return { ok: false, message: `放行失败：${error.message || error}` }
+      }
+    }
     case 'copy-key': {
       const key = config.ADMIN_SETUP_KEY || ''
       clipboard.writeText(key)
@@ -230,12 +243,15 @@ async function pushPanelState(force = false) {
       refreshMenus()
     }
     const state = serverState()
+    // startedAt 是 ISO 字符串：直接相减得到 NaN，面板会一直显示「已运行 0 秒」
+    const startedAtMs = Date.parse(state.startedAt || '')
     mainWindow.webContents.send('panel:state', {
       running: alive,
       pid: state.pid ?? null,
       port: SERVER_PORT,
-      uptimeMs: alive && state.startedAt ? Date.now() - state.startedAt : 0,
+      uptimeMs: alive && Number.isFinite(startedAtMs) ? Math.max(Date.now() - startedAtMs, 0) : 0,
       lanUrl: lanAddress(),
+      lanUrls: lanAddresses(),
       clientUrl: CLIENT_URL,
       loginUrl: CLIENT_LOGIN_URL,
       needsSetup: alive ? await authNeedsSetup() : false,
@@ -572,15 +588,118 @@ async function openClientInBrowser() {
   }
 }
 
-function lanAddress() {
-  for (const entries of Object.values(os.networkInterfaces())) {
+const LINK_LOCAL_V4 = /^169\.254\./
+const PRIVATE_V4 = /^(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})$/
+/** 虚拟网卡、代理网卡、容器网桥：地址属于本机，但同一网段的同事访问不到 */
+const VIRTUAL_HINTS = ['virtual', 'vmware', 'virtualbox', 'hyper-v', 'vethernet', 'npcap', 'tap', 'tailscale', 'zerotier', 'wsl', 'docker']
+
+/**
+ * 局域网地址候选，按可用性从高到低排。
+ * 以前直接取第一个非回环 IPv4：网线插着但没拿到 DHCP 时那块网卡是 169.254.x，
+ * 虚拟机/代理网卡也常排在前面，同事拿到的地址根本连不上。
+ */
+function lanAddresses() {
+  const ranked = []
+  for (const [name, entries] of Object.entries(os.networkInterfaces())) {
     for (const entry of entries || []) {
-      if ((entry.family === 'IPv4' || entry.family === 4) && !entry.internal) {
-        return `http://${entry.address}:${SERVER_PORT}/batch.html`
-      }
+      if (entry.family !== 'IPv4' && entry.family !== 4) continue
+      if (entry.internal || LINK_LOCAL_V4.test(entry.address) || !PRIVATE_V4.test(entry.address)) continue
+      const label = name.toLowerCase()
+      let score = entry.address.startsWith('192.168.') ? 20 : 0
+      if (VIRTUAL_HINTS.some(hint => label.includes(hint))) score -= 50
+      ranked.push({ score, url: `http://${entry.address}:${SERVER_PORT}/batch.html` })
     }
   }
-  return ''
+  ranked.sort((a, b) => b.score - a.score)
+  return [...new Set(ranked.map(item => item.url))]
+}
+
+function lanAddress() {
+  return lanAddresses()[0] || ''
+}
+
+/** 与服务端 HOST 一致：只监听回环时，局域网设备无论地址对不对都连不上 */
+function bindsLoopbackOnly() {
+  const host = String(config.HOST ?? '127.0.0.1')
+  return host === '127.0.0.1' || host === 'localhost' || host === '::1'
+}
+
+const execFileAsync = promisify(execFile)
+
+/** 防火墙是否给这个端口放了行：只看本应用自己建的那条规则 */
+async function firewallStatus(port) {
+  if (process.platform !== 'win32') return { allowed: true, detail: '非 Windows 系统不做防火墙检查' }
+  try {
+    const { stdout } = await execFileAsync(
+      'netsh',
+      ['advfirewall', 'firewall', 'show', 'rule', `name=Huajing Server ${port}`],
+      { timeout: 8000 },
+    )
+    if (/已启用\s*[:：]\s*否/i.test(stdout)) {
+      return { allowed: false, detail: `防火墙规则 Huajing Server ${port} 被停用了` }
+    }
+    if (!/允许|allow/i.test(stdout)) {
+      return { allowed: false, detail: `防火墙规则 Huajing Server ${port} 不是“允许”` }
+    }
+    return { allowed: true, detail: `防火墙已放行 TCP ${port}` }
+  } catch {
+    return { allowed: false, detail: `防火墙没有放行 TCP ${port}，其他设备会被挡在门外` }
+  }
+}
+
+/** netsh 要管理员权限：点按钮时用 UAC 提权跑一次 */
+async function allowPortThroughFirewall(port) {
+  const args = [
+    'advfirewall', 'firewall', 'add', 'rule',
+    `name=Huajing Server ${port}`,
+    'dir=in', 'action=allow', 'protocol=TCP', `localport=${port}`, 'profile=any',
+  ]
+  const quoted = args.map(arg => `'${arg.replace(/'/g, "''")}'`).join(',')
+  await execFileAsync(
+    'powershell',
+    ['-NoProfile', '-NonInteractive', '-Command',
+      `Start-Process -FilePath netsh -ArgumentList ${quoted} -Verb RunAs -WindowStyle Hidden`],
+    { timeout: 30000 },
+  )
+}
+
+/** 局域网自检：把“为什么别人连不上”拆成监听地址、候选地址、本机自测、防火墙四段 */
+async function lanReport() {
+  const parts = []
+  const host = String(config.HOST ?? '127.0.0.1')
+  parts.push(
+    bindsLoopbackOnly()
+      ? `服务只监听 ${host}:${SERVER_PORT}，局域网设备连不上：把 config.env 的 HOST 改成 0.0.0.0 再重启`
+      : `服务监听 ${host}:${SERVER_PORT}`,
+  )
+
+  const urls = lanAddresses()
+  if (!urls.length) {
+    parts.push('没有私有网段地址：确认这台电脑已经连上 Wi-Fi 或网线')
+  } else {
+    const reachable = []
+    for (const url of urls) {
+      try {
+        const response = await fetch(`${url.replace(/\/batch\.html$/, '')}/api/auth/status`, {
+          signal: AbortSignal.timeout(1500),
+        })
+        if (response.ok) reachable.push(url)
+      } catch {}
+    }
+    parts.push(
+      reachable.length
+        ? `可用地址 ${reachable.join('、')}`
+        : `本机自测 ${urls[0]} 不通，先确认服务在运行`,
+    )
+    if (reachable.length && reachable.length < urls.length) {
+      parts.push(`另有 ${urls.length - reachable.length} 个地址本机自测不通（多为虚拟网卡），别发给同事`)
+    }
+  }
+
+  const firewall = await firewallStatus(SERVER_PORT)
+  parts.push(firewall.detail)
+  log(`局域网自检：${parts.join('；')}`)
+  return { ok: firewall.allowed && !bindsLoopbackOnly(), message: parts.join('；') }
 }
 
 async function copyLanAddress() {
@@ -594,12 +713,15 @@ async function copyLanAddress() {
     })
     return
   }
+  const others = lanAddresses().length - 1
   clipboard.writeText(address)
   await dialog.showMessageBox({
     type: 'info',
     title: '局域网地址已复制',
     message: address,
-    detail: '同一局域网内的其他设备用它打开同一套工作台。',
+    detail: others > 0
+      ? `同一局域网内的其他设备用它打开同一套工作台（另有 ${others} 个备选地址，可在控制台“局域网自检”里查看）。`
+      : '同一局域网内的其他设备用它打开同一套工作台。',
   })
 }
 
