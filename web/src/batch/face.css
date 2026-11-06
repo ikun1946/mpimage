@@ -162,6 +162,88 @@
   margin-top: 8px;
 }
 
+.face-text-parse {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 20px 22px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-panel);
+  background: var(--surface-subtle);
+}
+
+.face-text-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.face-text-head h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.face-text-head p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.face-text-count {
+  flex-shrink: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.face-text-parse .textarea {
+  min-height: 92px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.face-text-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.face-style-custom {
+  margin-top: 6px;
+}
+
+.face-block-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.face-refine {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-inner);
+  background: var(--paper-deep);
+}
+
+.face-refine .input {
+  width: 100%;
+}
+
+.face-refine-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 @media (max-width: 1080px) {
   .face-layout {
     grid-template-columns: minmax(0, 1fr);

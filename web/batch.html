@@ -184,6 +184,27 @@
           </div>
         </div>
 
+        <section class="face-text-parse" id="face-text-parse">
+          <div class="face-text-head">
+            <div>
+              <h3>从一段文本解析</h3>
+              <p>粘贴人设、小说片段或人物小传，AI 会先提取年龄、气场、身份与风格，再给出提示词。</p>
+            </div>
+            <span class="face-text-count"><span id="face-source-count">0</span> / 4000</span>
+          </div>
+          <textarea
+            class="textarea"
+            id="face-source-text"
+            rows="4"
+            maxlength="4000"
+            placeholder="例如：沈昭，二十四岁，镇北侯府嫡女。性子冷，眉眼生得极淡，常年一身玄色劲装……"
+          ></textarea>
+          <div class="face-text-actions">
+            <button class="button secondary" id="face-text-run" type="button">AI 解析并生成</button>
+            <span class="status-text" id="face-text-status" role="status" aria-live="polite"></span>
+          </div>
+        </section>
+
         <div class="face-layout">
           <form class="face-form" id="face-form">
             <div class="face-grid">
@@ -211,7 +232,16 @@
                   <option>古典</option>
                   <option>理性</option>
                   <option>冷峻坚毅</option>
+                  <option value="__custom__">自定义…</option>
                 </select>
+                <input
+                  class="input"
+                  id="face-temperament-custom"
+                  type="text"
+                  maxlength="60"
+                  placeholder="例如：冷冽沉静、话少疏离"
+                  hidden
+                />
               </label>
               <label class="face-field">
                 <span class="field-label">角色身份</span>
@@ -241,7 +271,16 @@
                   <option>自然写实</option>
                   <option>生活质感</option>
                   <option>东方写实</option>
+                  <option value="__custom__">自定义…</option>
                 </select>
+                <input
+                  class="input"
+                  id="face-style-custom"
+                  type="text"
+                  maxlength="80"
+                  placeholder="例如：胶片写实 / 日系清透；留空按真人写实"
+                  hidden
+                />
               </label>
             </div>
 
@@ -277,20 +316,42 @@
                 <p class="face-analysis" id="face-analysis"></p>
               </section>
 
-              <section class="face-block">
+              <section class="face-block" data-face-block="prompt">
                 <header class="face-block-head">
                   <h3>完整提示词</h3>
-                  <button class="button mini" type="button" data-face-copy="face-prompt">复制</button>
+                  <div class="face-block-tools">
+                    <button class="button mini" type="button" data-face-refine="prompt">AI 修改</button>
+                    <button class="button mini" type="button" data-face-copy="face-prompt">复制</button>
+                  </div>
                 </header>
-                <textarea class="textarea face-prompt" id="face-prompt" readonly aria-label="捏脸完整提示词"></textarea>
+                <textarea class="textarea face-prompt" id="face-prompt" aria-label="捏脸完整提示词"></textarea>
+                <div class="face-refine" data-refine-field="prompt" hidden>
+                  <input class="input" type="text" maxlength="300" placeholder="想怎么改？例如：下巴更利落、眼神再冷一点" />
+                  <div class="face-refine-actions">
+                    <button class="button mini primary" type="button" data-refine-run>修改</button>
+                    <button class="button mini" type="button" data-refine-cancel>取消</button>
+                    <span class="status-text" data-refine-status role="status" aria-live="polite"></span>
+                  </div>
+                </div>
               </section>
 
-              <section class="face-block">
+              <section class="face-block" data-face-block="negative">
                 <header class="face-block-head">
                   <h3>负面提示词</h3>
-                  <button class="button mini" type="button" data-face-copy="face-negative">复制</button>
+                  <div class="face-block-tools">
+                    <button class="button mini" type="button" data-face-refine="negative">AI 修改</button>
+                    <button class="button mini" type="button" data-face-copy="face-negative">复制</button>
+                  </div>
                 </header>
-                <textarea class="textarea face-negative" id="face-negative" readonly aria-label="捏脸负面提示词"></textarea>
+                <textarea class="textarea face-negative" id="face-negative" aria-label="捏脸负面提示词"></textarea>
+                <div class="face-refine" data-refine-field="negative" hidden>
+                  <input class="input" type="text" maxlength="300" placeholder="想怎么改？例如：再去掉假睫毛和明显修容" />
+                  <div class="face-refine-actions">
+                    <button class="button mini primary" type="button" data-refine-run>修改</button>
+                    <button class="button mini" type="button" data-refine-cancel>取消</button>
+                    <span class="status-text" data-refine-status role="status" aria-live="polite"></span>
+                  </div>
+                </div>
               </section>
 
               <div class="face-actions">

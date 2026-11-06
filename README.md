@@ -272,10 +272,21 @@ POST /api/prompts/revise
         用户这次点名要改的约束不再保护，其余风格与设定原样保留
 
 POST /api/prompts/face-design
-  请求  { age?, gender?, temperament?, identity?, framing?, background?, style?, extra? }   需要登录
-        字段都是字符串：extra ≤600 字，其余 ≤40–60 字；全部为空时 400
-  成功  { analysis, prompt, negativePrompt, model, tokens }
-        按《夏冬一捏脸 Skill》产出：角色分析、素颜正脸定妆提示词、负面提示词
+  请求  { age?, gender?, temperament?, identity?, framing?, background?, style?, extra?, sourceText? }   需要登录
+        字段都是字符串：extra ≤600 字，style ≤80 字，其余 ≤20–60 字；
+        sourceText 为原始文本（人设 / 小说片段，≤4000 字），给了就由模型先解析成设定再设计；
+        全部为空时 400
+  成功  { analysis, prompt, negativePrompt, fields?, model, tokens }
+        按《夏冬一捏脸 Skill》产出：角色分析、素颜正脸定妆提示词、负面提示词；
+        带 sourceText 时 fields 返回解析出的角色设定，供表单回填
+
+POST /api/prompts/face-refine
+  请求  { field, value, instruction, analysis?, other? }   需要登录
+        field 为 prompt（完整提示词）或 negative（负面提示词）；
+        value 为该栏当前内容（≤3000–6000 字），instruction ≤500 字；
+        analysis 与 other 用来守住人物设定、避免和另一栏矛盾
+  成功  { field, value, model, tokens }
+        只改一个字段；提示词保持分段与 500–800 字，负面词保持中文逗号分隔
 
 GET    /api/config      画面比例、原生尺寸、提示词上限、默认值
 GET  /api/health      后端与上游 Magpie 的连通状态

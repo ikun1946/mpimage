@@ -70,11 +70,23 @@ export function revisePrompt({ prompt, instruction, ratio, referencePaths, conte
 
 /**
  * 捏脸：把角色设定交给对话模型，返回角色分析 + 完整提示词 + 负面提示词。
+ * sourceText 为一段人设 / 小说片段，模型会先解析出角色设定再设计。
  */
-export function designFace({ age, gender, temperament, identity, framing, background, style, extra }) {
+export function designFace({ age, gender, temperament, identity, framing, background, style, extra, sourceText }) {
   return request('/api/prompts/face-design', {
     method: 'POST',
-    body: JSON.stringify({ age, gender, temperament, identity, framing, background, style, extra }),
+    body: JSON.stringify({ age, gender, temperament, identity, framing, background, style, extra, sourceText }),
+  })
+}
+
+/**
+ * 捏脸的定向修改：field 为 prompt 或 negative，一次只改这一栏。
+ * analysis 与 other 用来让人物设定和另一栏保持一致。
+ */
+export function refineFaceField({ field, value, instruction, analysis, other }) {
+  return request('/api/prompts/face-refine', {
+    method: 'POST',
+    body: JSON.stringify({ field, value, instruction, analysis, other }),
   })
 }
 

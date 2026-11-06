@@ -44,7 +44,7 @@ const EXCLUDED_PREFIXES: readonly string[] = [
 const COUNTED_ROUTES: ReadonlyArray<{ pattern: RegExp; methods: readonly string[] }> = [
   { pattern: /^\/api\/images$/, methods: ['POST'] },
   { pattern: /^\/api\/images\/jobs\/[^/]+$/, methods: ['GET'] },
-  { pattern: /^\/api\/prompts\/(optimize|revise|face-design)$/, methods: ['POST'] },
+  { pattern: /^\/api\/prompts\/(optimize|revise|face-design|face-refine)$/, methods: ['POST'] },
   { pattern: /^\/api\/history$/, methods: ['GET'] },
   { pattern: /^\/api\/quota$/, methods: ['GET'] },
   { pattern: /^\/api\/projects(\/[^/]+(\/activate)?)?$/, methods: ['GET', 'POST', 'PATCH', 'DELETE'] },

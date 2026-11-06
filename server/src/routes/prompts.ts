@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { config, findRatio } from '../config.js'
 import { ApiError } from '../lib/errors.js'
-import { designFace } from '../services/face-design.js'
+import { designFace, refineFaceField } from '../services/face-design.js'
 import { optimizePrompt, revisePrompt } from '../services/prompt-optimizer.js'
 import {
   MAX_REFERENCE_IMAGES,
@@ -160,8 +160,9 @@ export function registerPromptRoutes(
       identity: readText(body.identity, 60, '身份'),
       framing: readText(body.framing, 40, '画面类型'),
       background: readText(body.background, 40, '背景'),
-      style: readText(body.style, 40, '风格'),
+      style: readText(body.style, 80, '风格'),
       extra: readText(body.extra, 600, '特殊诉求'),
+      sourceText: readText(body.sourceText, 4000, '原始文本'),
     }
 
     return designFace(
@@ -173,10 +174,50 @@ export function registerPromptRoutes(
       params,
     )
   })
+
+  // 捏脸的定向修改：一次只改完整提示词或负面提示词中的一个字段
+  app.post('/api/prompts/face-refine', async request => {
+    requireAuth(request)
+    const body = (request.body ?? {}) as FaceRefineBody
+
+    const field =
+      body.field === 'negative' ? 'negative' : body.field === 'prompt' ? 'prompt' : null
+    if (!field) {
+      throw new ApiError('INVALID_PROMPT', '只能修改完整提示词或负面提示词')
+    }
+
+    const value = readText(
+      body.value,
+      field === 'prompt' ? MAX_FACE_PROMPT_VALUE : MAX_FACE_NEGATIVE_VALUE,
+      '当前内容',
+    )
+    const instruction = readText(body.instruction, 500, '修改要求')
+    if (!value) throw new ApiError('INVALID_PROMPT', '这一栏还没有内容可以修改')
+    if (!instruction) throw new ApiError('INVALID_PROMPT', '先说说想怎么改')
+
+    return refineFaceField(
+      {
+        baseUrl: await deps.settings.getBaseUrl(),
+        model: await deps.settings.getTextModel(),
+        timeoutMs: config.promptOptimizeTimeoutMs,
+      },
+      {
+        field,
+        value,
+        instruction,
+        analysis: readText(body.analysis, 3000, '角色分析'),
+        other: readText(body.other, MAX_FACE_PROMPT_VALUE, '另一个字段'),
+      },
+    )
+  })
 }
 
 /** 改写要求最多这么长：再长就不是「改一句」而是重写整条，超出直接拦下 */
 const MAX_REVISE_INSTRUCTION = 2000
+
+/** 捏脸结果可以被用户手改，所以给得比生成时的 500–800 字宽一些 */
+const MAX_FACE_PROMPT_VALUE = 6000
+const MAX_FACE_NEGATIVE_VALUE = 3000
 
 interface ReviseBody {
   prompt?: unknown
@@ -197,6 +238,16 @@ interface FaceDesignBody {
   background?: unknown
   style?: unknown
   extra?: unknown
+  /** 原始文本：人设 / 小说片段，给了就由模型先解析再设计 */
+  sourceText?: unknown
+}
+
+interface FaceRefineBody {
+  field?: unknown
+  value?: unknown
+  instruction?: unknown
+  analysis?: unknown
+  other?: unknown
 }
 
 /** 表单字段：非字符串按格式错误处理，超长直接拦下，避免把整段小说塞进提示词 */

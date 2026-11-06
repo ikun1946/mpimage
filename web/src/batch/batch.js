@@ -33,6 +33,7 @@ import {
   getUpdateStatus,
   logout,
   optimizePrompt,
+  refineFaceField,
   revisePrompt,
   updateMyProfile,
   saveStyleLibrary,
@@ -174,11 +175,17 @@ import { setupTablist } from '../lib/tabs.js'
         age: '25 岁',
         gender: '女性',
         temperament: '成熟清冷',
+        temperamentCustom: false,
+        temperamentCustomText: '',
         identity: '',
         framing: '胸像特写',
         background: '浅灰纯色背景',
         style: '真人写实',
+        styleCustom: false,
+        styleCustomText: '',
         extra: '',
+        // 从一段文本解析时保存原文，刷新后还能看到
+        sourceText: '',
         analysis: '',
         prompt: '',
         negativePrompt: '',
@@ -305,11 +312,18 @@ import { setupTablist } from '../lib/tabs.js'
       faceAge: document.querySelector('#face-age'),
       faceGender: document.querySelector('#face-gender'),
       faceTemperament: document.querySelector('#face-temperament'),
+      faceTemperamentCustom: document.querySelector('#face-temperament-custom'),
       faceIdentity: document.querySelector('#face-identity'),
       faceFraming: document.querySelector('#face-framing'),
       faceBackground: document.querySelector('#face-background'),
       faceStyle: document.querySelector('#face-style'),
+      faceStyleCustom: document.querySelector('#face-style-custom'),
       faceExtra: document.querySelector('#face-extra'),
+      faceResult: document.querySelector('#face-result'),
+      faceSourceText: document.querySelector('#face-source-text'),
+      faceSourceCount: document.querySelector('#face-source-count'),
+      faceTextRun: document.querySelector('#face-text-run'),
+      faceTextStatus: document.querySelector('#face-text-status'),
       faceDesignRun: document.querySelector('#face-design-run'),
       faceStatus: document.querySelector('#face-status'),
       faceEmpty: document.querySelector('#face-empty'),
@@ -387,11 +401,14 @@ import { setupTablist } from '../lib/tabs.js'
         // 捏脸页：表单与上一次方案，刷新后保持
         if (saved.face && typeof saved.face === 'object') {
           for (const key of [
-            'age', 'gender', 'temperament', 'identity', 'framing', 'background',
-            'style', 'extra', 'analysis', 'prompt', 'negativePrompt', 'imageUrl',
+            'age', 'gender', 'temperament', 'temperamentCustomText', 'identity',
+            'framing', 'background', 'style', 'styleCustomText', 'extra', 'sourceText',
+            'analysis', 'prompt', 'negativePrompt', 'imageUrl',
           ]) {
             if (typeof saved.face[key] === 'string') state.face[key] = saved.face[key]
           }
+          if (saved.face.styleCustom === true) state.face.styleCustom = true
+          if (saved.face.temperamentCustom === true) state.face.temperamentCustom = true
         }
         // 分页页码按类型持久化：刷新后回到离开时的那一页。
         // 越界（资产变少、分组数变化）由 renderTable 的 clamp 兜底，不会出现空白页。
@@ -3403,23 +3420,57 @@ import { setupTablist } from '../lib/tabs.js'
     function hydrateFaceForm() {
       dom.faceAge.value = state.face.age
       dom.faceGender.value = state.face.gender
-      dom.faceTemperament.value = state.face.temperament
+      // 气场与风格都可能是下拉预设，也可能是自定义文本；对不上就落回自定义
+      const temperament = state.face.temperament || '成熟清冷'
+      if (state.face.temperamentCustom) {
+        dom.faceTemperament.value = '__custom__'
+        dom.faceTemperamentCustom.value = state.face.temperamentCustomText || ''
+        dom.faceTemperamentCustom.hidden = false
+      } else {
+        dom.faceTemperament.value = temperament
+        const known = dom.faceTemperament.value === temperament
+        dom.faceTemperament.value = known ? temperament : '__custom__'
+        dom.faceTemperamentCustom.value = known ? '' : temperament
+        dom.faceTemperamentCustom.hidden = known
+      }
       dom.faceIdentity.value = state.face.identity
       dom.faceFraming.value = state.face.framing
       dom.faceBackground.value = state.face.background
-      dom.faceStyle.value = state.face.style
+      // 风格可能是下拉里的预设，也可能是用户自己写的；对不上就落回自定义
+      const style = state.face.style || '真人写实'
+      if (state.face.styleCustom) {
+        dom.faceStyle.value = '__custom__'
+        dom.faceStyleCustom.value = state.face.styleCustomText || ''
+        dom.faceStyleCustom.hidden = false
+      } else {
+        dom.faceStyle.value = style
+        const known = dom.faceStyle.value === style
+        dom.faceStyle.value = known ? style : '__custom__'
+        dom.faceStyleCustom.value = known ? '' : style
+        dom.faceStyleCustom.hidden = known
+      }
       dom.faceExtra.value = state.face.extra
+      dom.faceSourceText.value = state.face.sourceText || ''
+      dom.faceSourceCount.textContent = String(dom.faceSourceText.value.length)
     }
 
     function readFaceForm() {
+      const customStyle = dom.faceStyle.value === '__custom__'
+      const customTemperament = dom.faceTemperament.value === '__custom__'
       return {
         age: dom.faceAge.value.trim(),
         gender: dom.faceGender.value,
-        temperament: dom.faceTemperament.value,
+        temperament: customTemperament
+          ? (dom.faceTemperamentCustom.value.trim() || '成熟清冷')
+          : dom.faceTemperament.value,
+        temperamentCustom: customTemperament,
+        temperamentCustomText: customTemperament ? dom.faceTemperamentCustom.value.trim() : '',
         identity: dom.faceIdentity.value.trim(),
         framing: dom.faceFraming.value,
         background: dom.faceBackground.value,
-        style: dom.faceStyle.value,
+        style: customStyle ? (dom.faceStyleCustom.value.trim() || '真人写实') : dom.faceStyle.value,
+        styleCustom: customStyle,
+        styleCustomText: customStyle ? dom.faceStyleCustom.value.trim() : '',
         extra: dom.faceExtra.value.trim(),
       }
     }
@@ -3431,7 +3482,7 @@ import { setupTablist } from '../lib/tabs.js'
 
     /** 三块结果与定妆照一起渲染；没有方案时回到空态 */
     function renderFaceResult() {
-      const has = Boolean(state.face.prompt)
+      const has = Boolean(state.face.prompt.trim())
       dom.faceEmpty.hidden = has
       dom.faceOutput.hidden = !has
       dom.faceGenerate.disabled = !has || faceGenBusy
@@ -3440,14 +3491,98 @@ import { setupTablist } from '../lib/tabs.js'
         return
       }
       dom.faceAnalysis.textContent = state.face.analysis || '这次没有单独给出角色分析'
-      dom.facePrompt.value = state.face.prompt
-      dom.faceNegative.value = state.face.negativePrompt
+      // 用户可能正在手改这两栏：只有内容和 state 不一致时才写回，避免把光标顶走
+      if (dom.facePrompt.value !== state.face.prompt) dom.facePrompt.value = state.face.prompt
+      if (dom.faceNegative.value !== state.face.negativePrompt) {
+        dom.faceNegative.value = state.face.negativePrompt
+      }
       if (state.face.imageUrl) {
         dom.faceImage.src = state.face.imageUrl
         dom.facePreview.hidden = false
       } else {
         dom.facePreview.hidden = true
       }
+    }
+
+    /** 文本解析出的性别可能是「女」「男性」「female」，先归一到下拉选项 */
+    function normalizeFaceGender(value) {
+      const text = String(value || '').trim()
+      if (!text) return ''
+      if (/^(男|男性|male|m)$/i.test(text)) return '男性'
+      if (/^(女|女性|female|f)$/i.test(text)) return '女性'
+      if (/中性|无性别|androgynous/i.test(text)) return '中性'
+      return ''
+    }
+
+    /** 画面类型可能带补充说明（「半身定妆照，头顶至腰线」），取其中的景别 */
+    function normalizeFaceFraming(value) {
+      const text = String(value || '').trim()
+      if (!text) return ''
+      if (/全身|白底|脚部|脚背/.test(text)) return '全身白底定妆照'
+      if (/半身|腰线|七分/.test(text)) return '半身定妆照'
+      if (/胸像|特写|头像|面部|头肩/.test(text)) return '胸像特写'
+      return ''
+    }
+
+    /** 背景只接受四个纯色预设；「白底」「米色」「深灰」这类说法折回最近的选项 */
+    function normalizeFaceBackground(value) {
+      const text = String(value || '').trim()
+      if (!text) return ''
+      if (/白/.test(text)) return '白色纯色背景'
+      if (/米|暖|奶油/.test(text)) return '浅米色纯色背景'
+      if (/中性灰|深灰/.test(text)) return '中性灰纯色背景'
+      if (/浅灰|灰/.test(text)) return '浅灰纯色背景'
+      return ''
+    }
+
+    /**
+     * 把一次生成结果写进页面。
+     * fillFields 用于「从文本解析」：把模型提取出的设定回填到左侧表单。
+     */
+    function applyFaceResult(result, { fillFields = false } = {}) {
+      const prompt = (result?.prompt || '').trim()
+      if (!prompt) throw new Error('模型没有返回可用的提示词')
+
+      if (fillFields && result?.fields && typeof result.fields === 'object') {
+        for (const key of [
+          'age', 'gender', 'temperament', 'identity', 'framing', 'background', 'style', 'extra',
+        ]) {
+          const value = result.fields[key]
+          if (typeof value !== 'string' || !value.trim()) continue
+          state.face[key] = value.trim().slice(0, key === 'extra' ? 600 : 80)
+        }
+        // 文本里的说法未必和下拉选项一字不差：能归一的归一，归一不了的落到自定义
+        state.face.gender = normalizeFaceGender(state.face.gender) || dom.faceGender.value || '女性'
+        state.face.framing = normalizeFaceFraming(state.face.framing) || state.face.framing
+        state.face.background = normalizeFaceBackground(state.face.background) || state.face.background
+
+        const temperament = state.face.temperament || '成熟清冷'
+        const knownTemperament = Array.from(dom.faceTemperament.options)
+          .some(option => option.value === temperament)
+        state.face.temperament = temperament
+        state.face.temperamentCustom = !knownTemperament
+        state.face.temperamentCustomText = knownTemperament ? '' : temperament
+
+        const style = state.face.style || '真人写实'
+        const knownStyle = Array.from(dom.faceStyle.options).some(option => option.value === style)
+        state.face.style = style
+        state.face.styleCustom = !knownStyle
+        state.face.styleCustomText = knownStyle ? '' : style
+        hydrateFaceForm()
+      }
+
+      state.face.analysis = (result.analysis || '').trim()
+      state.face.prompt = prompt
+      state.face.negativePrompt = (result.negativePrompt || '').trim()
+      // 新方案先清掉旧图，避免文字换了、图还是上一版
+      state.face.imageUrl = ''
+      // 作废还在途中的出图：它拍的是上一版方案
+      faceGenSeq += 1
+      faceGenBusy = false
+      dom.faceGenerate.textContent = '生成定妆照'
+      dom.faceGenStatus.textContent = ''
+      persistSoon()
+      renderFaceResult()
     }
 
     async function runFaceDesign(event) {
@@ -3463,27 +3598,14 @@ import { setupTablist } from '../lib/tabs.js'
 
       faceBusy = true
       dom.faceDesignRun.disabled = true
+      dom.faceTextRun.disabled = true
       dom.faceDesignRun.setAttribute('aria-busy', 'true')
       // 方案在途时不允许按旧提示词去出图
       dom.faceGenerate.disabled = true
       dom.faceStatus.textContent = '正在拆骨架、定配比…'
       try {
         const result = await designFace(fields)
-        const prompt = (result?.prompt || '').trim()
-        if (!prompt) throw new Error('模型没有返回可用的提示词')
-
-        state.face.analysis = (result.analysis || '').trim()
-        state.face.prompt = prompt
-        state.face.negativePrompt = (result.negativePrompt || '').trim()
-        // 新方案先清掉旧图，避免文字换了、图还是上一版
-        state.face.imageUrl = ''
-        // 作废还在途中的出图：它拍的是上一版方案
-        faceGenSeq += 1
-        faceGenBusy = false
-        dom.faceGenerate.textContent = '生成定妆照'
-        dom.faceGenStatus.textContent = ''
-        persistSoon()
-        renderFaceResult()
+        applyFaceResult(result)
         dom.faceStatus.textContent = '方案已生成；可以直接生成定妆照，也可以改设定再试'
       } catch (error) {
         dom.faceStatus.textContent = error.message || '生成失败，请稍后重试'
@@ -3492,8 +3614,44 @@ import { setupTablist } from '../lib/tabs.js'
         faceBusy = false
         // 配置没读到时不做判断，避免把按钮永久锁死
         dom.faceDesignRun.disabled = serverConfig !== null && !faceTextModelAvailable()
-        dom.faceGenerate.disabled = faceGenBusy || !state.face.prompt
+        dom.faceTextRun.disabled = dom.faceDesignRun.disabled
+        dom.faceGenerate.disabled = faceGenBusy || !state.face.prompt.trim()
         dom.faceDesignRun.removeAttribute('aria-busy')
+      }
+    }
+
+    /** 从一段人设 / 小说片段解析角色：模型先提取字段，再给完整方案 */
+    async function runFaceParseText() {
+      if (faceBusy) return
+      const text = dom.faceSourceText.value.trim()
+      if (!text) {
+        showToast('先粘贴一段角色文本')
+        dom.faceSourceText.focus()
+        return
+      }
+
+      faceBusy = true
+      dom.faceTextRun.disabled = true
+      dom.faceDesignRun.disabled = true
+      dom.faceGenerate.disabled = true
+      dom.faceTextRun.setAttribute('aria-busy', 'true')
+      dom.faceTextStatus.textContent = '正在读文本、拆人设…'
+      try {
+        const result = await designFace({ sourceText: text })
+        state.face.sourceText = text
+        applyFaceResult(result, { fillFields: true })
+        dom.faceTextStatus.textContent = '已解析并生成，左侧设定可继续改'
+        dom.faceStatus.textContent = '已从文本生成方案；可直接出定妆照，或改设定后重新生成'
+        dom.faceResult.scrollIntoView({ block: 'nearest' })
+      } catch (error) {
+        dom.faceTextStatus.textContent = error.message || '解析失败，请稍后重试'
+        showToast(error.message || '解析失败，请稍后重试', true)
+      } finally {
+        faceBusy = false
+        dom.faceTextRun.disabled = serverConfig !== null && !faceTextModelAvailable()
+        dom.faceDesignRun.disabled = dom.faceTextRun.disabled
+        dom.faceGenerate.disabled = faceGenBusy || !state.face.prompt.trim()
+        dom.faceTextRun.removeAttribute('aria-busy')
       }
     }
 
@@ -3540,6 +3698,89 @@ import { setupTablist } from '../lib/tabs.js'
           dom.faceGenerate.disabled = !state.face.prompt
           dom.faceGenerate.textContent = '生成定妆照'
           dom.faceDesignRun.disabled = serverConfig !== null && !faceTextModelAvailable()
+        }
+      }
+    }
+
+    /* ===== 捏脸结果的两栏定向修改 =====
+       一次只改一栏；角色分析与另一栏一起送给模型，避免改出互相矛盾的设定。 */
+    let faceRefineBusy = false
+    let faceRefineSeq = 0
+
+    function faceRefinePanel(field) {
+      return dom.faceOutput.querySelector(`.face-refine[data-refine-field="${field}"]`)
+    }
+
+    function closeFaceRefine(panel) {
+      if (!panel) return
+      panel.hidden = true
+      const input = panel.querySelector('input')
+      if (input) input.value = ''
+      const status = panel.querySelector('[data-refine-status]')
+      if (status) status.textContent = ''
+    }
+
+    async function runFaceRefine(panel) {
+      if (!panel || faceRefineBusy) return
+      if (serverConfig !== null && !faceTextModelAvailable()) {
+        const status = panel.querySelector('[data-refine-status]')
+        if (status) status.textContent = '管理员还没配置提示词模型'
+        return
+      }
+      const field = panel.dataset.refineField === 'negative' ? 'negative' : 'prompt'
+      const input = panel.querySelector('input')
+      const status = panel.querySelector('[data-refine-status]')
+      const run = panel.querySelector('[data-refine-run]')
+      const instruction = (input?.value || '').trim()
+      if (!instruction) {
+        if (status) status.textContent = '先写一句想怎么改'
+        input?.focus()
+        return
+      }
+
+      // 以文本框里的当前内容为准：用户可能刚手改过
+      const value =
+        field === 'prompt' ? dom.facePrompt.value.trim() : dom.faceNegative.value.trim()
+      if (!value) {
+        if (status) status.textContent = '这一栏还没有内容'
+        return
+      }
+
+      faceRefineBusy = true
+      const seq = ++faceRefineSeq
+      if (run) run.disabled = true
+      if (status) status.textContent = '正在修改…'
+      try {
+        const result = await refineFaceField({
+          field,
+          value,
+          instruction,
+          analysis: state.face.analysis,
+          other: field === 'prompt' ? dom.faceNegative.value : dom.facePrompt.value,
+        })
+        if (seq !== faceRefineSeq) return
+        const next = (result?.value || '').trim()
+        if (!next) throw new Error('模型没有返回内容')
+
+        if (field === 'prompt') {
+          state.face.prompt = next
+          dom.facePrompt.value = next
+        } else {
+          state.face.negativePrompt = next
+          dom.faceNegative.value = next
+        }
+        dom.faceGenerate.disabled = faceGenBusy || !state.face.prompt.trim()
+        persistSoon()
+        if (status) status.textContent = '已修改；出图会使用这里的内容'
+        if (input) input.value = ''
+        input?.focus()
+      } catch (error) {
+        if (seq !== faceRefineSeq) return
+        if (status) status.textContent = error.message || '修改失败，请稍后重试'
+      } finally {
+        if (seq === faceRefineSeq) {
+          faceRefineBusy = false
+          if (run) run.disabled = false
         }
       }
     }
@@ -4360,6 +4601,50 @@ import { setupTablist } from '../lib/tabs.js'
       dom.faceForm.addEventListener('submit', runFaceDesign)
       dom.faceForm.addEventListener('input', persistFaceForm)
       dom.faceForm.addEventListener('change', persistFaceForm)
+      dom.faceTextRun.addEventListener('click', () => { void runFaceParseText() })
+      dom.faceSourceText.addEventListener('input', () => {
+        state.face.sourceText = dom.faceSourceText.value
+        dom.faceSourceCount.textContent = String(dom.faceSourceText.value.length)
+        persistSoon()
+      })
+      // 风格切到「自定义」时露出输入框；切回预设时把自定义内容收起来。
+      // 用捕获阶段：先更新输入框，再让表单的 change 监听去持久化，避免把旧文本冲掉。
+      dom.faceStyle.addEventListener('change', () => {
+        const custom = dom.faceStyle.value === '__custom__'
+        dom.faceStyleCustom.hidden = !custom
+        if (custom) {
+          if (!dom.faceStyleCustom.value) {
+            dom.faceStyleCustom.value = state.face.styleCustomText || ''
+          }
+          dom.faceStyleCustom.focus()
+        } else {
+          dom.faceStyleCustom.value = ''
+        }
+        persistFaceForm()
+      }, true)
+      dom.faceTemperament.addEventListener('change', () => {
+        const custom = dom.faceTemperament.value === '__custom__'
+        dom.faceTemperamentCustom.hidden = !custom
+        if (custom) {
+          if (!dom.faceTemperamentCustom.value) {
+            dom.faceTemperamentCustom.value = state.face.temperamentCustomText || ''
+          }
+          dom.faceTemperamentCustom.focus()
+        } else {
+          dom.faceTemperamentCustom.value = ''
+        }
+        persistFaceForm()
+      }, true)
+      // 完整提示词与负面提示词都可以手改，出图与复制都以文本框内容为准
+      dom.facePrompt.addEventListener('input', () => {
+        state.face.prompt = dom.facePrompt.value
+        dom.faceGenerate.disabled = faceGenBusy || !state.face.prompt.trim()
+        persistSoon()
+      })
+      dom.faceNegative.addEventListener('input', () => {
+        state.face.negativePrompt = dom.faceNegative.value
+        persistSoon()
+      })
       dom.faceGenerate.addEventListener('click', generateFaceImage)
       dom.faceCopyAll.addEventListener('click', () => {
         void copyFaceText(state.face.prompt, '提示词已复制到剪贴板')
@@ -4381,6 +4666,24 @@ import { setupTablist } from '../lib/tabs.js'
         if (!target) return
         const value = 'value' in target ? target.value : target.textContent || ''
         void copyFaceText(value, '已复制')
+      })
+      // 两栏各自的「AI 修改」：展开输入框、执行、取消
+      dom.faceOutput.addEventListener('click', event => {
+        const trigger = event.target.closest('[data-face-refine]')
+        if (trigger) {
+          const panel = faceRefinePanel(trigger.dataset.faceRefine)
+          if (!panel) return
+          panel.hidden = false
+          panel.querySelector('input')?.focus()
+          return
+        }
+        const cancel = event.target.closest('[data-refine-cancel]')
+        if (cancel) {
+          closeFaceRefine(cancel.closest('.face-refine'))
+          return
+        }
+        const run = event.target.closest('[data-refine-run]')
+        if (run) void runFaceRefine(run.closest('.face-refine'))
       })
       dom.freePrompt.addEventListener('keydown', event => {
         if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
@@ -4825,9 +5128,11 @@ import { setupTablist } from '../lib/tabs.js'
             if (dom.freePromptRevise) dom.freePromptRevise.hidden = false
             if (dom.modalRevisePrompt) dom.modalRevisePrompt.hidden = false
             if (dom.faceDesignRun) dom.faceDesignRun.disabled = false
+            if (dom.faceTextRun) dom.faceTextRun.disabled = false
           } else if (dom.faceStatus) {
             dom.faceStatus.textContent = '管理员还没配置提示词模型，捏脸暂时不可用'
             if (dom.faceDesignRun) dom.faceDesignRun.disabled = true
+            if (dom.faceTextRun) dom.faceTextRun.disabled = true
           }
         })
         .catch(() => {
