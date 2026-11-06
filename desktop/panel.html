@@ -1800,6 +1800,8 @@
     pid: 0,
     port: 0,
     uptimeMs: 0,
+    /** 由 uptimeMs 反推的服务启动时刻；状态每两秒推一次，秒表靠它每一秒自走一格 */
+    startedAtMs: 0,
     lanUrl: '',
     lanUrls: [],
     clientUrl: '',
@@ -1982,12 +1984,12 @@
     const running = state.running
     dom.dot.className = running ? 'dot on' : 'dot off'
     setText(dom.statusText, running ? '运行中' : '已停止')
-    setText(
-      dom.serviceMeta,
-      running
-        ? `PID ${state.pid || '—'} · 端口 ${state.port || '—'} · 已运行 ${formatDuration(state.uptimeMs)}`
-        : `服务已停止${state.port ? ` · 端口 ${state.port}` : ''}`,
-    )
+    // 主进程每两秒才推一次状态，直接用 uptimeMs 渲染会让秒数两格两格地跳；
+    // 这里按推送时刻反推服务启动时间，交给 tickServiceClock 每秒重算。
+    state.startedAtMs = running
+      ? (state.uptimeMs > 0 ? Date.now() - state.uptimeMs : Date.now())
+      : 0
+    renderServiceMeta()
 
     const url = state.lanUrl || state.clientUrl
     setText(dom.clientUrl, url || '服务启动后在这里显示客户端地址')
@@ -2006,6 +2008,22 @@
 
     renderServiceButtons()
     syncUrlButtons()
+  }
+
+  /** 状态栏那行「PID · 端口 · 已运行」；每秒重绘一次，别等两秒一次的推送 */
+  function renderServiceMeta() {
+    setText(
+      dom.serviceMeta,
+      state.running
+        ? `PID ${state.pid || '—'} · 端口 ${state.port || '—'} · 已运行 ${formatDuration(state.startedAtMs ? Date.now() - state.startedAtMs : state.uptimeMs)}`
+        : `服务已停止${state.port ? ` · 端口 ${state.port}` : ''}`,
+    )
+  }
+
+  function tickServiceClock() {
+    if (!state.running || !state.startedAtMs) return
+    if (document.hidden) return
+    renderServiceMeta()
   }
 
   function renderServiceButtons() {
@@ -3420,7 +3438,8 @@
 
     bridge.onState(onState)
 
-    // 运行时间每秒自走一格；监控块每 30 秒回一次服务端（管理端接口不计入统计口径）
+    // 运行时间每秒自走一格（状态栏 + 监控块各一份）；监控块每 30 秒回一次服务端（管理端接口不计入统计口径）
+    setInterval(tickServiceClock, 1000)
     setInterval(tickMonitorClock, 1000)
     setInterval(() => {
       if (document.hidden) return

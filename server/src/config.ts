@@ -110,8 +110,12 @@ export const config = {
    * 选 flash 档是因为只做扩写，1–2 秒返回，没必要上更贵的模型。
    */
   textModel: process.env.MAGPIE_TEXT_MODEL || 'auto/deepseek-v4.1-flash',
-  /** 提示词优化的上游超时；对话模型偶尔排队，比生图短得多也够用 */
-  promptOptimizeTimeoutMs: intFromEnv('PROMPT_OPTIMIZE_TIMEOUT_MS', 60000),
+  /**
+   * 提示词优化的上游超时。
+   * 60 秒不够：扩写要连贯写 500–700 字，加上看图与自检两轮，实测偶发到 90 秒以上，
+   * 超时会让用户连第一条提示词都拿不到。前端没有自己的超时，以这里为唯一上限。
+   */
+  promptOptimizeTimeoutMs: intFromEnv('PROMPT_OPTIMIZE_TIMEOUT_MS', 120000),
   /**
    * 同时打向 Magpie 的生图请求上限：0 表示不限制，正整数表示最大并发，默认 5。
    * 服务端控制台保存过 data/concurrency.json 时以文件为准；这里只是文件缺失时的默认值，

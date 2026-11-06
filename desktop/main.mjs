@@ -199,8 +199,14 @@ ipcMain.handle('panel:action', async (_event, name) => {
     case 'lan-allow': {
       if (process.platform !== 'win32') return { ok: false, message: '只有 Windows 需要单独放行端口' }
       try {
-        await allowPortThroughFirewall(SERVER_PORT)
-        return { ok: true, message: `已提交放行 TCP ${SERVER_PORT} 的请求，在系统弹窗里点“是”后生效` }
+        const status = await allowPortThroughFirewall(SERVER_PORT)
+        const silent = await uacPromptsDisabled()
+        return {
+          ok: true,
+          message: silent
+            ? `${status.detail}（系统 UAC 设为「从不通知」，本次是静默提权，不会弹窗）`
+            : status.detail,
+        }
       } catch (error) {
         return { ok: false, message: `放行失败：${error.message || error}` }
       }
@@ -626,20 +632,33 @@ function bindsLoopbackOnly() {
 
 const execFileAsync = promisify(execFile)
 
-/** 防火墙是否给这个端口放了行：只看本应用自己建的那条规则 */
+/**
+ * 防火墙是否给这个端口放了行：只看本应用自己建的那条规则。
+ *
+ * 这里用 PowerShell 的 Get-NetFirewallRule，而不是 netsh show：
+ * 中文 Windows 上 netsh 输出是 GBK，Node 按 UTF-8 解码后全是乱码，
+ * 原来的 /允许/ 永远匹配不上——规则明明建好了也会被判成「没有放行」。
+ */
 async function firewallStatus(port) {
   if (process.platform !== 'win32') return { allowed: true, detail: '非 Windows 系统不做防火墙检查' }
+  const name = `Huajing Server ${port}`
   try {
     const { stdout } = await execFileAsync(
-      'netsh',
-      ['advfirewall', 'firewall', 'show', 'rule', `name=Huajing Server ${port}`],
+      'powershell',
+      ['-NoProfile', '-NonInteractive', '-Command',
+        `$r = Get-NetFirewallRule -DisplayName '${name}' -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $r) { 'MISSING' } else { '{0}|{1}|{2}' -f $r.Enabled, $r.Action, $r.Direction }`],
       { timeout: 8000 },
     )
-    if (/已启用\s*[:：]\s*否/i.test(stdout)) {
-      return { allowed: false, detail: `防火墙规则 Huajing Server ${port} 被停用了` }
+    const [enabled, action, direction] = stdout.trim().split('|')
+    if (!enabled || enabled === 'MISSING') {
+      return { allowed: false, detail: `防火墙没有放行 TCP ${port}，其他设备会被挡在门外` }
     }
-    if (!/允许|allow/i.test(stdout)) {
-      return { allowed: false, detail: `防火墙规则 Huajing Server ${port} 不是“允许”` }
+    if (String(enabled).toLowerCase() !== 'true') {
+      return { allowed: false, detail: `防火墙规则 ${name} 被停用了` }
+    }
+    if (action !== 'Allow' || direction !== 'Inbound') {
+      return { allowed: false, detail: `防火墙规则 ${name} 不是「入站·允许」` }
     }
     return { allowed: true, detail: `防火墙已放行 TCP ${port}` }
   } catch {
@@ -647,20 +666,75 @@ async function firewallStatus(port) {
   }
 }
 
-/** netsh 要管理员权限：点按钮时用 UAC 提权跑一次 */
+/**
+ * netsh 要管理员权限：点按钮时用 UAC 提权跑一次。
+ *
+ * 两个坑都在这里：
+ * 1. 规则名里有空格，必须把整个 name="Huajing Server 8787" 作为一个参数传给 netsh。
+ *    原来写成 name=Huajing Server 8787，netsh 会把 Server 当成下一个参数，
+ *    直接报「指定的值无效」，规则根本建不出来。
+ * 2. Start-Process 不加 -Wait 时立刻返回，netsh 的报错全被吞掉，
+ *    面板只能显示「已提交」，实际什么都没发生。这里改成等它退出并核对结果。
+ */
 async function allowPortThroughFirewall(port) {
+  const name = `Huajing Server ${port}`
   const args = [
     'advfirewall', 'firewall', 'add', 'rule',
-    `name=Huajing Server ${port}`,
+    `name="${name}"`,
     'dir=in', 'action=allow', 'protocol=TCP', `localport=${port}`, 'profile=any',
   ]
   const quoted = args.map(arg => `'${arg.replace(/'/g, "''")}'`).join(',')
-  await execFileAsync(
-    'powershell',
-    ['-NoProfile', '-NonInteractive', '-Command',
-      `Start-Process -FilePath netsh -ArgumentList ${quoted} -Verb RunAs -WindowStyle Hidden`],
-    { timeout: 30000 },
-  )
+
+  let exitCode = NaN
+  try {
+    const { stdout } = await execFileAsync(
+      'powershell',
+      ['-NoProfile', '-NonInteractive', '-Command',
+        `$p = Start-Process -FilePath netsh -ArgumentList ${quoted} -Verb RunAs -WindowStyle Hidden -Wait -PassThru
+"EXIT=$($p.ExitCode)"`],
+      { timeout: 120000 },
+    )
+    const match = /EXIT=(-?\d+)/.exec(stdout)
+    if (match) exitCode = Number(match[1])
+  } catch (error) {
+    const detail = String(error.stderr || error.message || '').trim()
+    throw new Error(
+      detail
+        ? `提权失败或已被取消：${detail.split(/\r?\n/)[0]}`
+        : '提权失败或已被取消，请重试；若始终没有反应，请用管理员身份运行本程序',
+    )
+  }
+
+  // 以规则是否真的建出来为准：退出码为 0 也可能因为参数问题没生效
+  const status = await firewallStatus(port)
+  if (!status.allowed) {
+    throw new Error(
+      Number.isFinite(exitCode) && exitCode !== 0
+        ? `netsh 返回 ${exitCode}，防火墙规则没有建立`
+        : '防火墙规则没有建立，请用管理员身份运行本程序后重试',
+    )
+  }
+  return status
+}
+
+/**
+ * 系统 UAC 是否被设成「从不通知」（ConsentPromptBehaviorAdmin=0）。
+ * 这种机器上提权会静默完成，本来就不会弹窗——面板要如实说明，
+ * 否则用户会以为按钮没生效。
+ */
+async function uacPromptsDisabled() {
+  if (process.platform !== 'win32') return false
+  try {
+    const { stdout } = await execFileAsync(
+      'powershell',
+      ['-NoProfile', '-NonInteractive', '-Command',
+        `(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System').ConsentPromptBehaviorAdmin`],
+      { timeout: 5000 },
+    )
+    return stdout.trim() === '0'
+  } catch {
+    return false
+  }
 }
 
 /** 局域网自检：把“为什么别人连不上”拆成监听地址、候选地址、本机自测、防火墙四段 */
