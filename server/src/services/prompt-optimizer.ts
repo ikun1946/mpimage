@@ -68,14 +68,15 @@ export interface PromptOptimizeResult {
  * 新规则要求 500–700 字，实测偶发写到 1000 字以上，2000 会撞上限，
  * 所以再留一截余量；撞上 length 会直接报错，用户拿不到半条提示词。
  */
-const EXPAND_MAX_TOKENS = 2600
+// 推理模型的思考 token 也计入预算，给正文留出足够空间
+const EXPAND_MAX_TOKENS = 8000
 /**
  * 改图指令现在要先写成片、再写改动、最后写保持不变，
  * 用户一次提多处改动时 700 装不下，会被截断成半条指令。
  */
-const EDIT_MAX_TOKENS = 2400
+const EDIT_MAX_TOKENS = 6000
 /** 自检轮要重写整条提示词，预算与首轮相当 */
-const CHECK_MAX_TOKENS = 2200
+const CHECK_MAX_TOKENS = 7000
 /** 自检轮最多用掉这么久，超时就保留首轮结果 */
 const CHECK_TIMEOUT_CAP_MS = 25000
 /** 观察阶段最多用掉总超时的一半，且不超过这个上限 */
@@ -94,8 +95,8 @@ const EDIT_TEMPERATURE = 0.35
  * 固定 2600 装不下长提示词（接口允许到 MAX_PROMPT_LENGTH），
  * 所以按输入长度给预算：中文约 1.6 token/字，再留一截余量。
  */
-const REVISE_MAX_TOKENS_MIN = 2600
-const REVISE_MAX_TOKENS_CAP = 16000
+const REVISE_MAX_TOKENS_MIN = 6000
+const REVISE_MAX_TOKENS_CAP = 20000
 
 /** 带参考图且文本像「改这里」时才走改图路径；没图一律当扩写 */
 const EDIT_PATTERNS: RegExp[] = [

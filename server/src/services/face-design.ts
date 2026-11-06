@@ -61,7 +61,12 @@ export interface FaceDesignResult {
   tokens: ChatTokens
 }
 
-const FACE_MAX_TOKENS = 4000
+/**
+ * 推理模型会先输出思考过程，reasoning tokens 也计入 max_tokens。
+ * 实测一次捏脸正文约 1450 字，但 completion_tokens 常在 3000–3500，
+ * 其中 2000 左右是思考；只给 4000 会在思考偏长时把 JSON 截断。
+ */
+const FACE_MAX_TOKENS = 12000
 const FACE_TEMPERATURE = 0.7
 
 const FACE_DESIGN_SYSTEM_PROMPT = `你是原创角色捏脸与影视定妆提示词专家。根据用户给的角色设定，设计一张原创 AI 角色的脸，并输出可以直接拿去生图的提示词与负面提示词。
@@ -155,7 +160,7 @@ export async function designFace(
     if (error instanceof ApiError && error.code === 'UPSTREAM_TRUNCATED') {
       throw new ApiError(
         'UPSTREAM_TRUNCATED',
-        '方案太长被截断，请把特殊诉求写短一点再试',
+        '模型这次的思考过长，方案被截断；再点一次通常就好',
         502,
       )
     }
@@ -191,7 +196,8 @@ export interface FaceRefineResult {
   tokens: ChatTokens
 }
 
-const FACE_REFINE_MAX_TOKENS = 2800
+// 定向修改同样要留出思考额度，否则会改到一半被截断
+const FACE_REFINE_MAX_TOKENS = 12000
 const FACE_REFINE_TEMPERATURE = 0.4
 
 const FACE_REFINE_SYSTEM_PROMPT = `你是捏脸定妆提示词的定向编辑。输入是当前字段（完整提示词或负面提示词）、角色分析、另一个字段，以及用户这次的修改要求。
@@ -237,13 +243,13 @@ export async function refineFaceField(
       ],
       maxTokens: Math.min(
         FACE_REFINE_MAX_TOKENS,
-        Math.max(1200, Math.ceil(params.value.length * 1.8)),
+        Math.max(6000, Math.ceil(params.value.length * 1.8)),
       ),
       temperature: FACE_REFINE_TEMPERATURE,
     })
   } catch (error) {
     if (error instanceof ApiError && error.code === 'UPSTREAM_TRUNCATED') {
-      throw new ApiError('UPSTREAM_TRUNCATED', '修改结果太长被截断，请把要求写短一点再试', 502)
+      throw new ApiError('UPSTREAM_TRUNCATED', '模型这次的思考过长，修改结果被截断；再点一次通常就好', 502)
     }
     throw error
   }
