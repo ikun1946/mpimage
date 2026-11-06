@@ -136,12 +136,20 @@ function pickAsset(assets: unknown): { name: string; url: string; size: number |
   return setup ?? portable ?? null
 }
 
+class UpdateSourceError extends Error {
+  readonly status: number
+  constructor(status: number) {
+    super(`更新源返回 ${status}`)
+    this.status = status
+  }
+}
+
 async function requestJson(url: string, headers: Record<string, string>): Promise<unknown> {
   const response = await fetch(url, {
     headers,
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
-  if (!response.ok) throw new Error(`更新源返回 ${response.status}`)
+  if (!response.ok) throw new UpdateSourceError(response.status)
   return response.json()
 }
 
@@ -165,7 +173,7 @@ async function fetchCustom(feedUrl: string): Promise<ReleaseInfo> {
   }
 }
 
-async function fetchGitHub(repo: string, token: string): Promise<ReleaseInfo> {
+async function fetchGitHubApi(repo: string, token: string): Promise<ReleaseInfo> {
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'User-Agent': `${USER_AGENT}/${currentVersion}`,
@@ -189,6 +197,111 @@ async function fetchGitHub(repo: string, token: string): Promise<ReleaseInfo> {
     downloadSize: asset?.size ?? null,
     publishedAt: nullableTextFrom(payload?.published_at),
     source: 'github',
+  }
+}
+
+/** 从发布页的资产片段里取下载链接；不经过 API，不受匿名额度限制 */
+function parseWebAssets(html: string): Array<Record<string, unknown>> {
+  const seen = new Set<string>()
+  const assets: Array<Record<string, unknown>> = []
+  const pattern = /href="(\/[^"\s]*\/releases\/download\/[^"\s]+)"/g
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(html)) !== null) {
+    const href = match[1]
+    if (!href) continue
+    let name = ''
+    try {
+      name = decodeURIComponent(href.split('/').pop() || '')
+    } catch {
+      name = href.split('/').pop() || ''
+    }
+    if (!name || seen.has(name)) continue
+    seen.add(name)
+    assets.push({ name, browser_download_url: `https://github.com${href}`, size: null })
+  }
+  return assets
+}
+
+/** 发布页不给字节数，HEAD 一次拿 content-length；拿不到就留空，下载器自己会处理 */
+async function headSize(url: string): Promise<number | null> {
+  try {
+    const response = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      headers: { 'User-Agent': `${USER_AGENT}/${currentVersion}` },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    })
+    if (!response.ok) return null
+    return normalizeSize(response.headers.get('content-length'))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * API 限流时的回退：GitHub 的匿名 API 每小时只有 60 次（按出口 IP 共用），
+ * 而发布页与资产片段是普通网页，不受这个额度限制。
+ * 302 的 Location 直接给出最新 tag；资产列表在 expanded_assets 片段里。
+ */
+async function fetchGitHubWeb(repo: string): Promise<ReleaseInfo> {
+  const headers: Record<string, string> = {
+    Accept: 'text/html,application/xhtml+xml',
+    'User-Agent': `${USER_AGENT}/${currentVersion}`,
+  }
+
+  const latest = await fetch(`https://github.com/${repo}/releases/latest`, {
+    headers,
+    redirect: 'manual',
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
+  const location = latest.headers.get('location') || ''
+  let tag = /\/releases\/tag\/([^/?#]+)/.exec(location)?.[1] || ''
+  if (!tag && latest.ok) {
+    const html = await latest.text()
+    tag = /\/releases\/tag\/([^"?#/]+)/.exec(html)?.[1] || ''
+  }
+  tag = decodeURIComponent(tag)
+  if (!tag) throw new Error('GitHub 发布页没有给出最新版本')
+
+  const assetsResponse = await fetch(
+    `https://github.com/${repo}/releases/expanded_assets/${encodeURIComponent(tag)}`,
+    { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
+  )
+  const assetsHtml = assetsResponse.ok ? await assetsResponse.text() : ''
+  const asset = pickAsset(parseWebAssets(assetsHtml))
+  if (!asset) throw new Error('GitHub 发布页没有找到安装包')
+
+  return {
+    version: normalizeVersion(tag),
+    notes: '',
+    pageUrl: `https://github.com/${repo}/releases/tag/${encodeURIComponent(tag)}`,
+    downloadUrl: asset.url,
+    downloadName: asset.name,
+    downloadSize: asset.size ?? (await headSize(asset.url)),
+    publishedAt: null,
+    source: 'github',
+  }
+}
+
+async function fetchGitHub(repo: string, token: string): Promise<ReleaseInfo> {
+  try {
+    return await fetchGitHubApi(repo, token)
+  } catch (error) {
+    // 403/429 是匿名 API 限流；网络层失败也值得换发布页再试一次
+    const status = error instanceof UpdateSourceError ? error.status : 0
+    const networkFailure =
+      error instanceof TypeError ||
+      (error instanceof Error && /fetch failed|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED/i.test(error.message))
+    if (status !== 403 && status !== 429 && !networkFailure) throw error
+
+    try {
+      return await fetchGitHubWeb(repo)
+    } catch {
+      if (status === 403 || status === 429) {
+        throw new Error('GitHub API 限流（匿名每小时 60 次），发布页回退也没有成功，请稍后重试')
+      }
+      throw error
+    }
   }
 }
 
