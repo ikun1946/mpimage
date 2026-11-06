@@ -57,6 +57,27 @@ export function optimizePrompt({ prompt, ratio, referenceCount, referencePaths }
   })
 }
 
+/**
+ * 改写已有提示词：instruction 是用户这次的修改要求。
+ * referencePaths 为参考图（参考图/），contextPaths 为已生成的结果图。
+ */
+export function revisePrompt({ prompt, instruction, ratio, referencePaths, contextPaths }) {
+  return request('/api/prompts/revise', {
+    method: 'POST',
+    body: JSON.stringify({ prompt, instruction, ratio, referencePaths, contextPaths }),
+  })
+}
+
+/**
+ * 捏脸：把角色设定交给对话模型，返回角色分析 + 完整提示词 + 负面提示词。
+ */
+export function designFace({ age, gender, temperament, identity, framing, background, style, extra }) {
+  return request('/api/prompts/face-design', {
+    method: 'POST',
+    body: JSON.stringify({ age, gender, temperament, identity, framing, background, style, extra }),
+  })
+}
+
 export function fetchServerConfig() {
   return request('/api/config', { method: 'GET' })
 }

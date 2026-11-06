@@ -251,10 +251,31 @@ POST /api/reference-images
   成功  { path, url, width, height, bytes }   201
 
 POST /api/prompts/optimize
-  请求  { prompt, ratio?, referenceCount? }   需要登录
-        ratio 为 config 里的比例 id；referenceCount 为 0–6
-  成功  { prompt, model, tokens: { input, output, total } }
-        由上游对话模型把短描述扩写成完整中文提示词；output/total 缺失时为 null
+  请求  { prompt, ratio?, referenceCount?, referencePaths? }   需要登录
+        ratio 为 config 里的比例 id；referenceCount 为 0–6；
+        referencePaths 为本次一起送模型的参考图（参考图/<文件名>）
+  成功  { prompt, model, tokens: { input, output, total }, mode,
+          lockedConstraints, restoredConstraints }
+        由上游对话模型把短描述扩写成完整中文提示词；output/total 缺失时为 null；
+        lockedConstraints 为本次识别并保护的风格 / 设定 / 否定约束，
+        restoredConstraints 为其中在模型成稿里丢失、由服务端补回的条目
+
+POST /api/prompts/revise
+  请求  { prompt, instruction, ratio?, referencePaths?, contextPaths? }   需要登录
+        prompt 为当前提示词，instruction 为这次的修改要求（≤2000 字）；
+        referencePaths 为参考图（参考图/<文件名>）；
+        contextPaths 为已生成的结果图（存储里任意类别，如 自由创作/<文件名>）。
+        两类图片合计最多 6 张。
+  成功  { prompt, model, tokens, mode: "revise", imageCount,
+          lockedConstraints, restoredConstraints }
+        输出整条改写后的提示词；带图时先观察再改，看图失败退回多模态直送；
+        用户这次点名要改的约束不再保护，其余风格与设定原样保留
+
+POST /api/prompts/face-design
+  请求  { age?, gender?, temperament?, identity?, framing?, background?, style?, extra? }   需要登录
+        字段都是字符串：extra ≤600 字，其余 ≤40–60 字；全部为空时 400
+  成功  { analysis, prompt, negativePrompt, model, tokens }
+        按《夏冬一捏脸 Skill》产出：角色分析、素颜正脸定妆提示词、负面提示词
 
 GET    /api/config      画面比例、原生尺寸、提示词上限、默认值
 GET  /api/health      后端与上游 Magpie 的连通状态
@@ -573,12 +594,20 @@ generated/    图片文件
   终审失败、超时、或结果比草稿短 40% 以上时静默保留首轮，用户不会因此拿不到提示词。
   **带参考图时会先看图，再写改图指令**：已上传的参考图（按显示顺序，最多 6 张）先单独送一次
   视觉模型做观察（主体 / 构图 / 背景 / 光线 / 色调 / 风格 / 画面文字 / 可改目标），
-  再把这份观察连同用户原话交给对话模型，写出「以图N为底图，只改这里，其余保持」的改图指令。
+  再把这份观察连同用户原话交给对话模型。改图指令按「底图是哪张 → 成片是什么样 → 哪些必须不动」
+  三段写，先定最终画面再定改动；用户一次提多处改动就一起写，不再硬压成 80–220 字的短指令。
   **带图扩写也会先观察**：观察摘要按图号写进提示词，多张图会分工（图1提供长相、图2提供服装、图3提供画风）；
   观察成功后首轮不再重复上传图片，省一次图片传输。
   观察结果按图片内容哈希缓存 30 分钟，同一张图反复改措辞不会重复调用视觉模型；
   任一阶段失败自动退回「图片 + 提示词一次送出」的旧路径，用户不会看到多余报错。
   优化会等参考图上传完成再发起，上传失败就提示而不是悄悄丢掉图片。
+  **风格约束不会被优化掉（v1.0.16）**：服务端先按分句抽出用户原文里的风格 / 媒介 / 色彩 / 质感 /
+  构图 / 必须出现的文字 / 否定约束，模型成稿回来后逐条核对；缺了的用用户原词补在末尾
+  （`风格与画面约束（保持不变）：…` / `不要出现：…`）。扩写与终审也不再无条件套电影分镜模板：
+  插画、动画、平面、产品、3D 各按自己的语言写，不会给插画加焦段和胶片颗粒。
+  补全只发生在约束之内，约束与补充冲突时删补充、保约束。
+  长文本带「加上 / 换成」不再被当成长改图指令（≥90 字或多分句按带参考图的创作处理），
+  避免整段描述被压成短指令、风格词一起消失。
   纯文本请求仍按创作模式扩写；带图的文本没有「改成 / 换成 / 去掉 / 加上」这类改动词时也按创作模式处理。
   响应带 `mode`（`edit` / `expand`），前端据此提示「已按参考图改写」。
   模型读不了图时返回 `VISION_UNSUPPORTED`，提示换多模态模型，不会退化成「假装看过图」的文本扩写。

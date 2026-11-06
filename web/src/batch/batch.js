@@ -21,6 +21,7 @@ import {
   activateProject,
   createProject,
   deleteProject,
+  designFace,
   fetchGenerationJob,
   fetchHistory,
   fetchMyFeedback,
@@ -32,6 +33,7 @@ import {
   getUpdateStatus,
   logout,
   optimizePrompt,
+  revisePrompt,
   updateMyProfile,
   saveStyleLibrary,
   submitFeedback,
@@ -167,6 +169,21 @@ import { setupTablist } from '../lib/tabs.js'
       // 自由创作的参考图（可多张）：只存相对路径与可预览地址，快照里不塞 base64
       freeReferences: [],
       freeRefUploading: false,
+      // 捏脸页：表单、三块结果与最近一次定妆照，刷新后保持
+      face: {
+        age: '25 岁',
+        gender: '女性',
+        temperament: '成熟清冷',
+        identity: '',
+        framing: '胸像特写',
+        background: '浅灰纯色背景',
+        style: '真人写实',
+        extra: '',
+        analysis: '',
+        prompt: '',
+        negativePrompt: '',
+        imageUrl: '',
+      },
       styleType: 'role',
       styleEditingId: '',
       styleDirty: false,
@@ -218,6 +235,7 @@ import { setupTablist } from '../lib/tabs.js'
         prop: document.querySelector('[data-panel="prop"]'),
         style: document.querySelector('[data-panel="style"]'),
         free: document.querySelector('[data-panel="free"]'),
+        face: document.querySelector('[data-panel="face"]'),
       },
       queuePanel: document.querySelector('#queue-panel'),
       queueTitle: document.querySelector('#queue-title'),
@@ -234,6 +252,7 @@ import { setupTablist } from '../lib/tabs.js'
       modalRatio: document.querySelector('#modal-ratio'),
       modalStyle: document.querySelector('#modal-style'),
       modalGenerate: document.querySelector('#modal-generate'),
+      modalRevisePrompt: document.querySelector('#modal-revise-prompt'),
       modalResetPrompt: document.querySelector('#modal-reset-prompt'),
       modalResultThumb: document.querySelector('#modal-result-thumb'),
       modalResultText: document.querySelector('#modal-result-text'),
@@ -241,6 +260,21 @@ import { setupTablist } from '../lib/tabs.js'
       modalHistoryHint: document.querySelector('#modal-history-hint'),
       modalHistoryGrid: document.querySelector('#modal-history-grid'),
       modalClose: document.querySelector('#modal-close'),
+      reviseModal: document.querySelector('#revise-modal'),
+      reviseCurrent: document.querySelector('#revise-current'),
+      reviseInstruction: document.querySelector('#revise-instruction'),
+      reviseUseRefs: document.querySelector('#revise-use-refs'),
+      reviseUseRefsText: document.querySelector('#revise-use-refs-text'),
+      reviseUseResult: document.querySelector('#revise-use-result'),
+      reviseUseResultText: document.querySelector('#revise-use-result-text'),
+      reviseThumbs: document.querySelector('#revise-thumbs'),
+      reviseResultWrap: document.querySelector('#revise-result-wrap'),
+      reviseResult: document.querySelector('#revise-result'),
+      reviseResultCount: document.querySelector('#revise-result-count'),
+      reviseStatus: document.querySelector('#revise-status'),
+      reviseRun: document.querySelector('#revise-run'),
+      reviseApply: document.querySelector('#revise-apply'),
+      reviseClose: document.querySelector('#revise-close'),
       lightbox: document.querySelector('#lightbox'),
       lightboxImage: document.querySelector('#lightbox-image'),
       lightboxClose: document.querySelector('#lightbox-close'),
@@ -261,11 +295,35 @@ import { setupTablist } from '../lib/tabs.js'
       freeMaximize: document.querySelector('#free-maximize'),
       freePromptMaximize: document.querySelector('#free-prompt-maximize'),
       freePromptOptimize: document.querySelector('#free-prompt-optimize'),
+      freePromptRevise: document.querySelector('#free-prompt-revise'),
       freePromptCopy: document.querySelector('#free-prompt-copy'),
       freePromptShell: document.querySelector('#free-prompt-shell'),
       freeRefStack: document.querySelector('#free-ref-stack'),
       freeRefFile: document.querySelector('#free-ref-file'),
       freeRefBusy: document.querySelector('#free-ref-busy'),
+      faceForm: document.querySelector('#face-form'),
+      faceAge: document.querySelector('#face-age'),
+      faceGender: document.querySelector('#face-gender'),
+      faceTemperament: document.querySelector('#face-temperament'),
+      faceIdentity: document.querySelector('#face-identity'),
+      faceFraming: document.querySelector('#face-framing'),
+      faceBackground: document.querySelector('#face-background'),
+      faceStyle: document.querySelector('#face-style'),
+      faceExtra: document.querySelector('#face-extra'),
+      faceDesignRun: document.querySelector('#face-design-run'),
+      faceStatus: document.querySelector('#face-status'),
+      faceEmpty: document.querySelector('#face-empty'),
+      faceOutput: document.querySelector('#face-output'),
+      faceAnalysis: document.querySelector('#face-analysis'),
+      facePrompt: document.querySelector('#face-prompt'),
+      faceNegative: document.querySelector('#face-negative'),
+      faceGenerate: document.querySelector('#face-generate'),
+      faceCopyAll: document.querySelector('#face-copy-all'),
+      faceGenStatus: document.querySelector('#face-gen-status'),
+      facePreview: document.querySelector('#face-preview'),
+      faceImage: document.querySelector('#face-image'),
+      faceDownload: document.querySelector('#face-download'),
+      faceOpen: document.querySelector('#face-open'),
     }
 
     let toastTimer = 0
@@ -326,6 +384,15 @@ import { setupTablist } from '../lib/tabs.js'
         if (typeof saved.freeImageExtension === 'string') {
           state.freeImageExtension = saved.freeImageExtension
         }
+        // 捏脸页：表单与上一次方案，刷新后保持
+        if (saved.face && typeof saved.face === 'object') {
+          for (const key of [
+            'age', 'gender', 'temperament', 'identity', 'framing', 'background',
+            'style', 'extra', 'analysis', 'prompt', 'negativePrompt', 'imageUrl',
+          ]) {
+            if (typeof saved.face[key] === 'string') state.face[key] = saved.face[key]
+          }
+        }
         // 分页页码按类型持久化：刷新后回到离开时的那一页。
         // 越界（资产变少、分组数变化）由 renderTable 的 clamp 兜底，不会出现空白页。
         if (saved.page && typeof saved.page === 'object') {
@@ -336,7 +403,7 @@ import { setupTablist } from '../lib/tabs.js'
         }
         // 自由创作/风格设定不依赖资产，刷新后停留在用户离开的页签；
         // 资产类页签在无资产时回落到导入页
-        if (['free', 'style'].includes(saved.activeTab)) {
+        if (['free', 'style', 'face'].includes(saved.activeTab)) {
           state.activeTab = saved.activeTab
         } else {
           state.activeTab = state.assets.length ? (saved.activeTab && saved.activeTab !== 'import' ? saved.activeTab : 'role') : 'import'
@@ -522,6 +589,7 @@ import { setupTablist } from '../lib/tabs.js'
           freeReferences: state.freeReferences.map(ref => ({ path: ref.path, url: ref.url, name: ref.name })),
           freeImageUrl: state.freeImageUrl,
           freeImageExtension: state.freeImageExtension,
+          face: { ...state.face },
           page: { ...state.page },
           assets: state.assets,
           styles: state.styles,
@@ -595,7 +663,7 @@ import { setupTablist } from '../lib/tabs.js'
       state.defaultStyle = normalizeDefaultStyles(project.defaultStyle, state.styles)
       state.bulkParams = normalizeBulkParams(project.bulkParams)
       // 自由创作/风格设定不依赖资产，载入项目时保留用户所在页签
-      if (!['free', 'style'].includes(state.activeTab)) {
+      if (!['free', 'style', 'face'].includes(state.activeTab)) {
         state.activeTab = state.assets.length
           ? (state.activeTab && state.activeTab !== 'import' ? state.activeTab : 'role')
           : 'import'
@@ -635,7 +703,7 @@ import { setupTablist } from '../lib/tabs.js'
           state.importedAt = ''
           state.assets = []
           // 无项目时尊重本地记住的页签：自由创作/风格设定不需要资产
-          if (!['free', 'style'].includes(state.activeTab)) {
+          if (!['free', 'style', 'face'].includes(state.activeTab)) {
             state.activeTab = 'import'
           }
           state.activeProjectId = ''
@@ -1339,6 +1407,7 @@ import { setupTablist } from '../lib/tabs.js'
       renderQueuePanel()
       refreshSelectionLabels()
       renderFreeResult()
+      renderFaceResult()
     }
 
     function renderTabs() {
@@ -1382,7 +1451,7 @@ import { setupTablist } from '../lib/tabs.js'
     }
 
     function switchTab(tab) {
-      if (!['import', 'free', 'style'].includes(tab) && countType(tab) === 0) return
+      if (!['import', 'free', 'style', 'face'].includes(tab) && countType(tab) === 0) return
       state.activeTab = tab
       persistSoon()
       renderTabs()
@@ -2999,6 +3068,15 @@ import { setupTablist } from '../lib/tabs.js'
       persistSoon()
     }
 
+    /** 优化结果里的约束保护说明：补回 > 保留 > 无 */
+    function optimizeKeptNote(result) {
+      const locked = Array.isArray(result?.lockedConstraints) ? result.lockedConstraints : []
+      const restored = Array.isArray(result?.restoredConstraints) ? result.restoredConstraints : []
+      if (restored.length) return `，已补回 ${restored.length} 条被丢掉的风格约束`
+      if (locked.length) return `，已保留 ${locked.length} 条风格约束`
+      return ''
+    }
+
     /** 用对话模型把一句短描述扩写成完整生图提示词；失败时原样保留用户输入 */
     async function optimizeFreePrompt() {
       let current = dom.freePrompt.value.trim()
@@ -3049,8 +3127,10 @@ import { setupTablist } from '../lib/tabs.js'
         }
         freePromptBeforeOptimize = dom.freePrompt.value
         applyFreePrompt(next)
+        // 让用户看见风格约束被保住了：补回条数优先于总数，说明这次确实差点丢
+        const keptNote = optimizeKeptNote(result)
         showToast(
-          result?.mode === 'edit' ? '已按参考图改写，只改你指定的地方' : '提示词已优化',
+          (result?.mode === 'edit' ? '已按参考图改写，只改你指定的地方' : '提示词已优化') + keptNote,
           false,
           {
             label: '撤销',
@@ -3064,6 +3144,426 @@ import { setupTablist } from '../lib/tabs.js'
         dom.freePromptOptimize.classList.remove('is-busy')
         dom.freePromptOptimize.removeAttribute('aria-busy')
       }
+    }
+
+    /* ===== 改写提示词 =====
+       用户说一句「把夜景改成清晨」，模型输出整条新提示词。
+       可以带上当前参考图和上一次生成的结果图，让改动接得上画面现状。 */
+    let reviseOverlayHandle = null
+    let reviseTarget = null
+    let reviseBusy = false
+    /* 请求代次：关闭弹窗或发起新一次改写都会 +1，迟到的响应据此丢弃 */
+    let reviseSeq = 0
+    /* 关闭时如果焦点回不到入口按钮（自由创作的按钮只在 hover 时露出），就落回提示词输入框 */
+    let reviseFocusFallback = null
+    /* 一次改写真送上游的图片上限，与服务端 MAX_REFERENCE_IMAGES 保持一致 */
+    const REVISE_MAX_IMAGES = 6
+
+    /** 把 /api/files/<类别>/<文件名> 还原成存储里的相对路径；老版单段 UUID 图没有类别，返回空 */
+    function storagePathFromUrl(url) {
+      if (!url || typeof url !== 'string') return ''
+      try {
+        const pathname = decodeURIComponent(new URL(url, location.origin).pathname)
+        const prefix = '/api/files/'
+        if (!pathname.startsWith(prefix)) return ''
+        const relative = pathname.slice(prefix.length)
+        return relative.includes('/') ? relative : ''
+      } catch {
+        return ''
+      }
+    }
+
+    /** 打开改写弹窗：target = { prompt, ratio, references, resultUrl, apply } */
+    function openReviseDialog(target) {
+      const prompt = (target?.prompt || '').trim()
+      if (!prompt) {
+        showToast('先写一条提示词，才能改写')
+        return
+      }
+      reviseTarget = target
+      reviseFocusFallback = target.focusAfterClose || null
+
+      dom.reviseCurrent.textContent = prompt
+      dom.reviseInstruction.value = ''
+      dom.reviseResult.value = ''
+      dom.reviseResultCount.textContent = '0'
+      dom.reviseResultWrap.hidden = true
+      dom.reviseApply.hidden = true
+      dom.reviseRun.textContent = '开始改写'
+      dom.reviseRun.disabled = false
+      dom.reviseRun.classList.remove('is-busy')
+      dom.reviseRun.removeAttribute('aria-busy')
+      dom.reviseStatus.textContent = '只改你点名的部分，其余保持原样'
+
+      const refs = Array.isArray(target.references) ? target.references : []
+      dom.reviseUseRefs.checked = refs.length > 0
+      dom.reviseUseRefs.disabled = refs.length === 0
+      dom.reviseUseRefsText.textContent = refs.length
+        ? `参考当前 ${refs.length} 张参考图`
+        : '没有可用的参考图'
+
+      const resultPath = storagePathFromUrl(target.resultUrl)
+      dom.reviseUseResult.checked = Boolean(resultPath)
+      dom.reviseUseResult.disabled = !resultPath
+      dom.reviseUseResultText.textContent = resultPath ? '参考当前已生成图片' : '还没有生成过图片'
+
+      renderReviseThumbs()
+
+      dom.reviseModal.classList.add('visible')
+      if (!reviseOverlayHandle) {
+        reviseOverlayHandle = activateOverlay(dom.reviseModal, {
+          onRequestClose: closeReviseDialog,
+          initialFocus: dom.reviseInstruction,
+        })
+      }
+    }
+
+    function closeReviseDialog() {
+      // 关闭即作废在途请求：迟到的响应不能再写进下一次打开的弹窗
+      reviseSeq += 1
+      reviseBusy = false
+      const fallback = reviseFocusFallback
+      reviseFocusFallback = null
+
+      reviseOverlayHandle?.release()
+      reviseOverlayHandle = null
+      dom.reviseModal.classList.remove('visible')
+      reviseTarget = null
+
+      // 自由创作的入口按钮藏在 hover 才出现的浮动层里，焦点归还不回去就落回输入框
+      if (fallback && document.activeElement === document.body) {
+        fallback.focus({ preventScroll: true })
+      }
+    }
+
+    /**
+     * 这次实际会送哪几张图：合计最多 6 张，勾了结果图就只带前 5 张参考图。
+     * 服务端也是 6 张上限、参考图排在前面，客户端先把预算算好，别让结果图被静默丢掉。
+     */
+    function reviseImageSelection() {
+      if (!reviseTarget) return { references: [], contextPath: '' }
+      const refs =
+        dom.reviseUseRefs.checked && !dom.reviseUseRefs.disabled
+          ? reviseTarget.references || []
+          : []
+      const contextPath =
+        dom.reviseUseResult.checked && !dom.reviseUseResult.disabled
+          ? storagePathFromUrl(reviseTarget.resultUrl)
+          : ''
+      const refBudget = contextPath ? REVISE_MAX_IMAGES - 1 : REVISE_MAX_IMAGES
+      return { references: refs.slice(0, refBudget), contextPath }
+    }
+
+    /** 勾选哪几张就预览哪几张——而且和实际送出去的张数一致，别多画也别少画 */
+    function renderReviseThumbs() {
+      if (!reviseTarget) return
+      const { references, contextPath } = reviseImageSelection()
+      const items = []
+      for (const ref of references) {
+        const url = ref.url || referenceUrl(ref.path)
+        if (url) items.push({ url, label: '参考图' })
+      }
+      if (contextPath && reviseTarget.resultUrl) {
+        items.push({ url: reviseTarget.resultUrl, label: '已生成' })
+      }
+      dom.reviseThumbs.hidden = items.length === 0
+      dom.reviseThumbs.innerHTML = items
+        .map(
+          item => `<figure class="revise-thumb">
+            <img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.label)}" loading="lazy">
+            <figcaption>${escapeHtml(item.label)}</figcaption>
+          </figure>`,
+        )
+        .join('')
+      // 参考图被预算截掉时写在勾选框文案里，别去覆盖结果状态
+      const refTotal = (reviseTarget.references || []).length
+      if (refTotal) {
+        dom.reviseUseRefsText.textContent =
+          refTotal > references.length
+            ? `参考当前 ${refTotal} 张参考图（本次送前 ${references.length} 张）`
+            : `参考当前 ${refTotal} 张参考图`
+      }
+    }
+
+    async function runRevise() {
+      if (reviseBusy || !reviseTarget) return
+      const instruction = dom.reviseInstruction.value.trim()
+      if (!instruction) {
+        showToast('先说说你想怎么改')
+        dom.reviseInstruction.focus()
+        return
+      }
+
+      const { references, contextPath } = reviseImageSelection()
+      const referencePaths = references.map(ref => ref.path)
+      const contextPaths = contextPath ? [contextPath] : []
+      const seq = ++reviseSeq
+      const prompt = reviseTarget.prompt
+      const ratio = reviseTarget.ratio
+
+      reviseBusy = true
+      dom.reviseRun.disabled = true
+      dom.reviseRun.classList.add('is-busy')
+      dom.reviseRun.setAttribute('aria-busy', 'true')
+      dom.reviseStatus.textContent =
+        referencePaths.length || contextPaths.length ? '正在看图并改写…' : '正在改写…'
+      try {
+        const result = await revisePrompt({
+          prompt,
+          instruction,
+          ratio,
+          referencePaths,
+          contextPaths,
+        })
+        // 请求期间弹窗被关掉、或又发起了新一次改写：这次结果作废
+        if (seq !== reviseSeq || !reviseTarget) return
+        const next = (result?.prompt || '').trim()
+        if (!next) throw new Error('模型没有返回改写结果')
+
+        dom.reviseResult.value = next
+        dom.reviseResultCount.textContent = String(next.length)
+        dom.reviseResultWrap.hidden = false
+        dom.reviseApply.hidden = false
+        dom.reviseRun.textContent = '重新改写'
+        const keptNote = optimizeKeptNote(result)
+        dom.reviseStatus.textContent = result?.imageCount
+          ? `已参考 ${result.imageCount} 张图片改写${keptNote}，确认后点「应用改写」`
+          : `改写完成${keptNote}，确认后点「应用改写」`
+        dom.reviseResultWrap.scrollIntoView({ block: 'nearest' })
+      } catch (error) {
+        if (seq !== reviseSeq) return
+        dom.reviseStatus.textContent = error.message || '改写失败，请稍后重试'
+        showToast(error.message || '改写失败，请稍后重试', true)
+      } finally {
+        // 只有最新一次请求能复位按钮，旧请求的 finally 不能把忙碌态清掉
+        if (seq === reviseSeq) {
+          reviseBusy = false
+          dom.reviseRun.disabled = false
+          dom.reviseRun.classList.remove('is-busy')
+          dom.reviseRun.removeAttribute('aria-busy')
+        }
+      }
+    }
+
+    function applyRevise() {
+      if (!reviseTarget) return
+      const value = dom.reviseResult.value.trim()
+      if (!value) return
+      reviseTarget.apply(value)
+      closeReviseDialog()
+      showToast('提示词已改写')
+    }
+
+    /** 自由创作的入口：带当前提示词、画幅、参考图与最近一次的结果图 */
+    function openReviseForFree() {
+      openReviseDialog({
+        prompt: dom.freePrompt.value,
+        ratio: dom.freeRatio.value,
+        references: state.freeReferences.slice(0, FREE_REF_LIMIT),
+        resultUrl: state.freeImageUrl,
+        apply: value => applyFreePrompt(value),
+        // 浮动按钮只在 hover 时可见，焦点归不回去时落回输入框
+        focusAfterClose: dom.freePrompt,
+      })
+    }
+
+    /** 资产弹窗的入口：带资产自己的提示词、画幅、参考图与主图 */
+    function openReviseForAsset() {
+      const asset = findAsset(state.modalId)
+      if (!asset) return
+      openReviseDialog({
+        prompt: dom.modalPrompt.value,
+        ratio: asset.ratio,
+        references: asset.referencePath
+          ? [{ path: asset.referencePath, url: referenceUrl(asset.referencePath) }]
+          : [],
+        resultUrl: primaryImageOf(asset),
+        focusAfterClose: dom.modalPrompt,
+        apply: value => {
+          // 走 input 事件，复用「编辑即保存到本地快照」的那条监听
+          dom.modalPrompt.value = value
+          dom.modalPrompt.dispatchEvent(new Event('input', { bubbles: true }))
+        },
+      })
+    }
+
+    /* ===== 捏脸页 =====
+       一份角色设定 → 骨架 / 配比 / 五官主辅 → 素颜正脸定妆提示词。
+       方案存进本地快照，刷新后表单与上次结果都还在。 */
+    let faceBusy = false
+    let faceGenBusy = false
+    let faceGenSeq = 0
+
+    /** 捏脸走的是同一条对话模型通道，没配置时按钮不可用 */
+    function faceTextModelAvailable() {
+      return Boolean(serverConfig?.promptOptimize?.textModel)
+    }
+
+    /** 把 state.face 回填到表单：首次进入与刷新恢复都走这里 */
+    function hydrateFaceForm() {
+      dom.faceAge.value = state.face.age
+      dom.faceGender.value = state.face.gender
+      dom.faceTemperament.value = state.face.temperament
+      dom.faceIdentity.value = state.face.identity
+      dom.faceFraming.value = state.face.framing
+      dom.faceBackground.value = state.face.background
+      dom.faceStyle.value = state.face.style
+      dom.faceExtra.value = state.face.extra
+    }
+
+    function readFaceForm() {
+      return {
+        age: dom.faceAge.value.trim(),
+        gender: dom.faceGender.value,
+        temperament: dom.faceTemperament.value,
+        identity: dom.faceIdentity.value.trim(),
+        framing: dom.faceFraming.value,
+        background: dom.faceBackground.value,
+        style: dom.faceStyle.value,
+        extra: dom.faceExtra.value.trim(),
+      }
+    }
+
+    function persistFaceForm() {
+      Object.assign(state.face, readFaceForm())
+      persistSoon()
+    }
+
+    /** 三块结果与定妆照一起渲染；没有方案时回到空态 */
+    function renderFaceResult() {
+      const has = Boolean(state.face.prompt)
+      dom.faceEmpty.hidden = has
+      dom.faceOutput.hidden = !has
+      dom.faceGenerate.disabled = !has || faceGenBusy
+      if (!has) {
+        dom.facePreview.hidden = true
+        return
+      }
+      dom.faceAnalysis.textContent = state.face.analysis || '这次没有单独给出角色分析'
+      dom.facePrompt.value = state.face.prompt
+      dom.faceNegative.value = state.face.negativePrompt
+      if (state.face.imageUrl) {
+        dom.faceImage.src = state.face.imageUrl
+        dom.facePreview.hidden = false
+      } else {
+        dom.facePreview.hidden = true
+      }
+    }
+
+    async function runFaceDesign(event) {
+      event?.preventDefault()
+      if (faceBusy) return
+
+      const fields = readFaceForm()
+      Object.assign(state.face, fields)
+      if (!fields.age && !fields.gender && !fields.temperament && !fields.identity) {
+        showToast('先给一点角色设定：年龄、性别或气场都可以')
+        return
+      }
+
+      faceBusy = true
+      dom.faceDesignRun.disabled = true
+      dom.faceDesignRun.setAttribute('aria-busy', 'true')
+      // 方案在途时不允许按旧提示词去出图
+      dom.faceGenerate.disabled = true
+      dom.faceStatus.textContent = '正在拆骨架、定配比…'
+      try {
+        const result = await designFace(fields)
+        const prompt = (result?.prompt || '').trim()
+        if (!prompt) throw new Error('模型没有返回可用的提示词')
+
+        state.face.analysis = (result.analysis || '').trim()
+        state.face.prompt = prompt
+        state.face.negativePrompt = (result.negativePrompt || '').trim()
+        // 新方案先清掉旧图，避免文字换了、图还是上一版
+        state.face.imageUrl = ''
+        // 作废还在途中的出图：它拍的是上一版方案
+        faceGenSeq += 1
+        faceGenBusy = false
+        dom.faceGenerate.textContent = '生成定妆照'
+        dom.faceGenStatus.textContent = ''
+        persistSoon()
+        renderFaceResult()
+        dom.faceStatus.textContent = '方案已生成；可以直接生成定妆照，也可以改设定再试'
+      } catch (error) {
+        dom.faceStatus.textContent = error.message || '生成失败，请稍后重试'
+        showToast(error.message || '生成失败，请稍后重试', true)
+      } finally {
+        faceBusy = false
+        // 配置没读到时不做判断，避免把按钮永久锁死
+        dom.faceDesignRun.disabled = serverConfig !== null && !faceTextModelAvailable()
+        dom.faceGenerate.disabled = faceGenBusy || !state.face.prompt
+        dom.faceDesignRun.removeAttribute('aria-busy')
+      }
+    }
+
+    /** 上游没有独立的负向字段，把负面词折进正向提示词 */
+    function faceGenerationPrompt() {
+      const prompt = state.face.prompt.trim()
+      const negative = state.face.negativePrompt.trim()
+      return negative ? `${prompt}\n\n不要出现：${negative}` : prompt
+    }
+
+    async function generateFaceImage() {
+      if (faceGenBusy || !state.face.prompt) return
+      faceGenBusy = true
+      const seq = ++faceGenSeq
+      dom.faceGenerate.disabled = true
+      dom.faceGenerate.textContent = '生成中…'
+      // 出图期间不让改方案，避免图与文字对不上
+      dom.faceDesignRun.disabled = true
+      dom.faceGenStatus.textContent = '正在生成定妆照…'
+      try {
+        const result = await generateImage({
+          prompt: faceGenerationPrompt(),
+          ratio: '3:4',
+          category: '捏脸',
+          name: `捏脸-${timestamp()}`,
+          source: 'face',
+          jobId: randomId(),
+        })
+        if (seq !== faceGenSeq) return
+        if (!result?.imageUrl) throw new Error('接口没有返回图片地址')
+
+        state.face.imageUrl = result.imageUrl
+        persistSoon()
+        renderFaceResult()
+        // 生成记录面板若开着，让下一次打开能看到这张
+        historyPanel.invalidate()
+        dom.faceGenStatus.textContent = '定妆照已生成'
+      } catch (error) {
+        dom.faceGenStatus.textContent = error.message || '生成失败，请稍后重试'
+        showToast(error.message || '生成失败，请稍后重试', true)
+      } finally {
+        if (seq === faceGenSeq) {
+          faceGenBusy = false
+          dom.faceGenerate.disabled = !state.face.prompt
+          dom.faceGenerate.textContent = '生成定妆照'
+          dom.faceDesignRun.disabled = serverConfig !== null && !faceTextModelAvailable()
+        }
+      }
+    }
+
+    /** 复制一段文本；navigator.clipboard 不可用时用临时 textarea 兜底，段落也能复制 */
+    async function copyFaceText(text, successMessage) {
+      if (!text) {
+        showToast('这里还没有内容可复制')
+        return
+      }
+      try {
+        await navigator.clipboard.writeText(text)
+      } catch {
+        const helper = document.createElement('textarea')
+        helper.value = text
+        helper.setAttribute('readonly', '')
+        helper.style.position = 'fixed'
+        helper.style.opacity = '0'
+        document.body.appendChild(helper)
+        helper.select()
+        document.execCommand('copy')
+        helper.remove()
+      }
+      showToast(successMessage)
     }
 
     /* ===== 断线恢复：刷新页面后接回仍在后台生成的图片 =====
@@ -3818,6 +4318,36 @@ import { setupTablist } from '../lib/tabs.js'
         startBatch([asset.id], `生成 ${asset.name}`)
       })
 
+      // 改写提示词：入口在资产弹窗与自由创作两处，弹窗本身共用
+      if (dom.modalRevisePrompt) {
+        dom.modalRevisePrompt.addEventListener('click', openReviseForAsset)
+      }
+      if (dom.reviseRun) dom.reviseRun.addEventListener('click', runRevise)
+      if (dom.reviseApply) dom.reviseApply.addEventListener('click', applyRevise)
+      if (dom.reviseClose) dom.reviseClose.addEventListener('click', closeReviseDialog)
+      if (dom.reviseUseRefs) dom.reviseUseRefs.addEventListener('change', renderReviseThumbs)
+      if (dom.reviseUseResult) dom.reviseUseResult.addEventListener('change', renderReviseThumbs)
+      if (dom.reviseResult) {
+        dom.reviseResult.addEventListener('input', () => {
+          dom.reviseResultCount.textContent = String(dom.reviseResult.value.length)
+        })
+      }
+      if (dom.reviseInstruction) {
+        // Ctrl / Cmd + Enter 直接开始改写
+        dom.reviseInstruction.addEventListener('keydown', event => {
+          if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault()
+            void runRevise()
+          }
+        })
+      }
+      if (dom.reviseModal) {
+        // 点卡片外的遮罩关闭，和资产弹窗 / 灯箱保持一致
+        dom.reviseModal.addEventListener('click', event => {
+          if (event.target === dom.reviseModal) closeReviseDialog()
+        })
+      }
+
       dom.modalResultThumb.addEventListener('click', () => {
         const asset = findAsset(state.modalId)
         const url = asset ? primaryImageOf(asset) : ''
@@ -3825,6 +4355,33 @@ import { setupTablist } from '../lib/tabs.js'
       })
 
       dom.freeForm.addEventListener('submit', generateFreeImage)
+
+      // 捏脸页：表单提交生成方案，结果区负责复制、下载与看大图
+      dom.faceForm.addEventListener('submit', runFaceDesign)
+      dom.faceForm.addEventListener('input', persistFaceForm)
+      dom.faceForm.addEventListener('change', persistFaceForm)
+      dom.faceGenerate.addEventListener('click', generateFaceImage)
+      dom.faceCopyAll.addEventListener('click', () => {
+        void copyFaceText(state.face.prompt, '提示词已复制到剪贴板')
+      })
+      dom.faceDownload.addEventListener('click', () => {
+        if (!state.face.imageUrl) return
+        downloadImage(
+          state.face.imageUrl,
+          `画境-捏脸-${timestamp()}.${getImageExtension(state.face.imageUrl)}`,
+        )
+      })
+      dom.faceOpen.addEventListener('click', () => {
+        if (state.face.imageUrl) openLightbox(state.face.imageUrl, '捏脸定妆照')
+      })
+      dom.faceOutput.addEventListener('click', event => {
+        const button = event.target.closest('[data-face-copy]')
+        if (!button) return
+        const target = document.getElementById(button.dataset.faceCopy)
+        if (!target) return
+        const value = 'value' in target ? target.value : target.textContent || ''
+        void copyFaceText(value, '已复制')
+      })
       dom.freePrompt.addEventListener('keydown', event => {
         if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
           event.preventDefault()
@@ -3859,6 +4416,7 @@ import { setupTablist } from '../lib/tabs.js'
 
       dom.freePromptMaximize.addEventListener('click', () => openFreePromptEditor())
       dom.freePromptOptimize.addEventListener('click', optimizeFreePrompt)
+      if (dom.freePromptRevise) dom.freePromptRevise.addEventListener('click', openReviseForFree)
 
       /* ===== 自由创作参考图：粘贴 / 拖入追加（可多张），点图看大图，右上角删除 ===== */
       const freeShell = dom.freePromptShell
@@ -4241,6 +4799,8 @@ import { setupTablist } from '../lib/tabs.js'
       await adoptLegacySnapshotIfOwned()
       await adoptLegacyPendingJobIfOwned()
       restoreState()
+      // 捏脸表单先按快照回填；服务端配置到达后再决定按钮是否可用
+      hydrateFaceForm()
       // 比例下拉先按本地选择渲染；服务端配置到达后再刷一次
       renderRatioSelects()
       renderAll()
@@ -4260,7 +4820,15 @@ import { setupTablist } from '../lib/tabs.js'
           renderRatioSelects()
           // 没配文本模型时不亮出按钮，省得点了才发现用不了
           const textModel = config?.promptOptimize?.textModel
-          if (textModel) dom.freePromptOptimize.hidden = false
+          if (textModel) {
+            dom.freePromptOptimize.hidden = false
+            if (dom.freePromptRevise) dom.freePromptRevise.hidden = false
+            if (dom.modalRevisePrompt) dom.modalRevisePrompt.hidden = false
+            if (dom.faceDesignRun) dom.faceDesignRun.disabled = false
+          } else if (dom.faceStatus) {
+            dom.faceStatus.textContent = '管理员还没配置提示词模型，捏脸暂时不可用'
+            if (dom.faceDesignRun) dom.faceDesignRun.disabled = true
+          }
         })
         .catch(() => {
           // 本会话读到过就沿用并说明；一次都没读到，开批时会被拦下并给重试

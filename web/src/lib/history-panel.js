@@ -192,6 +192,7 @@ export function setupHistoryPanel() {
   function sourceLabel(source) {
     if (source === 'batch') return '批量'
     if (source === 'free') return '自由创作'
+    if (source === 'face') return '捏脸'
     return '单张'
   }
 

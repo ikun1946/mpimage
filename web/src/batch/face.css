@@ -1,0 +1,175 @@
+/* 捏脸页：角色设定表单 + 三块结果（分析 / 正向 / 负面）与定妆照预览 */
+
+.face-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.88fr) minmax(380px, 1.12fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.face-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-panel);
+  background: var(--surface-subtle);
+}
+
+.face-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.face-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.face-field-wide {
+  grid-column: 1 / -1;
+}
+
+.face-field .field-label {
+  margin: 0;
+}
+
+.face-field .input,
+.face-field .select {
+  width: 100%;
+}
+
+.face-extra {
+  min-height: 84px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.face-submit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.face-result {
+  min-height: 420px;
+  padding: 24px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+}
+
+.face-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  min-height: 360px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.face-empty strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.face-empty span {
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.face-output {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.face-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.face-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.face-block-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.face-analysis {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.face-prompt {
+  min-height: 220px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.face-negative {
+  min-height: 96px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.face-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.face-preview {
+  margin: 0;
+}
+
+.face-preview img {
+  display: block;
+  width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-inner);
+  background: var(--paper-deep);
+}
+
+.face-preview-tools {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+@media (max-width: 1080px) {
+  .face-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .face-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -1045,3 +1045,95 @@
     opacity: 1;
   }
 }
+
+/* ---------- 改写提示词弹窗 ---------- */
+
+.revise-sheet {
+  width: min(680px, 100%);
+}
+
+.revise-body {
+  display: block;
+  padding: 20px 24px 22px;
+}
+
+/* 当前提示词只读预览：限高滚动，别把整条长提示词铺满弹窗 */
+.revise-current {
+  max-height: 132px;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-inner, 12px);
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.revise-body .field-label {
+  margin-top: 16px;
+}
+
+.revise-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 12px;
+}
+
+.revise-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.revise-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--moss);
+}
+
+.revise-check:has(input:disabled) {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.revise-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.revise-thumb {
+  margin: 0;
+  width: 84px;
+}
+
+.revise-thumb img {
+  display: block;
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-inner, 10px);
+}
+
+.revise-thumb figcaption {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.revise-result {
+  margin-top: 16px;
+}
+
+.revise-result .textarea {
+  min-height: 150px;
+}

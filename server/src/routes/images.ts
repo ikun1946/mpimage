@@ -247,7 +247,9 @@ export function registerImageRoutes(
     const category = typeof body.category === 'string' ? body.category : '未分类'
     const assetName = typeof body.name === 'string' ? body.name : ''
     const source =
-      body.source === 'batch' || body.source === 'free' ? body.source : 'studio'
+      body.source === 'batch' || body.source === 'free' || body.source === 'face'
+        ? body.source
+        : 'studio'
 
     // 记录本次生图归属与详情，供生成记录与管理端统计
     await deps.usage.record({

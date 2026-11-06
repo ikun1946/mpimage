@@ -9,7 +9,7 @@ export interface UsageEntry {
   username: string
   displayName: string
   /** 单张或批量 */
-  source: 'studio' | 'batch' | 'free'
+  source: 'studio' | 'batch' | 'free' | 'face'
   category: string
   name: string
   ratio: string

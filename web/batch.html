@@ -95,6 +95,7 @@
         道具资产 <span class="tab-count" data-count="prop">0</span>
       </button>
       <button class="tab" id="tab-free" data-tab="free" type="button" role="tab" aria-selected="false" aria-controls="panel-free" tabindex="-1">自由创作</button>
+      <button class="tab" id="tab-face" data-tab="face" type="button" role="tab" aria-selected="false" aria-controls="panel-face" tabindex="-1">捏脸</button>
       <button class="tab" id="tab-style" data-tab="style" type="button" role="tab" aria-selected="false" aria-controls="panel-style" tabindex="-1">风格设定</button>
     </nav>
 
@@ -175,6 +176,141 @@
       <section class="page" id="panel-role" role="tabpanel" aria-labelledby="tab-role" data-panel="role" hidden></section>
       <section class="page" id="panel-scene" role="tabpanel" aria-labelledby="tab-scene" data-panel="scene" hidden></section>
       <section class="page" id="panel-prop" role="tabpanel" aria-labelledby="tab-prop" data-panel="prop" hidden></section>
+      <section class="page" id="panel-face" role="tabpanel" aria-labelledby="tab-face" data-panel="face" hidden>
+        <div class="workspace-head">
+          <div>
+            <h2>捏脸</h2>
+            <p>按角色人设搭骨架、定配比、分五官主辅，产出素颜正脸的定妆提示词。</p>
+          </div>
+        </div>
+
+        <div class="face-layout">
+          <form class="face-form" id="face-form">
+            <div class="face-grid">
+              <label class="face-field">
+                <span class="field-label">角色年龄感</span>
+                <input class="input" id="face-age" type="text" maxlength="40" autocomplete="off" />
+              </label>
+              <label class="face-field">
+                <span class="field-label">性别</span>
+                <select class="select" id="face-gender">
+                  <option>女性</option>
+                  <option>男性</option>
+                  <option>中性</option>
+                </select>
+              </label>
+              <label class="face-field">
+                <span class="field-label">气场</span>
+                <select class="select" id="face-temperament">
+                  <option>成熟清冷</option>
+                  <option>亲和少女</option>
+                  <option>英气</option>
+                  <option>温柔</option>
+                  <option>疏离</option>
+                  <option>明亮</option>
+                  <option>古典</option>
+                  <option>理性</option>
+                  <option>冷峻坚毅</option>
+                </select>
+              </label>
+              <label class="face-field">
+                <span class="field-label">角色身份</span>
+                <input class="input" id="face-identity" type="text" maxlength="60" placeholder="例如：女将军、古风嫡女" autocomplete="off" />
+              </label>
+              <label class="face-field">
+                <span class="field-label">画面类型</span>
+                <select class="select" id="face-framing">
+                  <option>胸像特写</option>
+                  <option>半身定妆照</option>
+                  <option>全身白底定妆照</option>
+                </select>
+              </label>
+              <label class="face-field">
+                <span class="field-label">背景</span>
+                <select class="select" id="face-background">
+                  <option>浅灰纯色背景</option>
+                  <option>白色纯色背景</option>
+                  <option>浅米色纯色背景</option>
+                  <option>中性灰纯色背景</option>
+                </select>
+              </label>
+              <label class="face-field">
+                <span class="field-label">风格</span>
+                <select class="select" id="face-style">
+                  <option>真人写实</option>
+                  <option>自然写实</option>
+                  <option>生活质感</option>
+                  <option>东方写实</option>
+                </select>
+              </label>
+            </div>
+
+            <label class="face-field face-field-wide">
+              <span class="field-label">特殊诉求</span>
+              <textarea
+                class="textarea face-extra"
+                id="face-extra"
+                rows="3"
+                maxlength="600"
+                placeholder="例如：不微笑、中分长发、立领、不戴耳饰"
+              ></textarea>
+            </label>
+
+            <div class="face-submit">
+              <button class="button primary" id="face-design-run" type="submit">生成面部方案</button>
+              <p class="status-text" id="face-status" role="status" aria-live="polite">填好设定后点生成，会先拆骨架再给提示词</p>
+            </div>
+          </form>
+
+          <div class="face-result" id="face-result">
+            <div class="face-empty" id="face-empty">
+              <strong>还没有面部方案</strong>
+              <span>左侧填好角色设定，生成后这里会出现角色分析、完整提示词和负面提示词。</span>
+            </div>
+
+            <div class="face-output" id="face-output" hidden>
+              <section class="face-block">
+                <header class="face-block-head">
+                  <h3>角色分析</h3>
+                  <button class="button mini" type="button" data-face-copy="face-analysis">复制</button>
+                </header>
+                <p class="face-analysis" id="face-analysis"></p>
+              </section>
+
+              <section class="face-block">
+                <header class="face-block-head">
+                  <h3>完整提示词</h3>
+                  <button class="button mini" type="button" data-face-copy="face-prompt">复制</button>
+                </header>
+                <textarea class="textarea face-prompt" id="face-prompt" readonly aria-label="捏脸完整提示词"></textarea>
+              </section>
+
+              <section class="face-block">
+                <header class="face-block-head">
+                  <h3>负面提示词</h3>
+                  <button class="button mini" type="button" data-face-copy="face-negative">复制</button>
+                </header>
+                <textarea class="textarea face-negative" id="face-negative" readonly aria-label="捏脸负面提示词"></textarea>
+              </section>
+
+              <div class="face-actions">
+                <button class="button primary" id="face-generate" type="button">生成定妆照</button>
+                <button class="button secondary" id="face-copy-all" type="button">复制提示词</button>
+                <span class="status-text" id="face-gen-status" role="status" aria-live="polite"></span>
+              </div>
+
+              <figure class="face-preview" id="face-preview" hidden>
+                <img id="face-image" alt="捏脸定妆照" />
+                <figcaption class="face-preview-tools">
+                  <button class="button secondary mini" id="face-download" type="button">下载</button>
+                  <button class="button secondary mini" id="face-open" type="button">查看大图</button>
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="page" id="panel-style" role="tabpanel" aria-labelledby="tab-style" data-panel="style" hidden></section>
 
       <section class="page" id="panel-free" role="tabpanel" aria-labelledby="tab-free" data-panel="free" hidden>
@@ -217,6 +353,19 @@
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 3.5l1.7 4.3 4.3 1.7-4.3 1.7L12 15.5l-1.7-4.3L6 9.5l4.3-1.7z"></path>
                     <path d="M18.6 15.4l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"></path>
+                  </svg>
+                </button>
+                <button
+                  class="prompt-float-button"
+                  id="free-prompt-revise"
+                  type="button"
+                  title="改写提示词"
+                  aria-label="改写提示词"
+                  hidden
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17z"></path>
+                    <path d="M13.5 6.5l4 4"></path>
                   </svg>
                 </button>
                 <button
@@ -375,6 +524,7 @@
 
           <div class="modal-actions">
             <button class="button primary" id="modal-generate" type="button">生成这张资产图</button>
+            <button class="button secondary" id="modal-revise-prompt" type="button" hidden>AI 改写</button>
             <button class="button secondary" id="modal-reset-prompt" type="button">恢复自动提示词</button>
           </div>
 
@@ -394,6 +544,57 @@
             <div class="asset-history-grid" id="modal-history-grid"></div>
           </section>
         </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="revise-modal" role="dialog" aria-modal="true" aria-labelledby="revise-title">
+    <div class="modal-sheet revise-sheet">
+      <header class="modal-head">
+        <div>
+          <p class="modal-kicker">AI 改写</p>
+          <h3 id="revise-title">改写提示词</h3>
+        </div>
+        <button class="button secondary modal-close" id="revise-close" type="button">关闭</button>
+      </header>
+
+      <div class="modal-body revise-body">
+        <div class="revise-current" id="revise-current" aria-label="当前提示词"></div>
+
+        <label class="field-label" for="revise-instruction">你想怎么改？</label>
+        <textarea
+          class="textarea"
+          id="revise-instruction"
+          rows="3"
+          maxlength="2000"
+          placeholder="例如：把夜景改成清晨。没点名的风格、色彩与设定会自动保留"
+        ></textarea>
+
+        <div class="revise-attachments">
+          <label class="revise-check" for="revise-use-refs">
+            <input type="checkbox" id="revise-use-refs" />
+            <span id="revise-use-refs-text">参考当前参考图</span>
+          </label>
+          <label class="revise-check" for="revise-use-result">
+            <input type="checkbox" id="revise-use-result" />
+            <span id="revise-use-result-text">参考当前已生成图片</span>
+          </label>
+        </div>
+        <div class="revise-thumbs" id="revise-thumbs" hidden></div>
+
+        <div class="revise-result" id="revise-result-wrap" hidden>
+          <div class="label-row">
+            <span>改写结果</span>
+            <span class="counter"><span id="revise-result-count">0</span> 字</span>
+          </div>
+          <textarea class="textarea" id="revise-result" aria-label="改写后的提示词"></textarea>
+        </div>
+
+        <p class="status-text" id="revise-status" role="status" aria-live="polite">只改你点名的部分，风格与其余设定自动保留</p>
+        <div class="modal-actions">
+          <button class="button primary" id="revise-run" type="button">开始改写</button>
+          <button class="button secondary" id="revise-apply" type="button" hidden>应用改写</button>
+        </div>
       </div>
     </div>
   </div>

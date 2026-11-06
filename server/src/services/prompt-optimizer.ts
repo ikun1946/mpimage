@@ -7,15 +7,22 @@ import {
   type ImageObservation,
 } from './image-analysis.js'
 import type { ReferenceImage } from './reference-images.js'
-// 三套系统提示词集中在 prompt-rulebook 里维护（改编自造梦师 v2.6.0，CC BY-NC 4.0）
+// 四套系统提示词集中在 prompt-rulebook 里维护（改编自造梦师 v2.6.0，CC BY-NC 4.0）
 import {
   CHECK_SYSTEM_PROMPT,
   EDIT_SYSTEM_PROMPT,
   EXPAND_SYSTEM_PROMPT,
+  REVISE_SYSTEM_PROMPT,
 } from './prompt-rulebook.js'
+// 风格与硬约束的确定性保护：模型换词、压缩、漏写时用原文补回
+import {
+  applyConstraintGuard,
+  selectConstraints,
+  type PromptConstraint,
+} from './prompt-constraints.js'
 
-/** edit = 带参考图的改图；expand = 从零扩写画面 */
-export type PromptMode = 'edit' | 'expand'
+/** edit = 带参考图的改图；expand = 从零扩写画面；revise = 按用户要求改写已有提示词 */
+export type PromptMode = 'edit' | 'expand' | 'revise'
 
 export interface PromptOptimizeOptions {
   baseUrl: string
@@ -31,6 +38,18 @@ export interface PromptOptimizeParams {
   images?: ReferenceImage[]
 }
 
+export interface PromptReviseParams {
+  /** 当前提示词，用户要在这条基础上改 */
+  prompt: string
+  /** 用户这次的修改要求 */
+  instruction: string
+  ratioLabel?: string
+  /** 随请求送模型的图片：参考图与已生成结果图，按数组顺序编号 */
+  images?: ReferenceImage[]
+  /** 与 images 一一对应的角色说明，避免模型猜每张图管什么 */
+  imageNotes?: string[]
+}
+
 export type PromptOptimizeTokens = ChatTokens
 
 export interface PromptOptimizeResult {
@@ -38,6 +57,10 @@ export interface PromptOptimizeResult {
   model: string
   tokens: PromptOptimizeTokens
   mode: PromptMode
+  /** 本次识别到并保护的风格 / 设定 / 否定约束，用于前端告诉用户「保留了哪些」 */
+  lockedConstraints: string[]
+  /** 其中在模型成稿里丢失、由服务端补回的约束 */
+  restoredConstraints: string[]
 }
 
 /**
@@ -46,7 +69,11 @@ export interface PromptOptimizeResult {
  * 所以再留一截余量；撞上 length 会直接报错，用户拿不到半条提示词。
  */
 const EXPAND_MAX_TOKENS = 2600
-const EDIT_MAX_TOKENS = 700
+/**
+ * 改图指令现在要先写成片、再写改动、最后写保持不变，
+ * 用户一次提多处改动时 700 装不下，会被截断成半条指令。
+ */
+const EDIT_MAX_TOKENS = 2400
 /** 自检轮要重写整条提示词，预算与首轮相当 */
 const CHECK_MAX_TOKENS = 2200
 /** 自检轮最多用掉这么久，超时就保留首轮结果 */
@@ -58,6 +85,17 @@ const MIN_STAGE_TIMEOUT_MS = 5000
 /** 采样温度：扩写要发散，观察与自检要稳定 */
 const EXPAND_TEMPERATURE = 0.85
 const CHECK_TEMPERATURE = 0.3
+/** 改写是定向修改：温度压低，免得模型顺手把没点名的地方也重写一遍 */
+const REVISE_TEMPERATURE = 0.4
+/** 改图同样要稳：成片状态与保持项都不能自由发挥 */
+const EDIT_TEMPERATURE = 0.35
+/**
+ * 改写要原样保留没点名的内容，输出长度基本等于原提示词长度。
+ * 固定 2600 装不下长提示词（接口允许到 MAX_PROMPT_LENGTH），
+ * 所以按输入长度给预算：中文约 1.6 token/字，再留一截余量。
+ */
+const REVISE_MAX_TOKENS_MIN = 2600
+const REVISE_MAX_TOKENS_CAP = 16000
 
 /** 带参考图且文本像「改这里」时才走改图路径；没图一律当扩写 */
 const EDIT_PATTERNS: RegExp[] = [
@@ -72,7 +110,16 @@ const EDIT_PATTERNS: RegExp[] = [
 
 export function classifyPromptIntent(prompt: string, hasImages: boolean): PromptMode {
   if (!hasImages) return 'expand'
-  return EDIT_PATTERNS.some(pattern => pattern.test(prompt)) ? 'edit' : 'expand'
+
+  const text = prompt.trim()
+  if (!EDIT_PATTERNS.some(pattern => pattern.test(text))) return 'expand'
+
+  // 一整段画面描述里带「加上 / 换成」不等于「一句话改图」。
+  // 旧逻辑只要命中动词就走改图，再把整段压成 80–220 字，风格与设定会一起被压没。
+  // 长文、多分句按「带参考图的创作」处理，让扩写路径保留全部内容。
+  const clauses = text.split(/[，,。；;\n]/).filter(part => part.trim().length > 0)
+  if (text.length >= 90 || clauses.length >= 5) return 'expand'
+  return 'edit'
 }
 
 export async function optimizePrompt(
@@ -83,21 +130,118 @@ export async function optimizePrompt(
   const mode = classifyPromptIntent(params.prompt, images.length > 0)
 
   if (mode === 'expand') {
-    return requestExpand(options, params, images)
+    return guardResult(await requestExpand(options, params, images), params.prompt)
   }
 
-  const observed = await requestEditWithObservation(options, params, images)
-  if (observed) return observed
+  const observed =
+    (await requestEditWithObservation(options, params, images)) ??
+    // 观察没成（模型读不了图、超时、返回格式认不出）时退回一次调用：
+    // 图片和改图提示词一起送，用户仍然拿到一条聚焦改图的提示词
+    (await requestPrompt(options, {
+      systemPrompt: EDIT_SYSTEM_PROMPT,
+      params,
+      images,
+      mode,
+      maxTokens: EDIT_MAX_TOKENS,
+      temperature: EDIT_TEMPERATURE,
+      promptLabel: '改图要求',
+    }))
 
-  // 观察没成（模型读不了图、超时、返回格式认不出）时退回一次调用：
-  // 图片和改图提示词一起送，用户仍然拿到一条聚焦改图的提示词
-  return requestPrompt(options, {
-    systemPrompt: EDIT_SYSTEM_PROMPT,
-    params,
-    images,
-    mode,
-    maxTokens: EDIT_MAX_TOKENS,
-  })
+  // 改图指令同样要保住用户的风格词；用户明确要求「换成某种风格」的那条不保护
+  return guardResult(observed, params.prompt, params.prompt, { ignoreMentions: true })
+}
+
+/**
+ * 改写已有提示词：按用户这次的修改要求，输出新的完整提示词。
+ *
+ * 带图时先看一眼再改：参考图用来保持人物 / 服装 / 道具，
+ * 已生成结果图用来看清现在画成了什么样、用户要改的地方在画面哪个位置。
+ * 看图失败不挡改写，退回「图片和提示词一起送」的多模态直送。
+ */
+export async function revisePrompt(
+  options: PromptOptimizeOptions,
+  params: PromptReviseParams,
+): Promise<PromptOptimizeResult> {
+  const images = params.images ?? []
+  const startedAt = Date.now()
+  let observations: ImageObservation[] | undefined
+  let tokens: ChatTokens = { input: 0, output: 0, total: 0 }
+
+  if (images.length > 0) {
+    // 看图最多用掉一半预算：写正文才是主步骤
+    const analysisTimeout = Math.max(
+      MIN_STAGE_TIMEOUT_MS,
+      Math.min(ANALYSIS_TIMEOUT_CAP_MS, Math.floor(options.timeoutMs / 2)),
+    )
+    const analysis = await analyzeReferenceImages(
+      { ...options, timeoutMs: analysisTimeout },
+      images,
+    )
+    if (analysis) {
+      observations = analysis.observations
+      tokens = analysis.tokens
+    }
+  }
+
+  const maxTokens = Math.min(
+    REVISE_MAX_TOKENS_CAP,
+    Math.max(REVISE_MAX_TOKENS_MIN, Math.ceil(params.prompt.length * 1.6)),
+  )
+
+  let result: PromptOptimizeResult
+  try {
+    result = await requestPrompt(
+      { ...options, timeoutMs: remainingTimeout(options, startedAt) },
+      {
+        systemPrompt: REVISE_SYSTEM_PROMPT,
+        params: { prompt: params.prompt, ratioLabel: params.ratioLabel },
+        images: observations ? [] : images,
+        mode: 'revise',
+        maxTokens,
+        temperature: REVISE_TEMPERATURE,
+        keepParagraphs: true,
+        observations,
+        instruction: params.instruction,
+        promptLabel: '当前提示词',
+        observationLabel: '图片观察（按图号对应上面的角色说明，以图上看得见的为准）：',
+        imageNotes: params.imageNotes,
+      },
+    )
+  } catch (error) {
+    // 改写是「原样输出整条」，截断时让用户知道是结果太长，而不是让他缩短原提示词
+    if (error instanceof ApiError && error.code === 'UPSTREAM_TRUNCATED') {
+      throw new ApiError(
+        'UPSTREAM_TRUNCATED',
+        '改写结果太长被截断：请删掉提示词里的次要描述，或分几段分别改写',
+        502,
+      )
+    }
+    throw error
+  }
+
+  const merged = { ...result, tokens: mergeTokens(tokens, result.tokens) }
+  // 用户这次点名要改的约束不再保护，避免把旧值又补回去
+  return guardResult(merged, params.prompt, params.instruction)
+}
+
+/**
+ * 成稿回来后核对硬约束：模型换词、压缩、漏写时，用用户原文补齐。
+ * 这是确定性兜底，不依赖模型是否听话；locked 给前端展示，restored 是实际补回的条目。
+ */
+function guardResult(
+  result: PromptOptimizeResult,
+  source: string,
+  instruction?: string,
+  options: { ignoreMentions?: boolean } = {},
+): PromptOptimizeResult {
+  const constraints: PromptConstraint[] = selectConstraints(source, instruction, options)
+  const guarded = applyConstraintGuard(result.prompt, constraints, config.maxPromptLength)
+  return {
+    ...result,
+    prompt: guarded.prompt,
+    lockedConstraints: constraints.map(constraint => constraint.text),
+    restoredConstraints: guarded.restored,
+  }
 }
 
 interface RequestPromptInput {
@@ -114,6 +258,14 @@ interface RequestPromptInput {
   observations?: ImageObservation[]
   /** 自检轮要拿到的首轮草稿 */
   draft?: string
+  /** 改写模式：用户这次的修改要求 */
+  instruction?: string
+  /** user 消息里当前提示词那一行的标签，默认「画面想法」 */
+  promptLabel?: string
+  /** 图片观察块的说明文字，默认按扩写 / 改图各取一句 */
+  observationLabel?: string
+  /** 与 images 一一对应的角色说明（参考图 / 已生成结果图） */
+  imageNotes?: string[]
 }
 
 /**
@@ -247,6 +399,8 @@ async function requestEditWithObservation(
         images: [],
         mode: 'edit',
         maxTokens: EDIT_MAX_TOKENS,
+        temperature: EDIT_TEMPERATURE,
+        promptLabel: '改图要求',
         observations: analysis.observations,
       },
     )
@@ -280,18 +434,39 @@ async function requestPrompt(
     throw new ApiError('UPSTREAM_BAD_RESPONSE', '模型没有返回提示词', 502)
   }
 
-  return { prompt: cleaned, model: result.model, tokens: result.tokens, mode: input.mode }
+  return {
+    prompt: cleaned,
+    model: result.model,
+    tokens: result.tokens,
+    mode: input.mode,
+    lockedConstraints: [],
+    restoredConstraints: [],
+  }
 }
 
 function buildUserContent(input: RequestPromptInput): unknown {
-  const { params, images, observations, draft } = input
-  const lines = [`画面想法：${params.prompt}`]
+  const { params, images, observations, draft, instruction, imageNotes } = input
+  const lines: string[] = []
+
+  // 改写模式：先给整条现成提示词，再给这次的修改要求
+  if (instruction) {
+    lines.push(`${input.promptLabel || '当前提示词'}：`, params.prompt, '', `改写要求：${instruction}`)
+  } else {
+    lines.push(`${input.promptLabel || '画面想法'}：${params.prompt}`)
+  }
   if (params.ratioLabel) lines.push(`画幅：${params.ratioLabel}`)
 
   // 老客户端只传张数不上图，这里继续沿用那句「保持参考图主体特征」
   const imageCount = images.length || params.referenceCount || 0
   if (imageCount > 0) {
-    if (input.mode === 'edit') {
+    if (input.mode === 'revise') {
+      // 改写可能同时带参考图和结果图，别把它们一律叫「参考图」
+      lines.push(
+        imageCount === 1
+          ? '附图片：1 张，编号图1（每张图负责什么见下面的角色说明）。'
+          : `附图片：共 ${imageCount} 张，按输入顺序编号为图1至图${imageCount}（每张图负责什么见下面的角色说明）。`,
+      )
+    } else if (input.mode === 'edit') {
       lines.push(
         imageCount === 1
           ? '参考图：1 张，即图1，作为底图。'
@@ -307,14 +482,19 @@ function buildUserContent(input: RequestPromptInput): unknown {
       )
     }
   }
-  if (observations?.length) {
-    // 改图先读观察再改；扩写要把观察里的特征写进对应段落
+  // 每张图分别管什么：改写模式下参考图与结果图会同时出现，不写清楚模型会自己猜
+  if (imageNotes?.length) {
     lines.push(
-      input.mode === 'edit'
-        ? '参考图观察（改图前先读这里）：'
-        : '参考图观察（把这些看得见的特征写进对应段落，不要另编一套与参考图矛盾的外貌）：',
-      formatObservations(observations),
+      '图片角色：',
+      imageNotes.map((note, index) => `图${index + 1}：${note}`).join('\n'),
     )
+  }
+  if (observations?.length) {
+    // 改图先读观察再改；扩写 / 改写要把观察里的特征写进对应段落
+    const defaultLabel = input.mode === 'edit'
+      ? '参考图观察（改图前先读这里）：'
+      : '参考图观察（把这些看得见的特征写进对应段落，不要另编一套与参考图矛盾的外貌）：'
+    lines.push(input.observationLabel || defaultLabel, formatObservations(observations))
   }
   if (draft) {
     lines.push('待检查的提示词草稿：', draft)

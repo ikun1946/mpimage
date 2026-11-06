@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import { config, findRatio } from '../config.js'
 import { ApiError } from '../lib/errors.js'
-import { optimizePrompt } from '../services/prompt-optimizer.js'
+import { designFace } from '../services/face-design.js'
+import { optimizePrompt, revisePrompt } from '../services/prompt-optimizer.js'
 import {
   MAX_REFERENCE_IMAGES,
   loadReferenceImages,
+  loadStorageImages,
   type ReferenceImage,
 } from '../services/reference-images.js'
 import type { SettingsStore } from '../services/settings-store.js'
@@ -87,4 +89,142 @@ export function registerPromptRoutes(
       { prompt, ratioLabel, referenceCount, images },
     )
   })
+
+  // 改写已有提示词：用户说一句「把夜景改成清晨」，模型输出整条新提示词。
+  // 可以顺带带上参考图与上一次的生成结果，让改动接得上画面现状。
+  app.post('/api/prompts/revise', async request => {
+    requireAuth(request)
+    const body = (request.body ?? {}) as ReviseBody
+    const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
+    const instruction = typeof body.instruction === 'string' ? body.instruction.trim() : ''
+
+    if (!prompt) {
+      throw new ApiError('INVALID_PROMPT', '当前没有可以改写的提示词')
+    }
+    if (!instruction) {
+      throw new ApiError('INVALID_PROMPT', '先说说你想怎么改')
+    }
+    if (prompt.length > config.maxPromptLength) {
+      throw new ApiError('PROMPT_TOO_LONG', `提示词不能超过 ${config.maxPromptLength} 个字符`)
+    }
+    if (instruction.length > MAX_REVISE_INSTRUCTION) {
+      throw new ApiError('INVALID_PROMPT', `改写要求最多 ${MAX_REVISE_INSTRUCTION} 个字符`)
+    }
+
+    let ratioLabel: string | undefined
+    if (body.ratio !== undefined) {
+      const ratio = findRatio(body.ratio)
+      if (!ratio) {
+        throw new ApiError('RATIO_INVALID', '请选择有效的图片比例')
+      }
+      ratioLabel = ratio.label
+    }
+
+    const referencePaths = readPathList(body.referencePaths, '参考图')
+    const contextPaths = readPathList(body.contextPaths, '图片')
+
+    // 参考图只认「参考图/」，结果图可以是存储里任意类别；两类合计仍不超过上限
+    const references = referencePaths.length ? await loadReferenceImages(referencePaths) : []
+    const contexts = contextPaths.length ? await loadStorageImages(contextPaths) : []
+    const images = [...references, ...contexts].slice(0, MAX_REFERENCE_IMAGES)
+    const imageNotes = [
+      ...references.map(
+        () => '参考图：只沿用它被指派的部分（人物长相 / 服装 / 道具 / 场景 / 构图 / 材质 / 光），不要整张搬进新画面',
+      ),
+      ...contexts.map(
+        () => '已生成的结果图：这是上一次出图的实际效果，用户要改的地方以它为准',
+      ),
+    ].slice(0, images.length)
+
+    const result = await revisePrompt(
+      {
+        baseUrl: await deps.settings.getBaseUrl(),
+        model: await deps.settings.getTextModel(),
+        timeoutMs: config.promptOptimizeTimeoutMs,
+      },
+      { prompt, instruction, ratioLabel, images, imageNotes },
+    )
+
+    return { ...result, imageCount: images.length }
+  })
+
+  // 捏脸：一份角色设定 → 角色分析 + 素颜正脸定妆提示词 + 负面提示词
+  app.post('/api/prompts/face-design', async request => {
+    requireAuth(request)
+    const body = (request.body ?? {}) as FaceDesignBody
+
+    const params = {
+      age: readText(body.age, 40, '年龄感'),
+      gender: readText(body.gender, 20, '性别'),
+      temperament: readText(body.temperament, 60, '气场'),
+      identity: readText(body.identity, 60, '身份'),
+      framing: readText(body.framing, 40, '画面类型'),
+      background: readText(body.background, 40, '背景'),
+      style: readText(body.style, 40, '风格'),
+      extra: readText(body.extra, 600, '特殊诉求'),
+    }
+
+    return designFace(
+      {
+        baseUrl: await deps.settings.getBaseUrl(),
+        model: await deps.settings.getTextModel(),
+        timeoutMs: config.promptOptimizeTimeoutMs,
+      },
+      params,
+    )
+  })
+}
+
+/** 改写要求最多这么长：再长就不是「改一句」而是重写整条，超出直接拦下 */
+const MAX_REVISE_INSTRUCTION = 2000
+
+interface ReviseBody {
+  prompt?: unknown
+  instruction?: unknown
+  ratio?: unknown
+  /** 参考图：必须以「参考图/」开头 */
+  referencePaths?: unknown
+  /** 已生成结果图：存储目录里的任意类别路径 */
+  contextPaths?: unknown
+}
+
+interface FaceDesignBody {
+  age?: unknown
+  gender?: unknown
+  temperament?: unknown
+  identity?: unknown
+  framing?: unknown
+  background?: unknown
+  style?: unknown
+  extra?: unknown
+}
+
+/** 表单字段：非字符串按格式错误处理，超长直接拦下，避免把整段小说塞进提示词 */
+function readText(value: unknown, max: number, label: string): string | undefined {
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'string') {
+    throw new ApiError('INVALID_PROMPT', `${label}格式无效`)
+  }
+  const text = value.trim()
+  if (text.length > max) {
+    throw new ApiError('INVALID_PROMPT', `${label}最多 ${max} 个字符`)
+  }
+  return text
+}
+
+/** 读取一组图片路径；格式不对就按图片参数报错，不让空字符串混进加载阶段 */
+function readPathList(value: unknown, noun: string): string[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) {
+    throw new ApiError('REFERENCE_INVALID', `${noun}参数格式无效`, 400)
+  }
+  const paths: string[] = []
+  for (const item of value) {
+    if (typeof item !== 'string') {
+      throw new ApiError('REFERENCE_INVALID', `${noun}地址无效`, 400)
+    }
+    const trimmed = item.trim()
+    if (trimmed) paths.push(trimmed)
+  }
+  return paths
 }
