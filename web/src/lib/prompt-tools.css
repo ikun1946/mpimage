@@ -124,6 +124,17 @@
   display: flex;
 }
 
+/* 编辑器打开时锁住背后的页面：滚轮只滚编辑器里的文本，不再带着底下的网页一起滚。
+   用 padding 补回滚动条宽度，避免打开/关闭时页面横向抖一下 */
+html.prompt-editor-open,
+html.prompt-editor-open body {
+  overflow: hidden;
+}
+
+html.prompt-editor-open body {
+  padding-right: var(--prompt-editor-gap, 0px);
+}
+
 .prompt-editor-card {
   display: flex;
   flex-direction: column;
@@ -179,6 +190,8 @@
   font: inherit;
   font-size: 15px;
   line-height: 1.75;
+  /* 文本滚到底后也别把滚动传给背后的页面 */
+  overscroll-behavior: contain;
 }
 
 .prompt-editor-text:focus {

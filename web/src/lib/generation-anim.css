@@ -1,0 +1,501 @@
+/* ===== 生成中的画布动画（六套随机播放） =====
+   覆盖在 .free-preview 上，进度、阶段文案都由 batch.js 的生成进度驱动。
+   所有类名都收在 .gen-anim 下面，避免和页面里同名的 .grid / .core 打架。 */
+
+@property --g-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.gen-anim {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--surface-subtle);
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 360ms ease;
+}
+
+.gen-anim.is-done {
+  opacity: 0;
+}
+
+/* 生成中不显示上一张图的按钮，免得遮罩底下有看不见但仍可点的热区 */
+.free-preview.is-generating .image-tools {
+  display: none !important;
+}
+
+/* ---------- 公共：百分比与阶段胶囊 ---------- */
+
+.gen-anim .gen-pct {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 5;
+  padding: 3px 9px;
+  border: 1px solid rgba(167, 130, 67, 0.3);
+  border-radius: 999px;
+  background: rgba(252, 251, 247, 0.9);
+  color: var(--gold);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gen-anim .gen-chip {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  /* 压在实时画布上时不要用 backdrop-filter：每帧回读画布做模糊会把帧率拖垮 */
+  background: rgba(252, 251, 247, 0.92);
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.gen-anim .gen-chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 0 rgba(167, 130, 67, 0.4);
+  animation: gen-pulse 1.6s ease-out infinite;
+}
+
+/* ---------- 方案一 · 显影 ---------- */
+
+.gen-anim.v1 .gen-ink {
+  position: absolute;
+  inset: -12%;
+  filter: blur(20px);
+  opacity: calc(0.18 + var(--p, 0) * 0.52);
+  transform: scale(calc(0.98 + var(--p, 0) * 0.06));
+  background:
+    radial-gradient(38% 32% at 34% 38%, rgba(102, 131, 110, 0.55), transparent 70%),
+    radial-gradient(34% 30% at 68% 30%, rgba(167, 130, 67, 0.5), transparent 70%),
+    radial-gradient(46% 40% at 55% 72%, rgba(165, 76, 49, 0.28), transparent 72%),
+    radial-gradient(40% 36% at 42% 60%, rgba(54, 84, 69, 0.36), transparent 74%);
+  animation: gen-drift 9s ease-in-out infinite alternate;
+}
+
+.gen-anim.v1 .gen-grain {
+  position: absolute;
+  inset: 0;
+  opacity: calc(0.05 + var(--p, 0) * 0.14);
+  background-image:
+    repeating-radial-gradient(circle at 17% 32%, rgba(32, 39, 34, 0.5) 0 1px, transparent 1px 4px),
+    repeating-radial-gradient(circle at 63% 68%, rgba(32, 39, 34, 0.4) 0 1px, transparent 1px 5px);
+  background-size: 9px 9px, 13px 13px;
+  animation: gen-grain-shift 1.2s steps(3) infinite;
+  mix-blend-mode: multiply;
+}
+
+.gen-anim.v1 .gen-core {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  z-index: 4;
+}
+
+.gen-anim.v1 .gen-ring {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from var(--g-angle),
+    rgba(167, 130, 67, 0.1) 0deg,
+    rgba(167, 130, 67, 0.1) 190deg,
+    var(--gold) 300deg,
+    var(--gold-soft) 332deg,
+    rgba(167, 130, 67, 0.1) 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+  animation: gen-g-spin 2s linear infinite;
+}
+
+.gen-anim.v1 .gen-core strong {
+  color: var(--ink);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.gen-anim.v1 .gen-stage {
+  color: var(--ink-faint);
+  font-size: 11.5px;
+}
+
+/* ---------- 方案二 · 扫描取景 ---------- */
+
+.gen-anim.v2 .gen-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background-image:
+    linear-gradient(rgba(32, 39, 34, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(32, 39, 34, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.gen-anim.v2 .gen-draft {
+  position: absolute;
+  inset: 0;
+  opacity: calc(0.12 + var(--p, 0) * 0.5);
+  filter: blur(10px);
+  background:
+    radial-gradient(26% 34% at 50% 44%, rgba(54, 84, 69, 0.75), transparent 72%),
+    radial-gradient(34% 26% at 50% 70%, rgba(167, 130, 67, 0.5), transparent 74%);
+  transition: opacity 300ms linear;
+}
+
+.gen-anim.v2 .gen-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 3;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold-soft), var(--gold), transparent);
+  box-shadow: 0 0 18px 4px rgba(167, 130, 67, 0.25);
+  animation: gen-scan 3.4s cubic-bezier(0.4, 0, 0.3, 1) infinite;
+}
+
+.gen-anim.v2 .gen-corners span {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: rgba(167, 130, 67, 0.65);
+  border-style: solid;
+  border-width: 0;
+}
+
+.gen-anim.v2 .gen-corners span:nth-child(1) { top: 12px; left: 12px; border-top-width: 1.5px; border-left-width: 1.5px; }
+.gen-anim.v2 .gen-corners span:nth-child(2) { top: 12px; right: 12px; border-top-width: 1.5px; border-right-width: 1.5px; }
+.gen-anim.v2 .gen-corners span:nth-child(3) { bottom: 12px; left: 12px; border-bottom-width: 1.5px; border-left-width: 1.5px; }
+.gen-anim.v2 .gen-corners span:nth-child(4) { bottom: 12px; right: 12px; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+
+/* ---------- 方案三 · 叠卡循环 ---------- */
+
+.gen-anim.v3 .gen-layers {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  perspective: 900px;
+}
+
+.gen-anim.v3 .gen-layer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 47%;
+  height: 31%;
+  margin-left: -23.5%;
+  margin-top: -15.5%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(150deg, #fdfcf8 0%, #f3eee2 100%);
+  box-shadow: 0 12px 26px rgba(40, 43, 36, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  transition:
+    transform 640ms cubic-bezier(0.2, 0.8, 0.22, 1.04),
+    box-shadow 420ms ease,
+    border-color 420ms ease,
+    color 420ms ease;
+  will-change: transform;
+}
+
+.gen-anim.v3 .slot-back {
+  z-index: 1;
+  transform: translate(-30px, 24px) rotate(-9deg) scale(0.96);
+  opacity: 0.92;
+}
+
+.gen-anim.v3 .slot-mid {
+  z-index: 2;
+  transform: translate(0, 3px) rotate(1.5deg) scale(0.99);
+  opacity: 0.97;
+}
+
+.gen-anim.v3 .slot-front {
+  z-index: 3;
+  transform: translate(30px, -18px) rotate(3.5deg) scale(1.03);
+  color: var(--gold);
+  border-color: rgba(167, 130, 67, 0.45);
+  box-shadow: 0 18px 34px rgba(40, 43, 36, 0.18);
+}
+
+.gen-anim.v3 .gen-layer.lift {
+  z-index: 5;
+  transform: translate(0, -165%) rotate(-4deg) scale(1.05);
+  border-color: rgba(167, 130, 67, 0.5);
+  box-shadow: 0 26px 46px rgba(40, 43, 36, 0.22);
+  transition-duration: 400ms;
+}
+
+.gen-anim.v3 .gen-layer::after {
+  content: "";
+  position: absolute;
+  inset: 5px -3px -5px 3px;
+  z-index: -1;
+  border-radius: 12px;
+  border: 1px solid rgba(32, 39, 34, 0.07);
+  background: #efe9dc;
+}
+
+.gen-anim.v3 .gen-pct-big {
+  position: absolute;
+  /* 它同时带着 .gen-pct，必须把 base 的 top/right 和胶囊壳清掉，
+     否则四个边都被写死，会拉成一整块盖住卡片 */
+  top: auto;
+  right: auto;
+  left: 14px;
+  bottom: 14px;
+  z-index: 5;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--gold);
+  font-family: var(--mono);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 方案四 · 像素显影 ---------- */
+
+.gen-anim.v4 .gen-tiles {
+  position: absolute;
+  inset: 14px;
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  grid-template-rows: repeat(14, 1fr);
+  gap: 2px;
+  z-index: 3;
+}
+
+.gen-anim.v4 .gen-tile {
+  border-radius: 1px;
+  background: var(--tint, rgba(54, 84, 69, 0.6));
+  opacity: 0.07;
+  transform: scale(0.92);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.gen-anim.v4 .gen-tile.on {
+  opacity: 0.86;
+  transform: scale(1);
+}
+
+/* ---------- 方案五 · 粒子汇聚 ---------- */
+
+.gen-anim.v5 .gen-orbit {
+  position: absolute;
+  inset: 0;
+  animation: gen-spin 18s linear infinite;
+}
+
+.gen-anim.v5 .gen-orbit.b {
+  animation-duration: 26s;
+  animation-direction: reverse;
+}
+
+.gen-anim.v5 .gen-orbit::before {
+  content: "";
+  position: absolute;
+  inset: 24%;
+  border: 1px dashed rgba(167, 130, 67, 0.14);
+  border-radius: 50%;
+}
+
+.gen-anim.v5 .gen-orbit.b::before {
+  inset: 11%;
+  border-color: rgba(102, 131, 110, 0.14);
+}
+
+.gen-anim.v5 .gen-orbit i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--gold-soft);
+  box-shadow: 0 0 10px rgba(167, 130, 67, 0.65);
+  opacity: 0.78;
+  transform: rotate(calc(var(--a, 0) * 1deg)) translateX(var(--r, 80px));
+  animation: gen-twinkle 3.2s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+
+.gen-anim.v5 .gen-orbit.b i {
+  background: var(--moss-light);
+  box-shadow: 0 0 10px rgba(102, 131, 110, 0.5);
+}
+
+.gen-anim.v5 .gen-halo {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.gen-anim.v5 .gen-halo span {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(167, 130, 67, 0.34), rgba(167, 130, 67, 0) 70%);
+  animation: gen-breathe 3.2s ease-in-out infinite;
+}
+
+.gen-anim.v5 .gen-halo span:nth-child(2) {
+  width: 150px;
+  height: 150px;
+  animation-delay: 0.7s;
+  opacity: 0.6;
+}
+
+.gen-anim.v5 .gen-seed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 4px;
+  z-index: 4;
+}
+
+.gen-anim.v5 .gen-num {
+  position: relative;
+  color: var(--gold);
+  font-family: var(--mono);
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gen-anim.v5 .gen-seed-label {
+  position: relative;
+  color: var(--ink-faint);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+/* ---------- 方案六 · 水位上涨（WebGL 水体） ---------- */
+
+.gen-anim.v6 {
+  background: linear-gradient(180deg, #f7f5ef 0%, #eef2ec 58%, #e3eae3 100%);
+}
+
+.gen-anim.v6 .gen-water-gl,
+.gen-anim.v6 .gen-water-fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 2;
+}
+
+.gen-anim.v6 .gen-water-fx {
+  z-index: 3;
+}
+
+.gen-anim.v6 .gen-ruler {
+  position: absolute;
+  left: 15px;
+  top: 16%;
+  bottom: 14%;
+  z-index: 4;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(54, 84, 69, 0.26), transparent);
+}
+
+.gen-anim.v6 .gen-ruler span {
+  position: absolute;
+  left: 6px;
+  bottom: var(--h, 0%);
+  transform: translateY(50%);
+  color: rgba(54, 84, 69, 0.62);
+  font-family: var(--mono);
+  font-size: 9px;
+}
+
+.gen-anim.v6 .gen-chip {
+  top: 14px;
+  bottom: auto;
+  z-index: 5;
+  color: var(--moss);
+  border-color: rgba(54, 84, 69, 0.22);
+}
+
+/* ---------- 动画 ---------- */
+
+@keyframes gen-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(167, 130, 67, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(167, 130, 67, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(167, 130, 67, 0); }
+}
+
+@keyframes gen-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes gen-g-spin {
+  to { --g-angle: 360deg; }
+}
+
+@keyframes gen-drift {
+  0% { transform: translate3d(-2%, -1%, 0) scale(0.98) rotate(-1deg); }
+  100% { transform: translate3d(2%, 2%, 0) scale(1.04) rotate(2deg); }
+}
+
+@keyframes gen-grain-shift {
+  0% { background-position: 0 0, 0 0; }
+  100% { background-position: 7px 5px, -6px 9px; }
+}
+
+@keyframes gen-scan {
+  0% { top: 8%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { top: 92%; opacity: 0; }
+}
+
+@keyframes gen-breathe {
+  0%, 100% { transform: scale(0.92); opacity: 0.5; }
+  50% { transform: scale(1.08); opacity: 0.9; }
+}
+
+@keyframes gen-twinkle {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gen-anim *,
+  .gen-anim *::before,
+  .gen-anim *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+  }
+}

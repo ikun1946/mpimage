@@ -42,16 +42,26 @@
 
 /* ===== 参考图：多张沿文本框上边线排开、各自倾斜，一半在线上一半被文本框盖住 ===== */
 
-/* 有参考图时：标题行收起、表单顶部留出抬升空间 */
+/* 有参考图时：表单顶部留出抬升空间。
+   标题文案可以收起，但字数统计要一直留在右上角，不能被参考图顶掉 */
+.free-form {
+  position: relative;
+}
+
 .free-form.has-ref {
   padding-top: 58px;
 }
 
 .free-form.has-ref .label-row {
-  opacity: 0;
-  height: 0;
+  position: absolute;
+  top: 16px;
+  right: 24px;
+  z-index: 4;
   margin: 0;
-  overflow: hidden;
+}
+
+.free-form.has-ref .label-row > span:first-child {
+  display: none;
 }
 
 /* 文本框压在参考图上面，图片下半截自然被挡住 */
@@ -390,7 +400,9 @@
   transition: opacity 180ms ease, transform 200ms ease;
 }
 
-.free-preview.has-image:hover .image-tools,
+/* 只在鼠标靠近右上角按钮的热区时浮现（.tools-near 由 JS 打上），
+   不再是鼠标一进图片就显示 */
+.free-preview.has-image.tools-near .image-tools,
 .free-preview.has-image:focus-within .image-tools {
   opacity: 1;
   pointer-events: auto;

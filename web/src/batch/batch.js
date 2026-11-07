@@ -59,6 +59,7 @@ import { requireLogin } from '../lib/guard.js'
 import { setupAvatarMenu } from '../lib/avatar-menu.js'
 import { HISTORY_LIMIT, assetFilename, assetHistory, primaryEntry, primaryFilename, primaryImageOf } from '../lib/format.js'
 import { markAiBusyStill, startAiBusy } from '../lib/ai-busy.js'
+import { mountGenerationAnimation, pickGenerationVariant } from '../lib/generation-anim.js'
 import { activateOverlay } from '../lib/overlay.js'
 import { ratioOptions } from '../lib/ratio.js'
 import { setupTablist } from '../lib/tabs.js'
@@ -348,6 +349,8 @@ import { setupTablist } from '../lib/tabs.js'
     let freeElapsedTimer = 0
     let freeStartedAt = 0
     let freeProgressValue = 0
+    /* 画布上的生成动画（每次生成随机挑一套，结束后销毁） */
+    let freeGenAnim = null
 
     function restoreState() {
       try {
@@ -3040,6 +3043,8 @@ import { setupTablist } from '../lib/tabs.js'
           dom.freeCount.textContent = String(state.freePrompt.length)
           persistSoon()
           editor.classList.remove('visible')
+          document.documentElement.classList.remove('prompt-editor-open')
+          document.documentElement.style.removeProperty('--prompt-editor-gap')
           dom.freePrompt.focus()
         }
 
@@ -3056,6 +3061,12 @@ import { setupTablist } from '../lib/tabs.js'
       const editorText = editor.querySelector('#free-prompt-editor-text')
       editorText.value = dom.freePrompt.value
       editor.querySelector('#free-prompt-editor-count').textContent = String(editorText.value.length)
+      // 浮层打开期间锁住页面滚动，只留编辑器自己的文本区可滚
+      document.documentElement.style.setProperty(
+        '--prompt-editor-gap',
+        `${Math.max(0, window.innerWidth - document.documentElement.clientWidth)}px`,
+      )
+      document.documentElement.classList.add('prompt-editor-open')
       editor.classList.add('visible')
       editorText.focus()
       editorText.setSelectionRange(editorText.value.length, editorText.value.length)
@@ -3970,6 +3981,7 @@ import { setupTablist } from '../lib/tabs.js'
         if (response.status === 404) {
           // 任务过期或服务重启：清掉标记，避免一直转圈
           clearPendingJob()
+          stopFreeCanvasAnimation()
           finishResume()
           dom.freeStatus.textContent = '上次的生成任务已失效（可能服务重启过），请重新生成'
           return
@@ -3991,6 +4003,7 @@ import { setupTablist } from '../lib/tabs.js'
           stopFreeProgress()
           dom.freeProgressLabel.textContent = '图像已生成'
           setFreeProgress(100)
+          finishFreeCanvasAnimation()
           state.freeImageUrl = data.result.imageUrl
           state.freeImageExtension = getImageExtension(data.result.imageUrl)
           persistSoon()
@@ -4007,6 +4020,7 @@ import { setupTablist } from '../lib/tabs.js'
         // 失败
         clearPendingJob()
         stopFreeProgress()
+        stopFreeCanvasAnimation()
         dom.freeProgressLabel.textContent = '生成中断'
         dom.freeStatus.textContent = data.error?.message || '生成失败，请重新尝试'
         finishResume()
@@ -4016,6 +4030,7 @@ import { setupTablist } from '../lib/tabs.js'
           return
         }
         clearPendingJob()
+        stopFreeCanvasAnimation()
         finishResume()
         dom.freeStatus.textContent = '无法查询生成状态，请重新生成'
       }
@@ -4376,6 +4391,7 @@ import { setupTablist } from '../lib/tabs.js'
         stopFreeProgress()
         dom.freeProgressLabel.textContent = '图像已生成'
         setFreeProgress(100)
+        finishFreeCanvasAnimation()
         await sleep(320)
         state.freeImageUrl = result.imageUrl
         state.freeImageExtension = getImageExtension(result.imageUrl)
@@ -4390,6 +4406,7 @@ import { setupTablist } from '../lib/tabs.js'
       } catch (error) {
         clearPendingJob()
         stopFreeProgress()
+        stopFreeCanvasAnimation()
         dom.freeProgressLabel.textContent = '生成中断'
         dom.freeStatus.textContent = error.message || '生成失败，请稍后重试'
       } finally {
@@ -4416,11 +4433,32 @@ import { setupTablist } from '../lib/tabs.js'
       renderFreeReferences()
     }
 
+    /** 生成 / 接回任务时在右侧画布挂一套随机动画 */
+    function startFreeCanvasAnimation() {
+      stopFreeCanvasAnimation()
+      if (!dom.freePreview) return
+      freeGenAnim = mountGenerationAnimation(dom.freePreview, pickGenerationVariant())
+      freeGenAnim.setProgress(freeProgressValue)
+    }
+
+    function stopFreeCanvasAnimation() {
+      freeGenAnim?.destroy()
+      freeGenAnim = null
+    }
+
+    /** 生成完成：让水/卡片走完最后一格再淡出 */
+    function finishFreeCanvasAnimation() {
+      if (!freeGenAnim) return
+      freeGenAnim.finish()
+      freeGenAnim = null
+    }
+
     function startFreeProgress() {
       stopFreeProgress()
       freeProgressValue = 3
       freeStartedAt = Date.now()
       setFreeProgress(freeProgressValue)
+      startFreeCanvasAnimation()
       dom.freeProgress.classList.add('visible')
       dom.freeProgressLabel.textContent = '正在理解画面'
       const stages = [
@@ -4451,6 +4489,7 @@ import { setupTablist } from '../lib/tabs.js'
 
     function setFreeProgress(value) {
       dom.freeProgressBar.style.width = `${Math.round(value)}%`
+      freeGenAnim?.setProgress(value)
     }
 
     /* ===== 启动 ===== */
@@ -4854,6 +4893,22 @@ import { setupTablist } from '../lib/tabs.js'
         })
         promptShell.addEventListener('mouseleave', () => {
           promptShell.classList.remove('tools-near')
+        })
+      }
+
+      /* 图片上的下载 / 最大化：只在右上角按钮附近出现，
+         鼠标扫过图片中间或下缘时不弹，免得挡住画面 */
+      if (dom.freePreview) {
+        const HOT_W = 240
+        const HOT_H = 96
+        dom.freePreview.addEventListener('mousemove', event => {
+          const rect = dom.freePreview.getBoundingClientRect()
+          const nearRight = event.clientX >= rect.right - HOT_W
+          const nearTop = event.clientY <= rect.top + HOT_H
+          dom.freePreview.classList.toggle('tools-near', nearRight && nearTop)
+        })
+        dom.freePreview.addEventListener('mouseleave', () => {
+          dom.freePreview.classList.remove('tools-near')
         })
       }
     }
