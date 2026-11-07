@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { config, findRatio } from '../config.js'
+import { auditFailure, auditLog } from '../lib/audit.js'
 import { ApiError } from '../lib/errors.js'
 import { designFace, refineFaceField } from '../services/face-design.js'
 import { optimizePrompt, revisePrompt } from '../services/prompt-optimizer.js'
@@ -25,7 +26,7 @@ export function registerPromptRoutes(
   deps: { settings: SettingsStore },
 ): void {
   app.post('/api/prompts/optimize', async request => {
-    requireAuth(request)
+    const auth = requireAuth(request)
     const body = (request.body ?? {}) as OptimizeBody
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
 
@@ -80,20 +81,42 @@ export function registerPromptRoutes(
       referenceCount = count
     }
 
-    return optimizePrompt(
-      {
-        baseUrl: await deps.settings.getBaseUrl(),
-        model: await deps.settings.getTextModel(),
-        timeoutMs: config.promptOptimizeTimeoutMs,
-      },
-      { prompt, ratioLabel, referenceCount, images },
-    )
+    const startedAt = Date.now()
+    try {
+      const result = await optimizePrompt(
+        {
+          baseUrl: await deps.settings.getBaseUrl(),
+          model: await deps.settings.getTextModel(),
+          timeoutMs: config.promptOptimizeTimeoutMs,
+        },
+        { prompt, ratioLabel, referenceCount, images },
+      )
+      auditLog(request.log, 'info', 'prompt.optimize', auth, '提示词优化完成', {
+        mode: result.mode,
+        model: result.model,
+        inputLength: prompt.length,
+        outputLength: result.prompt.length,
+        outputPreview: result.prompt.slice(0, 120),
+        references: images?.length ?? referenceCount ?? 0,
+        lockedConstraints: result.lockedConstraints.length,
+        restoredConstraints: result.restoredConstraints.length,
+        tokens: result.tokens,
+        durationMs: Date.now() - startedAt,
+      })
+      return result
+    } catch (error) {
+      auditFailure(request.log, 'prompt.optimize', auth, startedAt, error, '提示词优化失败', {
+        inputLength: prompt.length,
+        references: images?.length ?? referenceCount ?? 0,
+      })
+      throw error
+    }
   })
 
   // 改写已有提示词：用户说一句「把夜景改成清晨」，模型输出整条新提示词。
   // 可以顺带带上参考图与上一次的生成结果，让改动接得上画面现状。
   app.post('/api/prompts/revise', async request => {
-    requireAuth(request)
+    const auth = requireAuth(request)
     const body = (request.body ?? {}) as ReviseBody
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
     const instruction = typeof body.instruction === 'string' ? body.instruction.trim() : ''
@@ -136,21 +159,41 @@ export function registerPromptRoutes(
       ),
     ].slice(0, images.length)
 
-    const result = await revisePrompt(
-      {
-        baseUrl: await deps.settings.getBaseUrl(),
-        model: await deps.settings.getTextModel(),
-        timeoutMs: config.promptOptimizeTimeoutMs,
-      },
-      { prompt, instruction, ratioLabel, images, imageNotes },
-    )
-
-    return { ...result, imageCount: images.length }
+    const startedAt = Date.now()
+    try {
+      const result = await revisePrompt(
+        {
+          baseUrl: await deps.settings.getBaseUrl(),
+          model: await deps.settings.getTextModel(),
+          timeoutMs: config.promptOptimizeTimeoutMs,
+        },
+        { prompt, instruction, ratioLabel, images, imageNotes },
+      )
+      auditLog(request.log, 'info', 'prompt.revise', auth, '提示词改写完成', {
+        model: result.model,
+        inputLength: prompt.length,
+        instructionLength: instruction.length,
+        instructionPreview: instruction.slice(0, 120),
+        images: images.length,
+        outputLength: result.prompt.length,
+        outputPreview: result.prompt.slice(0, 120),
+        tokens: result.tokens,
+        durationMs: Date.now() - startedAt,
+      })
+      return { ...result, imageCount: images.length }
+    } catch (error) {
+      auditFailure(request.log, 'prompt.revise', auth, startedAt, error, '提示词改写失败', {
+        inputLength: prompt.length,
+        instructionLength: instruction.length,
+        images: images.length,
+      })
+      throw error
+    }
   })
 
   // 捏脸：一份角色设定 → 角色分析 + 素颜正脸定妆提示词 + 负面提示词
   app.post('/api/prompts/face-design', async request => {
-    requireAuth(request)
+    const auth = requireAuth(request)
     const body = (request.body ?? {}) as FaceDesignBody
 
     const params = {
@@ -165,19 +208,46 @@ export function registerPromptRoutes(
       sourceText: readText(body.sourceText, 4000, '原始文本'),
     }
 
-    return designFace(
-      {
-        baseUrl: await deps.settings.getBaseUrl(),
-        model: await deps.settings.getTextModel(),
-        timeoutMs: config.promptOptimizeTimeoutMs,
-      },
-      params,
-    )
+    const startedAt = Date.now()
+    try {
+      const result = await designFace(
+        {
+          baseUrl: await deps.settings.getBaseUrl(),
+          model: await deps.settings.getTextModel(),
+          timeoutMs: config.promptOptimizeTimeoutMs,
+        },
+        params,
+      )
+      auditLog(request.log, 'info', 'face.design', auth, '捏脸方案生成完成', {
+        model: result.model,
+        age: params.age,
+        gender: params.gender,
+        framing: params.framing,
+        style: params.style,
+        sourceTextLength: params.sourceText?.length ?? 0,
+        extraLength: params.extra?.length ?? 0,
+        analysisLength: result.analysis.length,
+        promptLength: result.prompt.length,
+        promptPreview: result.prompt.slice(0, 120),
+        negativeLength: result.negativePrompt.length,
+        tokens: result.tokens,
+        durationMs: Date.now() - startedAt,
+      })
+      return result
+    } catch (error) {
+      auditFailure(request.log, 'face.design', auth, startedAt, error, '捏脸方案生成失败', {
+        gender: params.gender,
+        framing: params.framing,
+        style: params.style,
+        sourceTextLength: params.sourceText?.length ?? 0,
+      })
+      throw error
+    }
   })
 
   // 捏脸的定向修改：一次只改完整提示词或负面提示词中的一个字段
   app.post('/api/prompts/face-refine', async request => {
-    requireAuth(request)
+    const auth = requireAuth(request)
     const body = (request.body ?? {}) as FaceRefineBody
 
     const field =
@@ -195,20 +265,42 @@ export function registerPromptRoutes(
     if (!value) throw new ApiError('INVALID_PROMPT', '这一栏还没有内容可以修改')
     if (!instruction) throw new ApiError('INVALID_PROMPT', '先说说想怎么改')
 
-    return refineFaceField(
-      {
-        baseUrl: await deps.settings.getBaseUrl(),
-        model: await deps.settings.getTextModel(),
-        timeoutMs: config.promptOptimizeTimeoutMs,
-      },
-      {
+    const startedAt = Date.now()
+    try {
+      const result = await refineFaceField(
+        {
+          baseUrl: await deps.settings.getBaseUrl(),
+          model: await deps.settings.getTextModel(),
+          timeoutMs: config.promptOptimizeTimeoutMs,
+        },
+        {
+          field,
+          value,
+          instruction,
+          analysis: readText(body.analysis, 3000, '角色分析'),
+          other: readText(body.other, MAX_FACE_PROMPT_VALUE, '另一个字段'),
+        },
+      )
+      auditLog(request.log, 'info', 'face.refine', auth, '捏脸字段修改完成', {
         field,
-        value,
-        instruction,
-        analysis: readText(body.analysis, 3000, '角色分析'),
-        other: readText(body.other, MAX_FACE_PROMPT_VALUE, '另一个字段'),
-      },
-    )
+        model: result.model,
+        instructionLength: instruction.length,
+        instructionPreview: instruction.slice(0, 120),
+        inputLength: value.length,
+        outputLength: result.value.length,
+        outputPreview: result.value.slice(0, 120),
+        tokens: result.tokens,
+        durationMs: Date.now() - startedAt,
+      })
+      return result
+    } catch (error) {
+      auditFailure(request.log, 'face.refine', auth, startedAt, error, '捏脸字段修改失败', {
+        field,
+        inputLength: value.length,
+        instructionLength: instruction.length,
+      })
+      throw error
+    }
   })
 }
 

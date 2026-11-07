@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { config, findRatio } from '../config.js'
 import { ApiError } from '../lib/errors.js'
 import type { SerialGate } from '../lib/serial-gate.js'
+import { auditFailure, auditLog } from '../lib/audit.js'
 import { buildFileUrl } from '../lib/url.js'
 import { requestImage, requestImageEdit } from '../services/magpie.js'
 import { detectImageType, readImageSize } from '../services/imaging.js'
@@ -193,6 +194,15 @@ export function registerImageRoutes(
       const pending = inflight.get(auth.userId) ?? 0
       const used = usedToday + pending
       if (used >= quota.dailyLimit) {
+        auditLog(request.log, 'warn', 'image.generate.rejected', auth, '生图被每日额度拦截', {
+          source: typeof body.source === 'string' ? body.source : 'studio',
+          ratio: ratio.id,
+          usedToday,
+          pending,
+          dailyLimit: quota.dailyLimit,
+          promptLength: prompt.length,
+          promptPreview: prompt.slice(0, 160),
+        })
         throw new ApiError(
           'QUOTA_EXCEEDED',
           `今日生图额度已用完（${used}/${quota.dailyLimit} 张${pending ? `，其中 ${pending} 张正在生成` : ''}），明天再来或联系管理员调整额度`,
@@ -204,8 +214,25 @@ export function registerImageRoutes(
     // 预约一个在途名额：并行请求按「已用 + 在途」判断，不会同时超发
     holdSlot(auth.userId)
 
+    const category = typeof body.category === 'string' ? body.category : '未分类'
+    const assetName = typeof body.name === 'string' ? body.name : ''
+    const source =
+      body.source === 'batch' || body.source === 'free' || body.source === 'face'
+        ? body.source
+        : 'studio'
+
     // 生图闸门：最多同时放行 IMAGE_CONCURRENCY 个请求打向 Magpie
     const startedAt = Date.now()
+    auditLog(request.log, 'info', 'image.generate.start', auth, '开始生图', {
+      jobId,
+      source,
+      category,
+      name: assetName,
+      ratio: ratio.id,
+      references: referencePaths.length,
+      promptLength: prompt.length,
+      promptPreview: prompt.slice(0, 160),
+    })
     try {
     const generated = await deps.gate.run(async () => {
       const references = await loadReferenceImages(referencePaths)
@@ -244,12 +271,8 @@ export function registerImageRoutes(
       return { stored, model: upstream.model, mimeType: type.mimeType, size, tokens: upstream.tokens }
     })
 
-    const category = typeof body.category === 'string' ? body.category : '未分类'
-    const assetName = typeof body.name === 'string' ? body.name : ''
-    const source =
-      body.source === 'batch' || body.source === 'free' || body.source === 'face'
-        ? body.source
-        : 'studio'
+    const width = generated.size?.width ?? ratio.nativeWidth
+    const height = generated.size?.height ?? ratio.nativeHeight
 
     // 记录本次生图归属与详情，供生成记录与管理端统计
     await deps.usage.record({
@@ -260,8 +283,8 @@ export function registerImageRoutes(
       category,
       name: assetName,
       ratio: ratio.id,
-      width: generated.size?.width ?? ratio.nativeWidth,
-      height: generated.size?.height ?? ratio.nativeHeight,
+      width,
+      height,
       bytes: generated.stored.bytes,
       prompt,
       durationMs: Date.now() - startedAt,
@@ -271,14 +294,39 @@ export function registerImageRoutes(
       tokensSource: generated.tokens.source,
     })
 
+    // 审计：谁、什么时候、生成了什么、花了多少
+    auditLog(request.log, 'info', 'image.generate', auth, '生图成功', {
+      jobId,
+      source,
+      category,
+      name: assetName,
+      ratio: ratio.id,
+      model: generated.model,
+      references: referencePaths.length,
+      promptLength: prompt.length,
+      promptPreview: prompt.slice(0, 160),
+      durationMs: Date.now() - startedAt,
+      imageId: generated.stored.id,
+      relativePath: generated.stored.relativePath,
+      bytes: generated.stored.bytes,
+      width,
+      height,
+      tokens: {
+        input: generated.tokens.inputTokens,
+        output: generated.tokens.outputTokens,
+        total: generated.tokens.totalTokens,
+        source: generated.tokens.source,
+      },
+    })
+
     const payload = {
       id: generated.stored.id,
       imageUrl: buildFileUrl(request, generated.stored.relativePath),
       model: generated.model,
       mimeType: generated.mimeType,
       bytes: generated.stored.bytes,
-      width: generated.size?.width ?? ratio.nativeWidth,
-      height: generated.size?.height ?? ratio.nativeHeight,
+      width,
+      height,
       ratio: ratio.id,
       tokens: {
         input: generated.tokens.inputTokens,
@@ -295,6 +343,16 @@ export function registerImageRoutes(
 
     return reply.send({ ...payload, jobId })
     } catch (error) {
+      auditFailure(request.log, 'image.generate', auth, startedAt, error, '生图失败', {
+        jobId,
+        source,
+        category,
+        name: assetName,
+        ratio: ratio.id,
+        references: referencePaths.length,
+        promptLength: prompt.length,
+        promptPreview: prompt.slice(0, 160),
+      })
       // 失败也要落到任务表，避免刷新后一直显示「生成中」
       job.status = 'error'
       job.finishedAt = Date.now()

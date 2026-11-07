@@ -213,6 +213,23 @@ npm run desktop:build  # 出安装包 + 便携版，产物在 release/
 
 
 运行日志按天写入 `logs/YYYY-MM-DD.log`，用桌面端菜单的「运行日志…」直接看，或「打开日志目录」取文件。
+文件里每行是一条 JSON：默认有每次请求的 `method / url / statusCode / responseTime`、
+启动与配置、限流与并发调整、错误堆栈；业务动作另有带 `audit` 字段的审计行，
+写明**谁（userId / username / displayName）在什么时候（at）做了什么、结果如何、消耗多少**：
+
+| audit | 什么时候写 | 关键字段 |
+| --- | --- | --- |
+| `image.generate.start` | 通过额度检查、真正开始生图 | jobId、source、ratio、参考图数、提示词长度与前 160 字 |
+| `image.generate` | 生图成功 | model、durationMs、imageId、relativePath、bytes、width/height、tokens（输入/输出/总计/来源） |
+| `image.generate.rejected` | 今日额度用完被拦下 | usedToday、pending、dailyLimit、ratio、提示词摘要 |
+| `image.generate`（失败） | 上游报错、超时 | errorCode、errorMessage、durationMs、提示词摘要 |
+| `prompt.optimize` | AI 优化提示词完成/失败 | mode、输入/输出长度与摘要、参考图数、保留/补回约束数、tokens、durationMs |
+| `prompt.revise` | AI 改写提示词完成/失败 | 改写要求摘要、送图张数、输出长度与摘要、tokens、durationMs |
+| `face.design` | 捏脸方案生成完成/失败 | 年龄/性别/画面类型/风格、原文长度、分析/提示词/负面词长度、tokens |
+| `face.refine` | 捏脸单栏修改完成/失败 | 字段、要求摘要、输入/输出长度与摘要、tokens、durationMs |
+
+按 `audit` 搜这份日志就能拉出全部业务动作；每个账号的生图明细另存在 `usage.json`，
+管理端统计读的就是它。
 
 ### 手动启动
 
