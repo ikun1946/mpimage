@@ -1,6 +1,6 @@
 {
   "name": "mpimage",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "private": true,
   "type": "module",
   "description": "画境生图：前后端分离的单张工作台与资产批量工作台",
@@ -81,5 +81,8 @@
       "artifactName": "huajing-portable-${version}.exe"
     }
   },
-  "author": "huajing"
+  "author": "huajing",
+  "dependencies": {
+    "multicast-dns": "^7.2.5"
+  }
 }

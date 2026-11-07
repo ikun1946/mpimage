@@ -535,6 +535,29 @@
     font-size: 11px;
   }
 
+  /* 固定名称：由应用自己回应 mDNS，换 IP 也不变 */
+  .url-alias {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin-top: 2px;
+  }
+
+  .url-alias[hidden] {
+    display: none;
+  }
+
+  .url-alias-label {
+    flex: none;
+    color: var(--ink-soft);
+    font-size: 11.5px;
+  }
+
+  .url-alias .url {
+    flex: 1 1 220px;
+  }
+
   .setup {
     display: flex;
     flex: none;
@@ -1467,6 +1490,13 @@
     <button class="button mini" type="button" id="btn-lan-unpin">恢复自动</button>
     <span class="url-pin-hint" id="lan-host-hint">固定后链接不再随网卡切换；要让 IP 本身不变，还得在路由器里给这台电脑做 DHCP 保留（绑定 MAC）。</span>
   </div>
+  <div class="url-alias" id="url-alias" role="group" aria-labelledby="mdns-title" hidden>
+    <span class="sr-only" id="mdns-title">局域网固定名称</span>
+    <span class="url-alias-label">固定名称</span>
+    <code class="url" id="mdns-url" tabindex="0"></code>
+    <button class="button mini" type="button" id="btn-copy-mdns">复制名称地址</button>
+    <span class="url-pin-hint">同一 Wi-Fi 下 iPhone、Android 和电脑浏览器都能用这个名字，换 IP 不用改链接。</span>
+  </div>
   <p class="line-result" id="service-result" role="status" aria-live="polite"></p>
   <p class="flash" id="admin-flash" role="status" aria-live="polite" hidden></p>
 </header>
@@ -1758,6 +1788,9 @@
     btnLanPin: $('btn-lan-pin'),
     btnLanUnpin: $('btn-lan-unpin'),
     lanHostHint: $('lan-host-hint'),
+    urlAlias: $('url-alias'),
+    mdnsUrl: $('mdns-url'),
+    btnCopyMdns: $('btn-copy-mdns'),
     setupHint: $('setup-hint'),
     btnSetup: $('btn-setup'),
     adminFlash: $('admin-flash'),
@@ -1858,6 +1891,9 @@
     lanHost: '',
     lanPinned: false,
     lanDetected: [],
+    mdnsName: '',
+    mdnsUrl: '',
+    mdnsOn: false,
     clientUrl: '',
     loginUrl: '',
     needsSetup: false,
@@ -2033,6 +2069,9 @@
     state.lanHost = typeof next.lanHost === 'string' ? next.lanHost : ''
     state.lanPinned = Boolean(next.lanPinned)
     state.lanDetected = Array.isArray(next.lanDetected) ? next.lanDetected.filter(url => typeof url === 'string') : []
+    state.mdnsName = typeof next.mdnsName === 'string' ? next.mdnsName : ''
+    state.mdnsUrl = typeof next.mdnsUrl === 'string' ? next.mdnsUrl : ''
+    state.mdnsOn = Boolean(next.mdnsOn)
     state.clientUrl = typeof next.clientUrl === 'string' ? next.clientUrl : ''
     state.loginUrl = typeof next.loginUrl === 'string' ? next.loginUrl : ''
     state.needsSetup = Boolean(next.needsSetup)
@@ -2085,6 +2124,11 @@
         ? `已固定为 ${state.lanHost}${offNic ? '（当前网卡列表里没有这个地址：用 IP 时确认是这台电脑的，用主机名可忽略）' : ''}：换 Wi-Fi、插拔网线都不再改变链接。IP 本身仍由路由器分配，建议同时在路由器里做 DHCP 保留。`
         : `不固定时自动在网卡里挑一个（当前 ${detected || '未检测到'}），换 Wi-Fi 或插拔网线就会变；要让 IP 本身不变，在路由器里给这台电脑做 DHCP 保留（绑定 MAC）。`,
     )
+
+    // mDNS 没起来（没有局域网地址或多播端口被占）时整行藏起来，别给一个用不了的名字
+    dom.urlAlias.hidden = !(state.mdnsOn && state.mdnsUrl)
+    if (state.mdnsOn && state.mdnsUrl) setText(dom.mdnsUrl, state.mdnsUrl)
+    if (dom.btnCopyMdns.dataset.busy !== '1') dom.btnCopyMdns.disabled = !(state.mdnsOn && state.mdnsUrl)
   }
 
   /** 状态栏那行「PID · 端口 · 已运行」；每秒重绘一次，别等两秒一次的推送 */
@@ -3377,6 +3421,9 @@
     })
     dom.btnLanAllow.addEventListener('click', () => {
       runOpenAction('lan-allow', '放行端口', dom.btnLanAllow)
+    })
+    dom.btnCopyMdns.addEventListener('click', () => {
+      runOpenAction('copy-mdns', '复制名称地址', dom.btnCopyMdns)
     })
     dom.btnLanPin.addEventListener('click', () => saveLanHost(dom.lanHostInput.value))
     dom.btnLanUnpin.addEventListener('click', () => saveLanHost(''))

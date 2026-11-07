@@ -5,6 +5,7 @@ import { open, readdir, stat } from 'node:fs/promises'
 import os from 'node:os'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
+import multicastdns from 'multicast-dns'
 import { appRoot, dataRoot } from './paths.mjs'
 import { loadConfig, saveConfig } from './config.mjs'
 import { desktopToken, initServer, restartServer, serverState, startServer, stopServer, waitForServer } from './server.mjs'
@@ -210,6 +211,16 @@ ipcMain.handle('panel:action', async (_event, name, payload) => {
       clipboard.writeText(address)
       return { ok: true, message: `已复制客户端地址：${address}` }
     }
+    case 'copy-mdns': {
+      const address = mdnsUrl()
+      clipboard.writeText(address)
+      return {
+        ok: mdnsResponder !== null,
+        message: mdnsResponder
+          ? `已复制固定名称地址：${address}`
+          : `没有局域网地址，${mdnsHostname()} 暂时不可用`,
+      }
+    }
     case 'lan-check':
       return lanReport()
     case 'lan-allow': {
@@ -277,6 +288,9 @@ async function pushPanelState(force = false) {
       lanHost: normalizeLanHost(config.LAN_HOST),
       lanPinned: Boolean(pinnedLanUrl()),
       lanDetected: detectedLanUrls(),
+      mdnsName: mdnsHostname(),
+      mdnsUrl: mdnsUrl(),
+      mdnsOn: Boolean(mdnsResponder),
       clientUrl: CLIENT_URL,
       loginUrl: CLIENT_LOGIN_URL,
       needsSetup: alive ? await authNeedsSetup() : false,
@@ -623,7 +637,7 @@ const VIRTUAL_HINTS = ['virtual', 'vmware', 'virtualbox', 'hyper-v', 'vethernet'
  * 以前直接取第一个非回环 IPv4：网线插着但没拿到 DHCP 时那块网卡是 169.254.x，
  * 虚拟机/代理网卡也常排在前面，同事拿到的地址根本连不上。
  */
-function detectedLanUrls() {
+function detectedLanIpv4s() {
   const ranked = []
   for (const [name, entries] of Object.entries(os.networkInterfaces())) {
     for (const entry of entries || []) {
@@ -632,11 +646,15 @@ function detectedLanUrls() {
       const label = name.toLowerCase()
       let score = entry.address.startsWith('192.168.') ? 20 : 0
       if (VIRTUAL_HINTS.some(hint => label.includes(hint))) score -= 50
-      ranked.push({ score, url: `http://${entry.address}:${SERVER_PORT}/batch.html` })
+      ranked.push({ score, address: entry.address })
     }
   }
   ranked.sort((a, b) => b.score - a.score)
-  return [...new Set(ranked.map(item => item.url))]
+  return [...new Set(ranked.map(item => item.address))]
+}
+
+function detectedLanUrls() {
+  return detectedLanIpv4s().map(address => `http://${address}:${SERVER_PORT}/batch.html`)
 }
 
 /**
@@ -682,6 +700,90 @@ function lanAddresses() {
 
 function lanAddress() {
   return lanAddresses()[0] || ''
+}
+
+/* ===== 局域网固定名称：huajing.local =====
+ * Windows 不替自己的主机名回应 .local，而主机名还可能被 VPN 网卡抢答成 10.x；
+ * 这里由应用自己回答 mDNS 查询，名字固定、IP 由当前网卡决定，换 Wi-Fi 也不用改链接。
+ */
+const MDNS_TTL = 120
+let mdnsResponder = null
+let mdnsBoundIp = ''
+let mdnsAnnounceTimer = null
+
+/** config.env 的 LAN_NAME，只留合法主机名字符；空则用 huajing */
+function lanName() {
+  const cleaned = String(config.LAN_NAME ?? '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32)
+  return cleaned || 'huajing'
+}
+
+function mdnsHostname() {
+  return `${lanName()}.local`
+}
+
+function mdnsUrl() {
+  return `http://${mdnsHostname()}:${SERVER_PORT}/batch.html`
+}
+
+function stopMdns() {
+  if (mdnsAnnounceTimer) {
+    clearInterval(mdnsAnnounceTimer)
+    mdnsAnnounceTimer = null
+  }
+  if (mdnsResponder) {
+    try { mdnsResponder.destroy() } catch {}
+    mdnsResponder = null
+  }
+  mdnsBoundIp = ''
+}
+
+/** 绑到指定网卡：只在这一块网卡上收发，避免应答从 VPN 的 TUN 网卡出去 */
+function startMdns(ip) {
+  stopMdns()
+  const name = mdnsHostname()
+  let responder
+  try {
+    // bind 0.0.0.0 是必须的：Windows 上绑到具体网卡地址会收不到发往 224.0.0.251 的组播，
+    // interface 只用来加组和指定应答出口，避免应答从 VPN 的 TUN 网卡发出去
+    responder = multicastdns({ interface: ip, bind: '0.0.0.0', loopback: false })
+  } catch (error) {
+    log(`局域网名称 ${name} 启动失败：${error.message || error}`)
+    return
+  }
+  mdnsResponder = responder
+  mdnsBoundIp = ip
+  const answers = () => [{ name, type: 'A', ttl: MDNS_TTL, data: ip }]
+
+  responder.on('query', query => {
+    const questions = Array.isArray(query?.questions) ? query.questions : []
+    const wanted = questions.some(question => question
+      && String(question.name).toLowerCase() === name
+      && (question.type === 'A' || question.type === 'ANY'))
+    if (!wanted) return
+    try { responder.respond({ answers: answers() }) } catch {}
+  })
+  responder.on('error', error => log(`局域网名称应答失败：${error.message || error}`))
+
+  // 主动宣告一次并定时重申，客户端缓存过期前就能重新拿到地址
+  const announce = () => {
+    try { responder.respond({ answers: answers() }) } catch {}
+  }
+  announce()
+  mdnsAnnounceTimer = setInterval(announce, 60_000)
+  log(`局域网名称已启用：${mdnsUrl()}（网卡 ${ip}）`)
+}
+
+/** 网卡地址变了就换绑定，固定名称始终指向当前局域网 IP */
+function ensureMdns() {
+  if (quitting) return
+  const ip = detectedLanIpv4s()[0] || ''
+  if (mdnsResponder && ip === mdnsBoundIp) return
+  if (!ip) {
+    if (mdnsResponder) log('没有局域网地址，局域网名称暂停应答')
+    stopMdns()
+    return
+  }
+  startMdns(ip)
 }
 
 /** 与服务端 HOST 一致：只监听回环时，局域网设备无论地址对不对都连不上 */
@@ -1140,6 +1242,7 @@ async function checkUpdates() {
 /* ===== 退出：先让服务把数据写完，再退进程 ===== */
 async function quitApp() {
   quitting = true
+  stopMdns()
   try {
     await stopServer()
   } catch (error) {
@@ -1177,6 +1280,7 @@ async function bootstrap() {
   createMainWindow()
 
   await refreshServiceState()
+  ensureMdns()
   createTray()
   refreshMenus()
 
@@ -1201,7 +1305,11 @@ async function bootstrap() {
   }
 
   // 菜单/托盘里的服务状态每 5 秒跟一次，避免点了才发现状态不对
-  setInterval(() => { void refreshServiceState() }, 5000)
+  setInterval(() => {
+    void refreshServiceState()
+    // 换 Wi-Fi、插拔网线后 IP 会变，固定名称的应答跟着换绑定
+    ensureMdns()
+  }, 5000)
 
   // 冒烟自检用：设置 HUAJING_DESKTOP_SMOKE=<毫秒> 时，启动完成后自动走一遍退出流程
   const smokeMs = Number(process.env.HUAJING_DESKTOP_SMOKE || 0)

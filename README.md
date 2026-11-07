@@ -123,9 +123,10 @@ npm run desktop:build  # 出安装包 + 便携版，产物在 release/
   并弹出管理密钥对话框（也已复制到剪贴板）。点「在浏览器打开客户端」进入登录页的「初始化画境」，
   粘贴密钥创建第一个管理员。之后菜单里的「复制管理密钥」随时可以再取
   （密钥保存在 `config.env` 的 `ADMIN_SETUP_KEY`，建好管理员后服务端会忽略它）
-- **配置**：改 `config.env`（`PORT`、`HOST`、`LAN_HOST`、`MAGPIE_BASE_URL`、`SESSION_SECRET`、
-  `IMAGE_CONCURRENCY` 等）后重启应用生效；桌面端不读 `server/.env`。
-  `LAN_HOST` 是控制台「固定地址」保存的位置，留空表示自动挑选网卡地址。
+- **配置**：改 `config.env`（`PORT`、`HOST`、`LAN_HOST`、`LAN_NAME`、`MAGPIE_BASE_URL`、
+  `SESSION_SECRET`、`IMAGE_CONCURRENCY` 等）后重启应用生效；桌面端不读 `server/.env`。
+  `LAN_HOST` 是控制台「固定地址」保存的位置，留空表示自动挑选网卡地址；
+  `LAN_NAME` 是 `huajing.local` 用的名字，默认 `huajing`。
   上游地址、限流、并发这些运行期设置在**控制台的「上游」「限流与并发」卡里**改，不必动 `config.env`
 - **端口占用只剩 8787**：启动前先探测 8787——如果是本应用的服务在跑，直接接管，
   不再拉起第二份；如果被别的程序占用，弹窗说明后退出
@@ -489,6 +490,13 @@ ADMIN_SETUP_KEY=换成你自己的长随机串
   要连 IP 也不变，在路由器后台把这台电脑的 MAC 绑定一个固定 IP（DHCP 保留），
   再把那个 IP 填进「固定地址」即可。用主机名（如 `my-pc` 或 `my-pc.local`）也可以，
   前提是局域网内能解析这个名字。
+- **固定名称 `huajing.local`（推荐）**：桌面端会自己回应 mDNS 查询，同一 Wi-Fi 下的
+  iPhone、Android 和电脑浏览器直接访问 `http://huajing.local:8787/batch.html`，
+  名字不变，换 IP 或换 Wi-Fi 都不用改链接。名字由 `config.env` 的 `LAN_NAME` 决定
+  （默认 `huajing`），控制台的「固定名称」一行会显示完整地址并可以复制。
+  注意：Windows 自带的 `ping` / `nslookup` 不走 mDNS，查不到这个名字是正常的，
+  用浏览器访问即可；手机浏览器和 Chrome/Edge 都支持 `.local`。应用只在一张网卡上应答，
+  换 Wi-Fi 后会自动改绑新地址；如果路由器开了 AP 隔离，设备之间仍然互相访问不了。
 
 ### 局域网连不上时按这个顺序查
 

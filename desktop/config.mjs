@@ -19,6 +19,9 @@ const DEFAULTS = {
   PUBLIC_BASE_URL: '',
   // 固定局域网地址：IP 或主机名（可带端口）。留空 = 自动挑一个可用网卡地址
   LAN_HOST: '',
+  // 局域网固定名称：同一 Wi-Fi 的设备用 http://<LAN_NAME>.local:<端口> 访问，
+  // 由应用自己做 mDNS 应答，换 IP 也不用改链接
+  LAN_NAME: 'huajing',
   // 更新下载连接数：1 强制单流，2/4/6 强制该段数，auto 或其它值按探测速率自适应
   UPDATE_DOWNLOAD_CONNECTIONS: 'auto',
   // 更新下载镜像前缀（默认空 = 直连）：只在用户自己填时才把地址拼到原始下载链接前
