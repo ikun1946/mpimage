@@ -122,12 +122,17 @@ const NEGATIVE_NOUNS: readonly string[] = [
  * 补进提示词会变成莫名其妙的「不要出现：动」。
  */
 function isVisualNegative(body: string): boolean {
+  // 字段标题、括号说明不是画面对象：「【别名】：无」这类内容一个都不该补进提示词
+  if (/[【】]/.test(body)) return false
   if (body.length >= 3) return true
   const words = [...STYLE_WORDS, ...COLOR_WORDS, ...TEXTURE_WORDS, ...COMPOSITION_WORDS, ...NEGATIVE_NOUNS]
   return words.some(word => word.includes(body))
 }
 
 const NEGATION = /(?:不要|别|禁止|避免|拒绝|不出现|不包含|去除|去掉|删除|移除|无|没有)/
+
+/** 「别」只有在跟动词时才是否定：「别名」「别人」「别处」都是名词 */
+const NEGATION_AT_START = /^(?:不要|禁止|避免|拒绝|不能|不可|不出现|不包含|去掉|去除|删除|移除|别(?=出现|画|加|带|放|写|有|用|让|把|要|弄|做|整|摆|拍|露|显示|包含))/
 const NEGATION_WINDOW = 14
 
 function normalize(value: string): string {
@@ -150,6 +155,7 @@ function cleanNegativeBody(raw: string): string {
         '',
       )
       .replace(/(?:之类|等等|什么)$/g, '')
+      .replace(/^[：:，,、。；;\s]+/g, '')
       .trim()
     if (next === cleaned) break
     cleaned = next
@@ -247,10 +253,8 @@ function extractStyleBlockClauses(text: string, list: PromptConstraint[]): void 
       if (clause.length < 3 || clause.length > 40) continue
       if (STYLE_BLOCK_META.test(clause)) continue
 
-      if (/^(?:不要|禁止|避免|拒绝|不能|不可|不出现|不包含|去掉|去除|删除|移除|别)/.test(clause)) {
-        const body = cleanNegativeBody(
-          clause.replace(/^(?:不要|禁止|避免|拒绝|不能|不可|不出现|不包含|去掉|去除|删除|移除|别)/, ''),
-        )
+      if (NEGATION_AT_START.test(clause)) {
+        const body = cleanNegativeBody(clause.replace(NEGATION_AT_START, ''))
         if (body && isVisualNegative(body)) {
           pushConstraint(list, 'negative', body, [body], start)
           added += 1
@@ -281,7 +285,7 @@ export function extractPromptConstraints(source: string): PromptConstraint[] {
 
   // 1. 否定约束：「不要 / 禁止 / 不出现 / 删除 …」
   const negativePattern =
-    /(?:不要|禁止|避免|拒绝|不能|不可|不出现|不包含|去掉|去除|删除|移除|(?<![特区分级性个])别)([^，。；;\n]{1,30})/g
+    /(?:不要|禁止|避免|拒绝|不能|不可|不出现|不包含|去掉|去除|删除|移除|别(?=出现|画|加|带|放|写|有|用|让|把|要|弄|做|整|摆|拍|露|显示|包含))([^，。；;\n]{1,30})/g
   let negativeMatch: RegExpExecArray | null
   while ((negativeMatch = negativePattern.exec(text)) !== null) {
     const capture = negativeMatch[1]
