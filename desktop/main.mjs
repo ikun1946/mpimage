@@ -6,7 +6,7 @@ import os from 'node:os'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
 import { appRoot, dataRoot } from './paths.mjs'
-import { loadConfig } from './config.mjs'
+import { loadConfig, saveConfig } from './config.mjs'
 import { desktopToken, initServer, restartServer, serverState, startServer, stopServer, waitForServer } from './server.mjs'
 import { checkForUpdate, downloadInstaller, findReadyInstaller, launchInstaller } from './updater.mjs'
 
@@ -178,8 +178,24 @@ async function runPanelServiceAction(label, action) {
   }
 }
 
-ipcMain.handle('panel:action', async (_event, name) => {
+ipcMain.handle('panel:action', async (_event, name, payload) => {
   switch (name) {
+    case 'set-lan-host': {
+      const raw = String(payload?.host ?? '')
+      const host = raw.trim() ? normalizeLanHost(raw) : ''
+      if (raw.trim() && !host) {
+        return { ok: false, message: '地址格式不对：填 IP 或主机名，例如 192.168.1.9、huajing.local:8787' }
+      }
+      config.LAN_HOST = host
+      try {
+        saveConfig(DATA, config)
+      } catch (error) {
+        return { ok: false, message: `地址保存失败：${error.message || error}` }
+      }
+      log(host ? `已固定局域网地址：${host}` : '已恢复自动选择局域网地址')
+      void pushPanelState(true)
+      return { ok: true, message: host ? `已固定为 ${lanAddress()}` : '已恢复自动选择地址' }
+    }
     case 'start':
       return runPanelServiceAction('启动服务', startServer)
     case 'stop':
@@ -258,6 +274,9 @@ async function pushPanelState(force = false) {
       uptimeMs: alive && Number.isFinite(startedAtMs) ? Math.max(Date.now() - startedAtMs, 0) : 0,
       lanUrl: lanAddress(),
       lanUrls: lanAddresses(),
+      lanHost: normalizeLanHost(config.LAN_HOST),
+      lanPinned: Boolean(pinnedLanUrl()),
+      lanDetected: detectedLanUrls(),
       clientUrl: CLIENT_URL,
       loginUrl: CLIENT_LOGIN_URL,
       needsSetup: alive ? await authNeedsSetup() : false,
@@ -604,7 +623,7 @@ const VIRTUAL_HINTS = ['virtual', 'vmware', 'virtualbox', 'hyper-v', 'vethernet'
  * 以前直接取第一个非回环 IPv4：网线插着但没拿到 DHCP 时那块网卡是 169.254.x，
  * 虚拟机/代理网卡也常排在前面，同事拿到的地址根本连不上。
  */
-function lanAddresses() {
+function detectedLanUrls() {
   const ranked = []
   for (const [name, entries] of Object.entries(os.networkInterfaces())) {
     for (const entry of entries || []) {
@@ -618,6 +637,47 @@ function lanAddresses() {
   }
   ranked.sort((a, b) => b.score - a.score)
   return [...new Set(ranked.map(item => item.url))]
+}
+
+/**
+ * config.env 的 LAN_HOST：用户填的固定地址。
+ * 只收 host[:port]（可带 http:// 前缀和路径，粘贴浏览器地址也能识别），
+ * 因为最终链接要由本应用拼端口和页面路径，乱填宁可当没填。
+ */
+function normalizeLanHost(raw) {
+  let text = String(raw ?? '').trim()
+  if (!text) return ''
+  text = text.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+  text = text.split(/[/?#]/)[0].trim()
+  if (!text || /\s/.test(text)) return ''
+  if (!/^(\[[0-9a-fA-F:.]+\]|[A-Za-z0-9._-]+)(:\d{1,5})?$/.test(text)) return ''
+  return splitLanHost(text) ? text : ''
+}
+
+/** 拆成 host 和 port；没写端口时用服务端口 */
+function splitLanHost(text) {
+  const close = text.startsWith('[') ? text.indexOf(']') : -1
+  const colon = text.lastIndexOf(':')
+  if (colon !== -1 && colon > close) {
+    const port = Number(text.slice(colon + 1))
+    if (!Number.isInteger(port) || port < 1 || port > 65535) return null
+    return { host: text.slice(0, colon), port }
+  }
+  return { host: text, port: SERVER_PORT }
+}
+
+function pinnedLanUrl() {
+  const text = normalizeLanHost(config.LAN_HOST)
+  if (!text) return ''
+  const parts = splitLanHost(text)
+  return parts ? `http://${parts.host}:${parts.port}/batch.html` : ''
+}
+
+/** 固定地址排在第一位；没固定时就是自动挑出来的网卡地址 */
+function lanAddresses() {
+  const detected = detectedLanUrls()
+  const pinned = pinnedLanUrl()
+  return pinned ? [pinned, ...detected.filter(url => url !== pinned)] : detected
 }
 
 function lanAddress() {
@@ -746,6 +806,18 @@ async function lanReport() {
       ? `服务只监听 ${host}:${SERVER_PORT}，局域网设备连不上：把 config.env 的 HOST 改成 0.0.0.0 再重启`
       : `服务监听 ${host}:${SERVER_PORT}`,
   )
+
+  // 固定地址和当前网卡对不上时，自检要直接说出来，否则同事拿到的链接永远连不上
+  const pinnedHost = normalizeLanHost(config.LAN_HOST)
+  if (pinnedHost) {
+    const split = splitLanHost(pinnedHost)
+    const onNic = Boolean(split) && detectedLanUrls().some(url => url.includes(`//${split.host}:`))
+    parts.push(
+      onNic
+        ? `固定地址 ${pinnedHost} 在本机网卡上`
+        : `固定地址 ${pinnedHost} 不在本机网卡上：去路由器给这台电脑做 DHCP 保留，或改回当前地址`,
+    )
+  }
 
   const urls = lanAddresses()
   if (!urls.length) {

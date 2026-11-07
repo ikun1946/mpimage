@@ -497,6 +497,44 @@
     font-size: 11.5px;
   }
 
+  /* 固定局域网地址：让链接不随网卡/候选排序变化 */
+  .url-pin {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin-top: 2px;
+  }
+
+  .url-pin label {
+    flex: none;
+    color: var(--ink-soft);
+    font-size: 11.5px;
+  }
+
+  .url-pin input {
+    flex: 1 1 220px;
+    min-width: 160px;
+    padding: 5px 9px;
+    border: 1px solid var(--line-soft);
+    border-radius: 7px;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .url-pin input:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 1px;
+  }
+
+  .url-pin-hint {
+    flex: 1 1 100%;
+    color: var(--ink-faint);
+    font-size: 11px;
+  }
+
   .setup {
     display: flex;
     flex: none;
@@ -1420,6 +1458,15 @@
     </div>
   </div>
   <p class="url-hint" id="url-label">还没有可用的地址</p>
+  <div class="url-pin" role="group" aria-labelledby="lan-pin-title">
+    <span class="sr-only" id="lan-pin-title">固定局域网地址</span>
+    <label for="lan-host-input">固定地址</label>
+    <input id="lan-host-input" type="text" inputmode="url" autocomplete="off" spellcheck="false"
+      placeholder="192.168.1.9 或 huajing.local" />
+    <button class="button mini" type="button" id="btn-lan-pin">固定</button>
+    <button class="button mini" type="button" id="btn-lan-unpin">恢复自动</button>
+    <span class="url-pin-hint" id="lan-host-hint">固定后链接不再随网卡切换；要让 IP 本身不变，还得在路由器里给这台电脑做 DHCP 保留（绑定 MAC）。</span>
+  </div>
   <p class="line-result" id="service-result" role="status" aria-live="polite"></p>
   <p class="flash" id="admin-flash" role="status" aria-live="polite" hidden></p>
 </header>
@@ -1707,6 +1754,10 @@
     btnCopyUrl: $('btn-copy-url'),
     btnLanCheck: $('btn-lan-check'),
     btnLanAllow: $('btn-lan-allow'),
+    lanHostInput: $('lan-host-input'),
+    btnLanPin: $('btn-lan-pin'),
+    btnLanUnpin: $('btn-lan-unpin'),
+    lanHostHint: $('lan-host-hint'),
     setupHint: $('setup-hint'),
     btnSetup: $('btn-setup'),
     adminFlash: $('admin-flash'),
@@ -1804,6 +1855,9 @@
     startedAtMs: 0,
     lanUrl: '',
     lanUrls: [],
+    lanHost: '',
+    lanPinned: false,
+    lanDetected: [],
     clientUrl: '',
     loginUrl: '',
     needsSetup: false,
@@ -1976,6 +2030,9 @@
     state.uptimeMs = Number(next.uptimeMs) || 0
     state.lanUrl = typeof next.lanUrl === 'string' ? next.lanUrl : ''
     state.lanUrls = Array.isArray(next.lanUrls) ? next.lanUrls.filter(url => typeof url === 'string') : []
+    state.lanHost = typeof next.lanHost === 'string' ? next.lanHost : ''
+    state.lanPinned = Boolean(next.lanPinned)
+    state.lanDetected = Array.isArray(next.lanDetected) ? next.lanDetected.filter(url => typeof url === 'string') : []
     state.clientUrl = typeof next.clientUrl === 'string' ? next.clientUrl : ''
     state.loginUrl = typeof next.loginUrl === 'string' ? next.loginUrl : ''
     state.needsSetup = Boolean(next.needsSetup)
@@ -2000,14 +2057,34 @@
     setText(
       dom.urlLabel,
       url
-        ? (state.lanUrl ? `局域网地址：同一网段的设备都能用${extraUrls}` : '本机地址：只有这台电脑能用')
+        ? (state.lanPinned
+          ? `固定局域网地址：所有设备都用这一个链接${extraUrls}`
+          : (state.lanUrl ? `局域网地址：同一网段的设备都能用${extraUrls}` : '本机地址：只有这台电脑能用'))
         : '还没有可用的地址',
     )
+    renderLanPin()
     dom.setupHint.hidden = !state.needsSetup
     setText(dom.appVersion, state.version ? `画境 v${state.version}` : '画境')
 
     renderServiceButtons()
     syncUrlButtons()
+  }
+
+  /** 固定地址那一行：输入框只在用户没在编辑时回填，避免每两秒把正在输入的内容冲掉 */
+  function renderLanPin() {
+    if (document.activeElement !== dom.lanHostInput) dom.lanHostInput.value = state.lanHost
+    dom.btnLanUnpin.disabled = !state.lanPinned
+    const detected = state.lanDetected.length
+      ? state.lanDetected[0].replace(/^https?:\/\//, '').replace(/\/batch\.html$/, '')
+      : ''
+    // 固定地址和当前网卡对不上：多半是填错了 IP，或路由器的 DHCP 保留还没生效
+    const offNic = state.lanPinned && state.lanDetected.length > 0 && !state.lanDetected.includes(state.lanUrl)
+    setText(
+      dom.lanHostHint,
+      state.lanPinned
+        ? `已固定为 ${state.lanHost}${offNic ? '（当前网卡列表里没有这个地址：用 IP 时确认是这台电脑的，用主机名可忽略）' : ''}：换 Wi-Fi、插拔网线都不再改变链接。IP 本身仍由路由器分配，建议同时在路由器里做 DHCP 保留。`
+        : `不固定时自动在网卡里挑一个（当前 ${detected || '未检测到'}），换 Wi-Fi 或插拔网线就会变；要让 IP 本身不变，在路由器里给这台电脑做 DHCP 保留（绑定 MAC）。`,
+    )
   }
 
   /** 状态栏那行「PID · 端口 · 已运行」；每秒重绘一次，别等两秒一次的推送 */
@@ -2071,6 +2148,26 @@
       serviceBusy.delete(name)
       renderServiceButtons()
     }
+  }
+
+  async function saveLanHost(host) {
+    if (!bridge) {
+      setServiceResult('控制台接口没准备好，请重启桌面端', 'error')
+      return
+    }
+    const button = String(host || '').trim() ? dom.btnLanPin : dom.btnLanUnpin
+    await withBusy(button, async () => {
+      try {
+        const result = await bridge.action('set-lan-host', { host })
+        if (!result || result.ok === false) {
+          setServiceResult((result && result.message) || '地址保存失败', 'error')
+          return
+        }
+        setServiceResult(result.message || '地址已保存', 'ok')
+      } catch (error) {
+        setServiceResult(`地址保存失败：${errorText(error)}`, 'error')
+      }
+    })
   }
 
   async function runOpenAction(name, label, button, payload) {
@@ -3280,6 +3377,13 @@
     })
     dom.btnLanAllow.addEventListener('click', () => {
       runOpenAction('lan-allow', '放行端口', dom.btnLanAllow)
+    })
+    dom.btnLanPin.addEventListener('click', () => saveLanHost(dom.lanHostInput.value))
+    dom.btnLanUnpin.addEventListener('click', () => saveLanHost(''))
+    dom.lanHostInput.addEventListener('keydown', event => {
+      if (event.key !== 'Enter') return
+      event.preventDefault()
+      saveLanHost(dom.lanHostInput.value)
     })
     dom.btnSetup.addEventListener('click', () => {
       runOpenAction('open-client', '打开初始化页面', dom.btnSetup)
