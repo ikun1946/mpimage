@@ -58,6 +58,7 @@ import { buildStyleExport, parseStyleFile, planStyleImport } from '../lib/style-
 import { requireLogin } from '../lib/guard.js'
 import { setupAvatarMenu } from '../lib/avatar-menu.js'
 import { HISTORY_LIMIT, assetFilename, assetHistory, primaryEntry, primaryFilename, primaryImageOf } from '../lib/format.js'
+import { markAiBusyStill, startAiBusy } from '../lib/ai-busy.js'
 import { activateOverlay } from '../lib/overlay.js'
 import { ratioOptions } from '../lib/ratio.js'
 import { setupTablist } from '../lib/tabs.js'
@@ -255,6 +256,7 @@ import { setupTablist } from '../lib/tabs.js'
       modalTitle: document.querySelector('#modal-title'),
       modalFields: document.querySelector('#modal-fields'),
       modalPrompt: document.querySelector('#modal-prompt'),
+      modalPromptField: document.querySelector('#modal-prompt-field'),
       modalPromptCount: document.querySelector('#modal-prompt-count'),
       modalRatio: document.querySelector('#modal-ratio'),
       modalStyle: document.querySelector('#modal-style'),
@@ -3106,6 +3108,7 @@ import { setupTablist } from '../lib/tabs.js'
       dom.freePromptOptimize.disabled = true
       dom.freePromptOptimize.classList.add('is-busy')
       dom.freePromptOptimize.setAttribute('aria-busy', 'true')
+      const busy = startAiBusy(dom.freePromptShell, { pool: 'optimize', action: '优化' })
       try {
         // 参考图还没传完就先等它：优化要带着这次上传的图一起送模型
         if (freeRefUploadTask) {
@@ -3157,6 +3160,7 @@ import { setupTablist } from '../lib/tabs.js'
       } catch (error) {
         showToast(error.message || '提示词优化失败，请稍后重试', true)
       } finally {
+        busy.stop()
         dom.freePromptOptimize.disabled = false
         dom.freePromptOptimize.classList.remove('is-busy')
         dom.freePromptOptimize.removeAttribute('aria-busy')
@@ -3207,10 +3211,13 @@ import { setupTablist } from '../lib/tabs.js'
       dom.reviseResultWrap.hidden = true
       dom.reviseApply.hidden = true
       dom.reviseRun.textContent = '开始改写'
-      dom.reviseRun.disabled = false
+      // 上一次改写还在后台跑：按钮先不明着可点，免得以为能并行发第二次
+      dom.reviseRun.disabled = reviseBusy
       dom.reviseRun.classList.remove('is-busy')
       dom.reviseRun.removeAttribute('aria-busy')
-      dom.reviseStatus.textContent = '只改你点名的部分，其余保持原样'
+      dom.reviseStatus.textContent = reviseBusy
+        ? '上一次改写还在后台进行，完成后这里会自动更新'
+        : '只改你点名的部分，其余保持原样'
 
       const refs = Array.isArray(target.references) ? target.references : []
       dom.reviseUseRefs.checked = refs.length > 0
@@ -3236,9 +3243,13 @@ import { setupTablist } from '../lib/tabs.js'
     }
 
     function closeReviseDialog() {
-      // 关闭即作废在途请求：迟到的响应不能再写进下一次打开的弹窗
-      reviseSeq += 1
-      reviseBusy = false
+      // 没有在途请求时仍然作废旧代次；有请求在跑时保留它：
+      // 弹窗关了，任务继续，结果回来直接落进目标输入框
+      if (reviseBusy) {
+        if (reviseTarget?.busyTarget) markAiBusyStill(reviseTarget.busyTarget, '改写')
+      } else {
+        reviseSeq += 1
+      }
       const fallback = reviseFocusFallback
       reviseFocusFallback = null
 
@@ -3303,7 +3314,11 @@ import { setupTablist } from '../lib/tabs.js'
     }
 
     async function runRevise() {
-      if (reviseBusy || !reviseTarget) return
+      if (reviseBusy) {
+        showToast('上一次改写还在进行，完成后再试')
+        return
+      }
+      if (!reviseTarget) return
       const instruction = dom.reviseInstruction.value.trim()
       if (!instruction) {
         showToast('先说说你想怎么改')
@@ -3315,8 +3330,13 @@ import { setupTablist } from '../lib/tabs.js'
       const referencePaths = references.map(ref => ref.path)
       const contextPaths = contextPath ? [contextPath] : []
       const seq = ++reviseSeq
-      const prompt = reviseTarget.prompt
-      const ratio = reviseTarget.ratio
+      const target = reviseTarget
+      const prompt = target.prompt
+      const ratio = target.ratio
+      const previousPrompt = prompt
+      const busy = target.busyTarget
+        ? startAiBusy(target.busyTarget, { pool: 'optimize', action: '改写' })
+        : null
 
       reviseBusy = true
       dom.reviseRun.disabled = true
@@ -3332,17 +3352,28 @@ import { setupTablist } from '../lib/tabs.js'
           referencePaths,
           contextPaths,
         })
-        // 请求期间弹窗被关掉、或又发起了新一次改写：这次结果作废
-        if (seq !== reviseSeq || !reviseTarget) return
+        // 又发起了新一次改写：这次结果作废
+        if (seq !== reviseSeq) return
         const next = (result?.prompt || '').trim()
         if (!next) throw new Error('模型没有返回改写结果')
+        const keptNote = optimizeKeptNote(result)
+
+        // 弹窗已经关了（或已经换成别的目标）：直接落进原来的输入框，不再要求确认
+        const dialogOpen = dom.reviseModal.classList.contains('visible') && reviseTarget === target
+        if (!dialogOpen) {
+          target.apply(next)
+          showToast(`改写完成${keptNote}，已更新提示词`, false, {
+            label: '撤销',
+            onClick: () => target.apply(previousPrompt),
+          })
+          return
+        }
 
         dom.reviseResult.value = next
         dom.reviseResultCount.textContent = String(next.length)
         dom.reviseResultWrap.hidden = false
         dom.reviseApply.hidden = false
         dom.reviseRun.textContent = '重新改写'
-        const keptNote = optimizeKeptNote(result)
         dom.reviseStatus.textContent = result?.imageCount
           ? `已参考 ${result.imageCount} 张图片改写${keptNote}，确认后点「应用改写」`
           : `改写完成${keptNote}，确认后点「应用改写」`
@@ -3352,6 +3383,7 @@ import { setupTablist } from '../lib/tabs.js'
         dom.reviseStatus.textContent = error.message || '改写失败，请稍后重试'
         showToast(error.message || '改写失败，请稍后重试', true)
       } finally {
+        busy?.stop()
         // 只有最新一次请求能复位按钮，旧请求的 finally 不能把忙碌态清掉
         if (seq === reviseSeq) {
           reviseBusy = false
@@ -3379,6 +3411,7 @@ import { setupTablist } from '../lib/tabs.js'
         references: state.freeReferences.slice(0, FREE_REF_LIMIT),
         resultUrl: state.freeImageUrl,
         apply: value => applyFreePrompt(value),
+        busyTarget: dom.freePromptShell,
         // 浮动按钮只在 hover 时可见，焦点归不回去时落回输入框
         focusAfterClose: dom.freePrompt,
       })
@@ -3396,6 +3429,7 @@ import { setupTablist } from '../lib/tabs.js'
           : [],
         resultUrl: primaryImageOf(asset),
         focusAfterClose: dom.modalPrompt,
+        busyTarget: dom.modalPromptField,
         apply: value => {
           // 走 input 事件，复用「编辑即保存到本地快照」的那条监听
           dom.modalPrompt.value = value
@@ -3713,6 +3747,11 @@ import { setupTablist } from '../lib/tabs.js'
 
     function closeFaceRefine(panel) {
       if (!panel) return
+      if (faceRefineBusy) {
+        const field = panel.dataset.refineField === 'negative' ? 'negative' : 'prompt'
+        const textEl = field === 'prompt' ? dom.facePrompt : dom.faceNegative
+        markAiBusyStill(textEl.parentElement, '修改')
+      }
       panel.hidden = true
       const input = panel.querySelector('input')
       if (input) input.value = ''
@@ -3739,8 +3778,8 @@ import { setupTablist } from '../lib/tabs.js'
       }
 
       // 以文本框里的当前内容为准：用户可能刚手改过
-      const value =
-        field === 'prompt' ? dom.facePrompt.value.trim() : dom.faceNegative.value.trim()
+      const rawValue = field === 'prompt' ? dom.facePrompt.value : dom.faceNegative.value
+      const value = rawValue.trim()
       if (!value) {
         if (status) status.textContent = '这一栏还没有内容'
         return
@@ -3750,6 +3789,10 @@ import { setupTablist } from '../lib/tabs.js'
       const seq = ++faceRefineSeq
       if (run) run.disabled = true
       if (status) status.textContent = '正在修改…'
+      // 动画挂在文本框本身：就算用户把修改条收起来，也还能看见它还在跑
+      const textEl = field === 'prompt' ? dom.facePrompt : dom.faceNegative
+      const busy = startAiBusy(textEl.parentElement, { pool: 'refine', action: '修改' })
+      const previousValue = rawValue
       try {
         const result = await refineFaceField({
           field,
@@ -3771,13 +3814,31 @@ import { setupTablist } from '../lib/tabs.js'
         }
         dom.faceGenerate.disabled = faceGenBusy || !state.face.prompt.trim()
         persistSoon()
-        if (status) status.textContent = '已修改；出图会使用这里的内容'
+        if (panel.hidden) {
+          showToast('提示词已修改', false, {
+            label: '撤销',
+            onClick: () => {
+              if (field === 'prompt') {
+                state.face.prompt = previousValue
+                dom.facePrompt.value = previousValue
+              } else {
+                state.face.negativePrompt = previousValue
+                dom.faceNegative.value = previousValue
+              }
+              persistSoon()
+            },
+          })
+        } else if (status) {
+          status.textContent = '已修改；出图会使用这里的内容'
+        }
         if (input) input.value = ''
         input?.focus()
       } catch (error) {
         if (seq !== faceRefineSeq) return
-        if (status) status.textContent = error.message || '修改失败，请稍后重试'
+        if (panel.hidden) showToast(error.message || '修改失败，请稍后重试', true)
+        else if (status) status.textContent = error.message || '修改失败，请稍后重试'
       } finally {
+        busy.stop()
         if (seq === faceRefineSeq) {
           faceRefineBusy = false
           if (run) run.disabled = false

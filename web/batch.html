@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/src/ui/components.css">
   <link rel="stylesheet" href="/src/batch/batch.css">
   <link rel="stylesheet" href="/src/lib/prompt-tools.css">
+  <link rel="stylesheet" href="/src/lib/ai-busy.css">
   <link rel="stylesheet" href="/src/lib/history-panel.css">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23425a46'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='%23fffdf8' font-family='serif'%3E境%3C/text%3E%3C/svg%3E">
 </head>
@@ -324,7 +325,9 @@
                     <button class="button mini" type="button" data-face-copy="face-prompt">复制</button>
                   </div>
                 </header>
-                <textarea class="textarea face-prompt" id="face-prompt" aria-label="捏脸完整提示词"></textarea>
+                <div class="face-text-field">
+                  <textarea class="textarea face-prompt" id="face-prompt" aria-label="捏脸完整提示词"></textarea>
+                </div>
                 <div class="face-refine" data-refine-field="prompt" hidden>
                   <input class="input" type="text" maxlength="300" placeholder="想怎么改？例如：下巴更利落、眼神再冷一点" />
                   <div class="face-refine-actions">
@@ -343,7 +346,9 @@
                     <button class="button mini" type="button" data-face-copy="face-negative">复制</button>
                   </div>
                 </header>
-                <textarea class="textarea face-negative" id="face-negative" aria-label="捏脸负面提示词"></textarea>
+                <div class="face-text-field">
+                  <textarea class="textarea face-negative" id="face-negative" aria-label="捏脸负面提示词"></textarea>
+                </div>
                 <div class="face-refine" data-refine-field="negative" hidden>
                   <input class="input" type="text" maxlength="300" placeholder="想怎么改？例如：再去掉假睫毛和明显修容" />
                   <div class="face-refine-actions">
@@ -560,7 +565,9 @@
         <section class="asset-prompt-editor">
           <!-- 不要用 .prompt-editor：那是 prompt-tools.css 里最大化编辑器的浮层类名，会把它隐藏 -->
           <h4>生图提示词</h4>
-          <textarea class="textarea" id="modal-prompt" maxlength="4000" aria-label="资产生图提示词"></textarea>
+          <div class="modal-prompt-field" id="modal-prompt-field">
+            <textarea class="textarea" id="modal-prompt" maxlength="4000" aria-label="资产生图提示词"></textarea>
+          </div>
           <div class="prompt-meta">
             <span>提示词会自动保存到当前浏览器</span>
             <span><span id="modal-prompt-count">0</span> / 4000</span>

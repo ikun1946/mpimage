@@ -1,0 +1,170 @@
+/* ===== AI 执行中的字段动画 =====
+   方案一：金色流光边框 + 状态胶囊 + 短句轮播。
+   挂在提示词框的包裹层上（.prompt-shell / .face-field / .modal-prompt-field），
+   不拦截点击，输入框仍然可以编辑。 */
+
+@property --ai-busy-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.prompt-shell,
+.face-text-field,
+.modal-prompt-field {
+  position: relative;
+}
+
+.is-ai-busy::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--ai-busy-angle),
+    transparent 0deg,
+    rgba(167, 130, 67, 0) 30deg,
+    var(--gold) 78deg,
+    #d8c39b 96deg,
+    rgba(167, 130, 67, 0) 150deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ai-busy-rotate 2.8s linear infinite;
+  pointer-events: none;
+}
+
+.is-ai-busy {
+  box-shadow: 0 0 0 3px rgba(167, 130, 67, 0.08), inset 0 0 22px rgba(167, 130, 67, 0.05);
+}
+
+/* 胶囊层：只负责提示，不挡输入 */
+.ai-busy-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ai-busy-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(216, 195, 155, 0.28) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: ai-busy-sweep 2.4s ease-in-out infinite;
+}
+
+.ai-busy-pill {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border: 1px solid rgba(167, 130, 67, 0.35);
+  border-radius: 999px;
+  background: rgba(252, 251, 247, 0.94);
+  box-shadow: 0 3px 12px rgba(167, 130, 67, 0.14);
+  color: var(--gold);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+}
+
+.ai-busy-pill svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  fill: currentColor;
+  animation: ai-busy-sparkle 2.4s ease-in-out infinite;
+}
+
+.ai-busy-text {
+  display: inline-block;
+  max-width: 16em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 170ms ease, transform 170ms ease;
+}
+
+.ai-busy-text.is-swapping {
+  opacity: 0;
+  transform: translateY(2px);
+}
+
+.ai-busy-dots {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 1px;
+}
+
+.ai-busy-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: ai-busy-dot 1.1s ease-in-out infinite;
+}
+
+.ai-busy-dots i:nth-child(2) { animation-delay: 0.15s; }
+.ai-busy-dots i:nth-child(3) { animation-delay: 0.3s; }
+
+/* 忙碌时把首行往下让一点，避免胶囊压住文字；结束后平滑还原 */
+.prompt-shell .textarea,
+.face-text-field .textarea,
+.modal-prompt-field .textarea {
+  transition: padding-top 180ms ease;
+}
+
+/* 类名写两遍：批次页的 .free-form .prompt-shell .textarea 也是三档权重，
+   这里压过它才能保证忙碌时首行让位给胶囊 */
+.prompt-shell.is-ai-busy.is-ai-busy > .textarea,
+.face-text-field.is-ai-busy.is-ai-busy > .textarea,
+.modal-prompt-field.is-ai-busy.is-ai-busy > .textarea {
+  padding-top: 36px;
+}
+
+@keyframes ai-busy-rotate {
+  to { --ai-busy-angle: 360deg; }
+}
+
+@keyframes ai-busy-sweep {
+  0% { transform: translateX(-120%); }
+  55%, 100% { transform: translateX(120%); }
+}
+
+@keyframes ai-busy-sparkle {
+  0%, 100% { transform: rotate(0deg) scale(1); opacity: 0.9; }
+  45% { transform: rotate(140deg) scale(1.12); opacity: 1; }
+  70% { transform: rotate(220deg) scale(1); opacity: 0.85; }
+}
+
+@keyframes ai-busy-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-2.5px); opacity: 1; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .ai-busy-pill {
+    background: rgba(27, 33, 28, 0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-ai-busy::before,
+  .ai-busy-layer::after,
+  .ai-busy-pill svg,
+  .ai-busy-dots i {
+    animation: none;
+  }
+}
