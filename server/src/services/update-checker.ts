@@ -16,6 +16,12 @@ export interface UpdateStatus {
   releaseNotes: string
   pageUrl: string | null
   downloadUrl: string | null
+  /**
+   * GitHub 资产 API 直链（Accept: application/octet-stream）。
+   * 走 github.com/…/releases/download 的普通链接在部分代理上会 504，
+   * 这个接口会 302 到签名 CDN，能绕开那种代理故障。
+   */
+  downloadApiUrl: string | null
   downloadName: string | null
   /** 安装包字节数：GitHub 取资产 size，自定义源可显式给出；拿不到就是 null */
   downloadSize: number | null
@@ -31,6 +37,7 @@ interface ReleaseInfo {
   notes: string
   pageUrl: string | null
   downloadUrl: string | null
+  downloadApiUrl: string | null
   downloadName: string | null
   downloadSize: number | null
   publishedAt: string | null
@@ -119,18 +126,25 @@ function normalizeSize(value: unknown): number | null {
 }
 
 /** GitHub release 的资产：.exe 里优先名字含 Setup 的（安装包），其次 portable（免安装） */
-function pickAsset(assets: unknown): { name: string; url: string; size: number | null } | null {
+function pickAsset(assets: unknown): { name: string; url: string; apiUrl: string | null; size: number | null } | null {
   if (!Array.isArray(assets)) return null
   const exes = assets
     .map(asset => {
-      const record = (asset ?? {}) as { name?: unknown; browser_download_url?: unknown; size?: unknown }
+      const record = (asset ?? {}) as { name?: unknown; browser_download_url?: unknown; url?: unknown; size?: unknown }
       const name = textFrom(record.name)
       const url = textFrom(record.browser_download_url)
+      // asset.url 是 API 形态（…/releases/assets/<id>），只认 api.github.com 的
+      const apiUrl = textFrom(record.url)
       return name && url && name.toLowerCase().endsWith('.exe')
-        ? { name, url, size: normalizeSize(record.size) }
+        ? {
+          name,
+          url,
+          apiUrl: apiUrl && apiUrl.startsWith('https://api.github.com/') ? apiUrl : null,
+          size: normalizeSize(record.size),
+        }
         : null
     })
-    .filter((asset): asset is { name: string; url: string; size: number | null } => asset !== null)
+    .filter((asset): asset is { name: string; url: string; apiUrl: string | null; size: number | null } => asset !== null)
   const setup = exes.find(asset => asset.name.toLowerCase().includes('setup'))
   const portable = exes.find(asset => asset.name.toLowerCase().includes('portable'))
   return setup ?? portable ?? null
@@ -167,6 +181,7 @@ async function fetchCustom(feedUrl: string): Promise<ReleaseInfo> {
     pageUrl: nullableTextFrom(payload?.pageUrl),
     downloadUrl: nullableTextFrom(payload?.downloadUrl),
     downloadName: null,
+    downloadApiUrl: nullableTextFrom(payload?.downloadApiUrl),
     downloadSize: normalizeSize(payload?.downloadSize),
     publishedAt: nullableTextFrom(payload?.publishedAt),
     source: 'custom',
@@ -193,6 +208,7 @@ async function fetchGitHubApi(repo: string, token: string): Promise<ReleaseInfo>
     notes: textFrom(payload?.body),
     pageUrl: nullableTextFrom(payload?.html_url),
     downloadUrl: asset?.url ?? null,
+    downloadApiUrl: asset?.apiUrl ?? null,
     downloadName: asset?.name ?? null,
     downloadSize: asset?.size ?? null,
     publishedAt: nullableTextFrom(payload?.published_at),
@@ -276,6 +292,7 @@ async function fetchGitHubWeb(repo: string): Promise<ReleaseInfo> {
     notes: '',
     pageUrl: `https://github.com/${repo}/releases/tag/${encodeURIComponent(tag)}`,
     downloadUrl: asset.url,
+    downloadApiUrl: asset.apiUrl ?? null,
     downloadName: asset.name,
     downloadSize: asset.size ?? (await headSize(asset.url)),
     publishedAt: null,
@@ -333,6 +350,7 @@ export class UpdateChecker {
         releaseNotes: '',
         pageUrl: null,
         downloadUrl: null,
+        downloadApiUrl: null,
         downloadName: null,
         downloadSize: null,
         publishedAt: null,
@@ -367,6 +385,7 @@ export class UpdateChecker {
         releaseNotes: info.notes.slice(0, NOTES_LIMIT),
         pageUrl: info.pageUrl,
         downloadUrl: info.downloadUrl,
+        downloadApiUrl: info.downloadApiUrl,
         downloadName: info.downloadName,
         downloadSize: info.downloadSize,
         publishedAt: info.publishedAt,
@@ -386,6 +405,7 @@ export class UpdateChecker {
         releaseNotes: '',
         pageUrl: null,
         downloadUrl: null,
+        downloadApiUrl: null,
         downloadName: null,
         downloadSize: null,
         publishedAt: null,

@@ -11,7 +11,7 @@ const DEFAULTS = {
   HOST: '0.0.0.0',
   PORT: '8787',
   MAGPIE_BASE_URL: 'http://127.0.0.1:3425',
-  MAGPIE_IMAGE_MODEL: 'codex/gpt-image-2',
+  MAGPIE_IMAGE_MODEL: 'ai-studio/gemini-3-pro-image',
   IMAGE_TIMEOUT_MS: '300000',
   MAX_PROMPT_LENGTH: '12000',
   // 同时打向上游的生图请求上限；批量页的「并行数」不会超过它
@@ -66,15 +66,27 @@ function serialize(values) {
  * SESSION_SECRET 持久化（重启后不用重新登录），ADMIN_SETUP_KEY 持久化
  * （首次建管理员时要用，之后服务端会自动忽略它）。
  */
+/**
+ * 已下线的生图模型：网关已经不再提供，留着只会让每次生图都 404。
+ * 老配置里读到这些值时自动换成当前默认值。
+ */
+const RETIRED_IMAGE_MODELS = new Set(['codex/gpt-image-2'])
+
 export function loadConfig(root) {
   const file = configPath(root)
   const saved = existsSync(file) ? parseEnv(readFileSync(file, 'utf8')) : {}
   const merged = { ...DEFAULTS, ...saved }
 
+  let migrated = false
+  if (RETIRED_IMAGE_MODELS.has(String(merged.MAGPIE_IMAGE_MODEL || '').trim())) {
+    merged.MAGPIE_IMAGE_MODEL = DEFAULTS.MAGPIE_IMAGE_MODEL
+    migrated = true
+  }
+
   if (!merged.SESSION_SECRET) merged.SESSION_SECRET = randomBytes(32).toString('hex')
   if (!merged.ADMIN_SETUP_KEY) merged.ADMIN_SETUP_KEY = randomBytes(10).toString('hex').toUpperCase()
 
-  if (!existsSync(file) || !saved.SESSION_SECRET || !saved.ADMIN_SETUP_KEY) {
+  if (migrated || !existsSync(file) || !saved.SESSION_SECRET || !saved.ADMIN_SETUP_KEY) {
     writeFileSync(file, serialize(merged), 'utf8')
   }
   return merged

@@ -319,6 +319,11 @@ async function resolveDirectUrl(url, headers, signal) {
   }
   if (!response.ok) {
     await response.body?.cancel().catch(() => {})
+    if (response.status >= 500) {
+      throw new DownloadError(
+        `更新下载源暂时不可用（HTTP ${response.status}），可稍后重试，或到发布页手动下载`,
+      )
+    }
     throw new DownloadError(`下载地址不可用（HTTP ${response.status}）`)
   }
   if (isJsonResponse(response)) {
@@ -661,7 +666,7 @@ async function writeInstallerMeta(metaPath, { version, size }) {
  * 已经下完的段直接跳过，服务端支持 Range 时从已有字节接着下。
  * 全部字节到位并核对过大小后才拼成 .part 再改名，中途失败不影响下次续传。
  */
-export async function downloadInstaller({ url, name, onProgress, signal, expectedSize, version } = {}) {
+export async function downloadInstaller({ url, apiUrl, name, onProgress, signal, expectedSize, version } = {}) {
   if (!/^https?:\/\//i.test(String(url || ''))) throw new Error('下载地址无效')
   if (signal?.aborted) throw abortError()
 
@@ -673,13 +678,20 @@ export async function downloadInstaller({ url, name, onProgress, signal, expecte
   }
   const mirrorPrefix = String(settings.UPDATE_DOWNLOAD_MIRROR || '').trim().replace(/\/+$/, '')
   const connectionSetting = String(settings.UPDATE_DOWNLOAD_CONNECTIONS || 'auto').trim().toLowerCase()
-  const sourceUrl = mirrorPrefix ? `${mirrorPrefix}/${url}` : url
+  // 依次尝试：镜像前缀（用户自己配的）→ 资产 API 直链 → 原始链接。
+  // 普通 releases/download 链接在部分代理上会 504，API 直链会 302 到签名 CDN，能绕开。
+  const candidates = []
+  if (mirrorPrefix) candidates.push({ url: `${mirrorPrefix}/${url}`, mirror: true })
+  if (apiUrl && /^https:\/\/api\.github\.com\//i.test(String(apiUrl))) {
+    candidates.push({ url: apiUrl, mirror: false })
+  }
+  candidates.push({ url, mirror: false })
   const expected = normalizeExpectedSize(expectedSize)
 
   const { dir, target, part, segmentDir, meta } = installerPaths({ url, name })
 
   const progress = createProgress(onProgress)
-  progress.set({ mirror: Boolean(mirrorPrefix) })
+  progress.set({ mirror: false })
 
   const headers = {
     // GitHub 的asset 接口要 octet-stream 才回二进制，否则给的是 JSON 元数据
@@ -691,7 +703,21 @@ export async function downloadInstaller({ url, name, onProgress, signal, expecte
     await mkdir(dir, { recursive: true })
 
     progress.set({ phase: 'resolve' })
-    const resolved = await resolveDirectUrl(sourceUrl, headers, signal)
+    let resolved = null
+    let sourceUrl = ''
+    let resolveError = null
+    for (const candidate of candidates) {
+      try {
+        resolved = await resolveDirectUrl(candidate.url, headers, signal)
+        sourceUrl = candidate.url
+        progress.set({ mirror: candidate.mirror })
+        break
+      } catch (error) {
+        if (signal?.aborted) throw abortError()
+        resolveError = error
+      }
+    }
+    if (!resolved) throw resolveError || new DownloadError('下载地址不可用')
 
     let directUrl = resolved.direct
     let refreshing = null

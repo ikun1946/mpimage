@@ -387,7 +387,7 @@ function openLogWindow() {
 
 /* ===== 更新窗口：检查、下载、安装都在这一个窗口里 ===== */
 let updateWindow = null
-let updateTarget = { url: '', name: '', version: '', pageUrl: '', expectedSize: null }
+let updateTarget = { url: '', apiUrl: '', name: '', version: '', pageUrl: '', expectedSize: null }
 let updateController = null
 let updateTimer = 0
 let updateDirty = false
@@ -527,6 +527,7 @@ async function startUpdateDownload() {
   try {
     const result = await downloadInstaller({
       url: updateTarget.url,
+      apiUrl: updateTarget.apiUrl,
       name: updateTarget.name,
       signal: updateController.signal,
       expectedSize: updateTarget.expectedSize,
@@ -1102,7 +1103,7 @@ async function runServiceAction(label, action) {
 /** 出错或源被禁用时别留着上一次的下载目标，免得错误页给出下载旧版本的重试按钮 */
 function clearStaleUpdateTarget() {
   if (updateBusy) return false
-  updateTarget = { url: '', name: '', version: '', pageUrl: '', expectedSize: null }
+  updateTarget = { url: '', apiUrl: '', name: '', version: '', pageUrl: '', expectedSize: null }
   return true
 }
 
@@ -1191,6 +1192,7 @@ async function checkUpdates() {
 
     updateTarget = {
       url: info.downloadUrl || '',
+      apiUrl: info.downloadApiUrl || '',
       name: info.downloadName || '',
       version: latestVersion,
       pageUrl: info.pageUrl || '',
