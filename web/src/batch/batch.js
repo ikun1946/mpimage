@@ -2318,14 +2318,16 @@ import { setupTablist } from '../lib/tabs.js'
       const models = Array.isArray(serverConfig?.imageModels) ? serverConfig.imageModels : []
       const defaultModel = serverConfig?.defaultImageModel || ''
       const defaultVisible = models.some(model => model.id === defaultModel)
+      // 客户端只显示模型名称，不显示带厂商前缀的 ID
       const options = models.map(model => ({
         id: model.id,
-        label: model.label ? `${model.label} · ${model.id}` : model.id,
+        label: model.label || model.id,
       }))
       // 只有默认模型本身对客户端可见时，才提供「跟随服务端默认」；
       // 否则显示它等于把后台关掉的模型又露出来
       if (defaultVisible) {
-        options.unshift({ id: '', label: `跟随服务端默认（${defaultModel}）` })
+        const defaultLabel = models.find(model => model.id === defaultModel)?.label || defaultModel
+        options.unshift({ id: '', label: `跟随服务端默认（${defaultLabel}）` })
       }
       return { options, defaultId: options[0]?.id || '' }
     }

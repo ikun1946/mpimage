@@ -40,6 +40,7 @@ export interface ImageModelSpec {
  * 这里的每一项都用 scripts/test-image-models.mjs 实测过能出图、能做图生图。
  */
 const imageModels: ImageModelSpec[] = [
+  { id: 'codex/gpt-image-2', label: 'GPT Image 2' },
   { id: 'ai-studio/gemini-3-pro-image', label: 'Gemini 3 Pro Image' },
   { id: 'ai-studio/gemini-3.1-flash-image', label: 'Gemini 3.1 Flash Image' },
   { id: 'ai-studio/gemini-3.1-flash-lite-image', label: 'Gemini 3.1 Flash Lite' },
@@ -213,7 +214,7 @@ export const config = {
   port: intFromEnv('PORT', 8787),
   publicBaseUrl: (process.env.PUBLIC_BASE_URL || '').replace(/\/+$/, ''),
   magpieBaseUrl: (process.env.MAGPIE_BASE_URL || 'http://127.0.0.1:3425').replace(/\/+$/, ''),
-  imageModel: process.env.MAGPIE_IMAGE_MODEL || 'ai-studio/gemini-3-pro-image',
+  imageModel: process.env.MAGPIE_IMAGE_MODEL || 'codex/gpt-image-2',
   /**
    * 提示词优化专用的对话模型，与生图模型互不相干。
    * 选 flash 档是因为只做扩写，1–2 秒返回，没必要上更贵的模型。

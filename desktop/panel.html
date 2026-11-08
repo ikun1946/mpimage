@@ -2002,6 +2002,7 @@
    * 所以这里用一份常用清单 + 自定义 ID；清单只是候选，不代表网关一定开通了。
    */
   const IMAGE_MODEL_PRESETS = [
+    { id: 'codex/gpt-image-2', label: 'GPT Image 2' },
     { id: 'ai-studio/gemini-3-pro-image', label: 'Gemini 3 Pro Image' },
     { id: 'ai-studio/gemini-3.1-flash-image', label: 'Gemini 3.1 Flash Image' },
     { id: 'ai-studio/gemini-3.1-flash-lite-image', label: 'Gemini 3.1 Flash Lite Image' },
@@ -2010,7 +2011,6 @@
     { id: 'ai-studio/gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image' },
     { id: 'grok/grok-imagine-image', label: 'Grok Imagine（限流，暂不可用）' },
     { id: 'grok/grok-imagine-image-quality', label: 'Grok Imagine Quality（限流，暂不可用）' },
-    { id: 'codex/gpt-image-2', label: 'GPT Image 2（本机网关不可用）' },
   ]
   /** 已保存的生图模型覆写值；空串表示跟随环境变量 */
   let upstreamSavedImageModel = ''
