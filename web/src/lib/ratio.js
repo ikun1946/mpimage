@@ -11,6 +11,15 @@ export const FALLBACK_RATIOS = [
   { id: '3:4', label: '3 : 4', shortLabel: '3 : 4' },
   { id: '16:9', label: '16 : 9', shortLabel: '16 : 9' },
   { id: '9:16', label: '9 : 16', shortLabel: '9 : 16' },
+  { id: '3:2', label: '3 : 2', shortLabel: '3 : 2' },
+  { id: '2:3', label: '2 : 3', shortLabel: '2 : 3' },
+  { id: '5:4', label: '5 : 4', shortLabel: '5 : 4' },
+  { id: '4:5', label: '4 : 5', shortLabel: '4 : 5' },
+  { id: '21:9', label: '21 : 9', shortLabel: '21 : 9' },
+  { id: '2:1', label: '2 : 1', shortLabel: '2 : 1' },
+  { id: '1:2', label: '1 : 2', shortLabel: '1 : 2' },
+  { id: '3:1', label: '3 : 1', shortLabel: '3 : 1' },
+  { id: '1:3', label: '1 : 3', shortLabel: '1 : 3' },
 ]
 
 /** 服务端给了配置就用配置，否则回落到内置列表 */

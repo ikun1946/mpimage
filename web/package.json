@@ -1,6 +1,6 @@
 {
   "name": "mpimage-web",
-  "version": "1.0.25",
+  "version": "1.0.26",
   "private": true,
   "type": "module",
   "description": "画境生图前端：单张工作台与资产批量工作台",
