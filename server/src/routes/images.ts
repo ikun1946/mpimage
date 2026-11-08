@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { randomUUID } from 'node:crypto'
-import { config, findRatio } from '../config.js'
+import { config, findImageModel, findRatio } from '../config.js'
 import { ApiError } from '../lib/errors.js'
 import type { SerialGate } from '../lib/serial-gate.js'
 import { auditFailure, auditLog } from '../lib/audit.js'
@@ -51,6 +51,8 @@ interface GenerateBody {
   referencePath?: unknown
   /** 自由创作的多张参考图：同上规则的路径数组，会与 referencePath 合并 */
   referencePaths?: unknown
+  /** 客户端选中的生图模型；不传则用服务端当前配置的模型 */
+  model?: unknown
 }
 
 export function registerImageRoutes(
@@ -143,6 +145,15 @@ export function registerImageRoutes(
     const ratio = findRatio(body.ratio)
     if (!ratio) {
       throw new ApiError('RATIO_INVALID', '请选择有效的图片比例')
+    }
+
+    // 客户端只能选服务端开启的模型；不传就跟随服务端当前配置
+    const requestedModel = typeof body.model === 'string' ? body.model.trim() : ''
+    if (requestedModel) {
+      const enabledModels = deps.settings.getEnabledImageModels()
+      if (!findImageModel(requestedModel) || !enabledModels.includes(requestedModel)) {
+        throw new ApiError('MODEL_INVALID', '这个生图模型当前不可用，请重新选择')
+      }
     }
 
     // 参考图：只接受上传接口产出的「参考图/」路径，防止拿任意文件当输入。
@@ -239,7 +250,8 @@ export function registerImageRoutes(
       // 每次生图都重读上游地址：后台改完立即生效，无需重启服务
       const upstreamOptions = {
         baseUrl: await deps.settings.getBaseUrl(),
-        model: config.imageModel,
+        // 客户端选了就用客户端的，否则每次重读服务端配置（后台改完立即生效）
+        model: requestedModel || deps.settings.getClientImageModel(),
         timeoutMs: config.requestTimeoutMs,
       }
       const upstream = references.length
@@ -283,6 +295,7 @@ export function registerImageRoutes(
       category,
       name: assetName,
       ratio: ratio.id,
+      model: generated.model,
       width,
       height,
       bytes: generated.stored.bytes,

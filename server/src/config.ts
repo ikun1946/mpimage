@@ -29,6 +29,25 @@ export interface RatioSpec {
   promptHint: string
 }
 
+export interface ImageModelSpec {
+  id: string
+  label: string
+}
+
+/**
+ * 客户端可选的生图模型白名单。
+ * 网关的 /v1/models 只列对话模型，生图模型得自己维护；
+ * 这里的每一项都用 scripts/test-image-models.mjs 实测过能出图、能做图生图。
+ */
+const imageModels: ImageModelSpec[] = [
+  { id: 'ai-studio/gemini-3-pro-image', label: 'Gemini 3 Pro Image' },
+  { id: 'ai-studio/gemini-3.1-flash-image', label: 'Gemini 3.1 Flash Image' },
+  { id: 'ai-studio/gemini-3.1-flash-lite-image', label: 'Gemini 3.1 Flash Lite' },
+  { id: 'antigravity/gemini-3.1-flash-image', label: 'Antigravity Gemini 3.1 Flash' },
+  { id: 'ai-studio/gemini-nano-banana-2.1', label: 'Nano Banana 2.1' },
+  { id: 'ai-studio/gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image' },
+]
+
 const ratios: RatioSpec[] = [
   {
     id: '1:1',
@@ -194,7 +213,7 @@ export const config = {
   port: intFromEnv('PORT', 8787),
   publicBaseUrl: (process.env.PUBLIC_BASE_URL || '').replace(/\/+$/, ''),
   magpieBaseUrl: (process.env.MAGPIE_BASE_URL || 'http://127.0.0.1:3425').replace(/\/+$/, ''),
-  imageModel: process.env.MAGPIE_IMAGE_MODEL || 'codex/gpt-image-2',
+  imageModel: process.env.MAGPIE_IMAGE_MODEL || 'ai-studio/gemini-3-pro-image',
   /**
    * 提示词优化专用的对话模型，与生图模型互不相干。
    * 选 flash 档是因为只做扩写，1–2 秒返回，没必要上更贵的模型。
@@ -254,6 +273,7 @@ export const config = {
     'http://127.0.0.1:4173',
   ]),
   ratios,
+  imageModels,
   defaultRatio: '1:1',
   defaultRoleRatio: '3:4',
   defaultSceneRatio: '16:9',
@@ -263,4 +283,10 @@ export const config = {
 export function findRatio(id: unknown): RatioSpec | undefined {
   if (typeof id !== 'string') return undefined
   return ratios.find(ratio => ratio.id === id)
+}
+
+/** 客户端只能从白名单里挑模型，避免任意字符串被拼进上游请求 */
+export function findImageModel(id: unknown): ImageModelSpec | undefined {
+  if (typeof id !== 'string') return undefined
+  return imageModels.find(model => model.id === id)
 }

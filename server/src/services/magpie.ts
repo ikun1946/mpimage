@@ -117,14 +117,9 @@ async function callImageEndpoint(
     throw new ApiError('UPSTREAM_ERROR', translateUpstreamError(message), upstream.status)
   }
 
-  const base64 = extractBase64(payload)
-  if (!base64) {
+  const buffer = await readImagePayload(payload, options.timeoutMs)
+  if (!buffer || buffer.byteLength === 0) {
     throw new ApiError('UPSTREAM_BAD_RESPONSE', 'Magpie 没有返回图片数据', 502)
-  }
-
-  const buffer = Buffer.from(base64, 'base64')
-  if (buffer.byteLength === 0) {
-    throw new ApiError('IMAGE_INVALID', '返回的图片数据无效', 502)
   }
 
   return {
@@ -228,6 +223,56 @@ function extractBase64(payload: unknown): string | undefined {
   if (!Array.isArray(data) || data.length === 0) return undefined
   const first = data[0] as { b64_json?: unknown }
   return typeof first?.b64_json === 'string' ? first.b64_json : undefined
+}
+
+function extractImageUrl(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  const data = (payload as { data?: unknown }).data
+  if (!Array.isArray(data) || data.length === 0) return undefined
+  const first = data[0] as { url?: unknown }
+  if (typeof first?.url !== 'string' || !first.url.trim()) return undefined
+  try {
+    const url = new URL(first.url.trim())
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** 部分上游只给图片 URL（混元等），这里下载成 Buffer，与 b64_json 路径共用后续处理 */
+const MAX_IMAGE_BYTES = 40 * 1024 * 1024
+
+async function readImagePayload(payload: unknown, timeoutMs: number): Promise<Buffer | undefined> {
+  const base64 = extractBase64(payload)
+  if (base64) return Buffer.from(base64, 'base64')
+
+  const url = extractImageUrl(payload)
+  if (!url) return undefined
+
+  let response: Response
+  try {
+    response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+  } catch (error) {
+    const isTimeout = (error as Error).name === 'TimeoutError'
+    throw new ApiError(
+      isTimeout ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_UNREACHABLE',
+      isTimeout ? '下载图片超时，请稍后重试' : '无法下载上游返回的图片',
+      502,
+    )
+  }
+  if (!response.ok) {
+    throw new ApiError('UPSTREAM_ERROR', `下载图片失败（HTTP ${response.status}）`, 502)
+  }
+
+  const declared = Number(response.headers.get('content-length') || 0)
+  if (declared > MAX_IMAGE_BYTES) {
+    throw new ApiError('IMAGE_INVALID', '上游返回的图片过大', 502)
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (bytes.byteLength > MAX_IMAGE_BYTES) {
+    throw new ApiError('IMAGE_INVALID', '上游返回的图片过大', 502)
+  }
+  return Buffer.from(bytes)
 }
 
 function extractModel(payload: unknown): string | undefined {

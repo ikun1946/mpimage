@@ -465,6 +465,10 @@
             </div>
 
             <div class="free-params">
+              <div class="free-params-wide">
+                <label class="field-label" for="free-model">生图模型</label>
+                <select class="select" id="free-model" data-model-select></select>
+              </div>
               <div>
                 <label class="field-label" for="free-ratio">画面比例</label>
                 <select class="select" id="free-ratio" data-ratio-select>
@@ -483,6 +487,13 @@
                   <option value="3:1">3 : 1 全景</option>
                   <option value="1:3">1 : 3 长竖幅</option>
                 </select>
+              </div>
+              <div>
+                <label class="field-label" for="free-style">风格</label>
+                <div class="free-style-control">
+                  <select class="select" id="free-style"></select>
+                  <button class="button secondary free-style-edit" id="free-style-edit" type="button" hidden>编辑</button>
+                </div>
               </div>
             </div>
 
@@ -814,6 +825,35 @@
             <button class="button secondary" id="about-recheck" type="button">重新检查</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="free-style-modal" role="dialog" aria-modal="true" aria-labelledby="free-style-title">
+    <div class="modal-sheet narrow">
+      <header class="modal-head">
+        <div>
+          <p class="modal-kicker">自由创作</p>
+          <h3 id="free-style-title">新建风格</h3>
+        </div>
+        <button class="button secondary modal-close" id="free-style-close" type="button">关闭</button>
+      </header>
+      <div class="modal-body narrow-body">
+        <form class="rename-form" id="free-style-form">
+          <label class="field-label" for="free-style-name">风格名称</label>
+          <input class="input" id="free-style-name" type="text" maxlength="40" autocomplete="off"
+                 placeholder="例如：3D 写实 CG">
+          <label class="field-label" for="free-style-desc">风格描述</label>
+          <textarea class="textarea" id="free-style-desc" maxlength="2000" rows="6"
+                    placeholder="写清楚画面材质、光影、色调与镜头质感，生成时会作为最高优先级的风格指令接到画面描述前面。"></textarea>
+          <p class="rename-hint">这套风格只属于自由创作，不会出现在「风格设定」里。</p>
+          <p class="rename-msg" id="free-style-msg" role="alert"></p>
+          <div class="modal-actions">
+            <button class="button primary" id="free-style-save" type="submit">保存</button>
+            <button class="button secondary" id="free-style-delete" type="button" hidden>删除</button>
+            <button class="button secondary" id="free-style-cancel" type="button">取消</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>

@@ -743,6 +743,42 @@
     text-overflow: ellipsis;
   }
 
+  /* 客户端可见模型：勾选框列表，模型 ID 用等宽字体免得看串 */
+  .client-models {
+    margin: 14px 0 4px;
+    padding: 10px 14px 12px;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    background: var(--surface-subtle);
+  }
+
+  .client-models legend {
+    padding: 0 6px;
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .client-models-list {
+    display: grid;
+    gap: 7px;
+    margin-top: 2px;
+  }
+
+  .client-models-list label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--ink);
+  }
+
+  .client-models-list code {
+    color: var(--ink-faint);
+    font-family: Consolas, "SFMono-Regular", monospace;
+    font-size: 11px;
+  }
+
   /* ---------- 徽标 ---------- */
 
   .chip {
@@ -1578,6 +1614,23 @@
       </div>
       <p class="current" id="upstream-model-status" role="status" aria-live="polite">还没获取模型列表。打开控制台会自动拉一次，也可以点「获取模型」强制刷新。</p>
       <p class="hint">用于自由创作的 AI 优化提示词，需与上面地址是同一个网关；留空表示使用环境变量默认值。</p>
+      <div class="form-row">
+        <label class="grow">生图模型
+          <select id="upstream-image-model" class="model-select" aria-describedby="upstream-image-model-status"></select>
+        </label>
+      </div>
+      <div class="form-row" id="upstream-image-model-custom-row" hidden>
+        <label class="grow">自定义生图模型 ID
+          <input type="text" id="upstream-image-model-custom" placeholder="codex/gpt-image-2" spellcheck="false" autocomplete="off" aria-describedby="upstream-image-model-status" />
+        </label>
+      </div>
+      <p class="current" id="upstream-image-model-status" role="status" aria-live="polite"></p>
+      <p class="hint">用于所有生图请求，需与上面地址是同一个网关，且该模型支持 /v1/images/generations 与图生图的 /v1/images/edits；留空表示使用环境变量默认值。</p>
+      <fieldset class="client-models">
+        <legend>客户端可选的生图模型</legend>
+        <div class="client-models-list" id="upstream-client-model-list"></div>
+        <p class="hint">只有勾选的模型才会出现在客户端下拉里；至少要勾一个。</p>
+      </fieldset>
       <p class="current" id="upstream-meta">读取中…</p>
       <p class="current" id="upstream-result"></p>
     </div>
@@ -1824,6 +1877,11 @@
     upstreamTextModelCustom: $('upstream-text-model-custom'),
     upstreamModelsRefresh: $('upstream-models-refresh'),
     upstreamModelStatus: $('upstream-model-status'),
+    upstreamImageModel: $('upstream-image-model'),
+    upstreamImageModelCustomRow: $('upstream-image-model-custom-row'),
+    upstreamImageModelCustom: $('upstream-image-model-custom'),
+    upstreamImageModelStatus: $('upstream-image-model-status'),
+    upstreamClientModelList: $('upstream-client-model-list'),
     upstreamTest: $('upstream-test'),
     upstreamSave: $('upstream-save'),
     upstreamMeta: $('upstream-meta'),
@@ -1937,6 +1995,32 @@
   /** 状态行当前的语气，重新渲染时沿用，别把报错刷成成功 */
   let upstreamModelStatusTone = ''
   const UPSTREAM_MODEL_STATUS_DEFAULT = '还没获取模型列表。打开控制台会自动拉一次，也可以点「获取模型」强制刷新。'
+
+  // ---------- 生图模型下拉 ----------
+  /**
+   * 网关的 /v1/models 只列对话模型，生图模型不会出现在里面，
+   * 所以这里用一份常用清单 + 自定义 ID；清单只是候选，不代表网关一定开通了。
+   */
+  const IMAGE_MODEL_PRESETS = [
+    { id: 'ai-studio/gemini-3-pro-image', label: 'Gemini 3 Pro Image' },
+    { id: 'ai-studio/gemini-3.1-flash-image', label: 'Gemini 3.1 Flash Image' },
+    { id: 'ai-studio/gemini-3.1-flash-lite-image', label: 'Gemini 3.1 Flash Lite Image' },
+    { id: 'antigravity/gemini-3.1-flash-image', label: 'Antigravity Gemini 3.1 Flash Image' },
+    { id: 'ai-studio/gemini-nano-banana-2.1', label: 'Nano Banana 2.1' },
+    { id: 'ai-studio/gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image' },
+    { id: 'grok/grok-imagine-image', label: 'Grok Imagine（限流，暂不可用）' },
+    { id: 'grok/grok-imagine-image-quality', label: 'Grok Imagine Quality（限流，暂不可用）' },
+    { id: 'codex/gpt-image-2', label: 'GPT Image 2（本机网关不可用）' },
+  ]
+  /** 已保存的生图模型覆写值；空串表示跟随环境变量 */
+  let upstreamSavedImageModel = ''
+  /** 当前生效的生图模型（可能是环境变量默认值） */
+  let upstreamEffectiveImageModel = ''
+  /** 用户在下拉里选中的值；null 表示还没动过，跟随已保存值 */
+  let upstreamImageModelSelection = null
+  /** 服务端白名单里的全部模型，以及客户端当前可见的模型 */
+  let upstreamImageModels = []
+  let upstreamEnabledImageModels = []
 
   // ---------- 小工具 ----------
 
@@ -2681,10 +2765,16 @@
     dom.upstreamUrl.value = data.baseUrl || ''
     upstreamSavedTextModel = String(data.textModelOverride || '').trim()
     upstreamEffectiveTextModel = String(data.textModel || '').trim()
+    upstreamSavedImageModel = String(data.imageModelOverride || '').trim()
+    upstreamEffectiveImageModel = String(data.imageModel || data.model || '').trim()
+    upstreamImageModels = Array.isArray(data.imageModels) ? data.imageModels : []
+    upstreamEnabledImageModels = Array.isArray(data.enabledImageModels) ? data.enabledImageModels : []
     renderUpstreamModelOptions()
+    renderUpstreamImageModelOptions()
+    renderClientModelFlags()
     setCurrent(
       dom.upstreamMeta,
-      `当前模型：${data.model || '—'} · 地址来源：${data.fromSettings ? '后台设置（settings.json）' : '环境变量默认值'} · 优化模型：${data.textModel || '未设置'}（${data.textModelFromSettings ? '后台设置' : '环境变量默认值'}）`,
+      `生图模型：${data.imageModel || data.model || '—'}（${data.imageModelFromSettings ? '后台设置' : '环境变量默认值'}） · 地址来源：${data.fromSettings ? '后台设置（settings.json）' : '环境变量默认值'} · 优化模型：${data.textModel || '未设置'}（${data.textModelFromSettings ? '后台设置' : '环境变量默认值'}）`,
     )
     setCurrent(dom.upstreamResult, '')
   }
@@ -2736,6 +2826,72 @@
     const selected = dom.upstreamTextModel.value
     if (selected === CUSTOM_MODEL_VALUE) return dom.upstreamTextModelCustom.value.trim()
     return selected.trim()
+  }
+
+  /** 重画生图模型下拉：空值项 → 常用清单 → 已保存但清单里没有的值 → 自定义 */
+  function renderUpstreamImageModelOptions() {
+    const options = [{
+      value: '',
+      label: upstreamEffectiveImageModel
+        ? `跟随环境变量默认（${upstreamEffectiveImageModel}）`
+        : '跟随环境变量默认',
+    }]
+
+    for (const preset of IMAGE_MODEL_PRESETS) {
+      const suffix = preset.label ? ` · ${preset.label}` : ''
+      options.push({ value: preset.id, label: `${preset.id}${suffix}` })
+    }
+
+    if (upstreamSavedImageModel && !IMAGE_MODEL_PRESETS.some(preset => preset.id === upstreamSavedImageModel)) {
+      options.push({ value: upstreamSavedImageModel, label: `${upstreamSavedImageModel} · 已保存` })
+    }
+    options.push({ value: CUSTOM_MODEL_VALUE, label: '自定义模型 ID…' })
+
+    dom.upstreamImageModel.innerHTML = options
+      .map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+      .join('')
+
+    const wanted = upstreamImageModelSelection === null ? upstreamSavedImageModel : upstreamImageModelSelection
+    dom.upstreamImageModel.value = options.some(option => option.value === wanted) ? wanted : ''
+    syncCustomImageModelInput()
+    renderUpstreamImageModelStatus()
+  }
+
+  /** 只有选中「自定义模型 ID…」才露出输入框，并把已保存的值填进去 */
+  function syncCustomImageModelInput() {
+    const custom = dom.upstreamImageModel.value === CUSTOM_MODEL_VALUE
+    dom.upstreamImageModelCustomRow.hidden = !custom
+    if (custom && !dom.upstreamImageModelCustom.value.trim()) {
+      dom.upstreamImageModelCustom.value = upstreamSavedImageModel
+    }
+  }
+
+  /** 当前要保存的生图模型 ID：选了自定义就取输入框的值 */
+  function currentImageModelValue() {
+    const selected = dom.upstreamImageModel.value
+    if (selected === CUSTOM_MODEL_VALUE) return dom.upstreamImageModelCustom.value.trim()
+    return selected.trim()
+  }
+
+  function renderUpstreamImageModelStatus() {
+    if (!dom.upstreamImageModelStatus) return
+    const effective = upstreamEffectiveImageModel || '未设置'
+    const source = upstreamSavedImageModel ? '后台设置' : '环境变量 MAGPIE_IMAGE_MODEL'
+    const clientCount = upstreamEnabledImageModels.length
+    dom.upstreamImageModelStatus.textContent =
+      `当前生效：${effective}（${source}）· 客户端可选 ${clientCount} 个 · 改动会在下一次生图时生效`
+  }
+
+  /** 客户端可见模型：勾选框按服务端白名单渲染 */
+  function renderClientModelFlags() {
+    if (!dom.upstreamClientModelList) return
+    const enabled = new Set(upstreamEnabledImageModels)
+    dom.upstreamClientModelList.innerHTML = upstreamImageModels
+      .map(model => {
+        const checked = enabled.has(model.id) ? ' checked' : ''
+        return `<label><input type="checkbox" value="${escapeHtml(model.id)}"${checked}> <span>${escapeHtml(model.label || model.id)}</span> <code>${escapeHtml(model.id)}</code></label>`
+      })
+      .join('')
   }
 
   /** 状态行 = 拉取说明 + 当前选中模型的能力提示 */
@@ -2858,8 +3014,28 @@
       return
     }
 
+    const imageModel = currentImageModelValue()
+    if (imageModel.length > 120) {
+      setCurrent(dom.upstreamResult, '生图模型最多 120 个字符', 'error')
+      return
+    }
+    if (/\s/.test(imageModel)) {
+      setCurrent(dom.upstreamResult, '生图模型里不能有空格', 'error')
+      return
+    }
+
+    const enabledImageModels = [...dom.upstreamClientModelList.querySelectorAll('input[type="checkbox"]:checked')]
+      .map(input => input.value)
+    if (!enabledImageModels.length) {
+      setCurrent(dom.upstreamResult, '客户端至少要保留一个可用模型', 'error')
+      return
+    }
+
     await withBusy(dom.upstreamSave, async () => {
-      const result = await api('/api/admin/upstream', { method: 'PUT', body: { baseUrl, textModel } })
+      const result = await api('/api/admin/upstream', {
+        method: 'PUT',
+        body: { baseUrl, textModel, imageModel, enabledImageModels },
+      })
       if (isAuthFailure(result)) {
         setCurrent(dom.upstreamResult, AUTH_HINT, 'error')
         return
@@ -2871,8 +3047,10 @@
       const saved = (result.data && result.data.baseUrl) || baseUrl
       const effectiveModel = (result.data && result.data.textModel) || '未设置'
       const fromSettings = Boolean(result.data && result.data.textModelFromSettings)
+      const effectiveImageModel = (result.data && result.data.imageModel) || '未设置'
+      const imageFromSettings = Boolean(result.data && result.data.imageModelFromSettings)
       flash(
-        `上游地址已保存：${saved} · 提示词优化模型：${effectiveModel}（${fromSettings ? '后台设置' : '环境变量默认值'}）`,
+        `上游地址已保存：${saved} · 生图模型：${effectiveImageModel}（${imageFromSettings ? '后台设置' : '环境变量默认值'}） · 提示词优化模型：${effectiveModel}（${fromSettings ? '后台设置' : '环境变量默认值'}）`,
       )
       await loadUpstream()
       // 地址可能换过，上游可用的模型也跟着换，保存后强制回源一次
@@ -3479,6 +3657,12 @@
       renderUpstreamModelStatus()
     })
     dom.upstreamTextModelCustom.addEventListener('input', () => renderUpstreamModelStatus())
+    dom.upstreamImageModel.addEventListener('change', () => {
+      upstreamImageModelSelection = dom.upstreamImageModel.value
+      syncCustomImageModelInput()
+      renderUpstreamImageModelStatus()
+    })
+    dom.upstreamImageModelCustom.addEventListener('input', () => renderUpstreamImageModelStatus())
     dom.upstreamTest.addEventListener('click', testUpstream)
     dom.upstreamSave.addEventListener('click', saveUpstream)
 

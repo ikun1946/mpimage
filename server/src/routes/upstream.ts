@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { config } from '../config.js'
+import { config, findImageModel } from '../config.js'
 import { ApiError } from '../lib/errors.js'
 import { checkHealth } from '../services/magpie.js'
 import { ModelCatalog } from '../services/model-catalog.js'
@@ -41,20 +41,45 @@ function parseBaseUrl(raw: unknown): string {
 }
 
 /**
- * 对话模型名会原样拼进上游请求，带空格基本是手滑粘了空格或整段说明，
+ * 模型 ID 会原样拼进上游请求，带空格基本是手滑粘了空格或整段说明，
  * 长度上限只是防止有人把整段提示词填进来。
  * 空串是「清除后台覆写、回落到环境变量」，不是错误，控制台靠它复位。
  */
-function parseTextModel(raw: unknown): string {
+function parseModelId(raw: unknown, label: string): string {
   const model = typeof raw === 'string' ? raw.trim() : ''
   if (!model) return ''
   if (model.length > 120) {
-    throw new ApiError('UPSTREAM_INVALID', '对话模型不能超过 120 个字符', 400)
+    throw new ApiError('UPSTREAM_INVALID', `${label}不能超过 120 个字符`, 400)
   }
   if (/\s/.test(model)) {
-    throw new ApiError('UPSTREAM_INVALID', '对话模型不能包含空格', 400)
+    throw new ApiError('UPSTREAM_INVALID', `${label}不能包含空格`, 400)
   }
   return model
+}
+
+/**
+ * 客户端可用模型：必须是白名单里的模型，且至少留一个，
+ * 否则客户端会一个模型都选不了、完全没法生图。
+ */
+function parseEnabledModels(raw: unknown): string[] | undefined {
+  if (raw === undefined) return undefined
+  if (!Array.isArray(raw)) {
+    throw new ApiError('UPSTREAM_INVALID', '客户端可用模型必须是数组', 400)
+  }
+  const ids: string[] = []
+  for (const item of raw) {
+    if (typeof item !== 'string') continue
+    const id = item.trim()
+    if (!id || ids.includes(id)) continue
+    if (!findImageModel(id)) {
+      throw new ApiError('UPSTREAM_INVALID', `未知的生图模型：${id}`, 400)
+    }
+    ids.push(id)
+  }
+  if (!ids.length) {
+    throw new ApiError('UPSTREAM_INVALID', '客户端至少需要保留一个可用模型', 400)
+  }
+  return ids
 }
 
 /** query 里 refresh=1/true 都算刷新，其余一律走缓存 */
@@ -70,13 +95,21 @@ export function registerUpstreamRoutes(
     requireAdmin(request)
     return {
       baseUrl: await deps.settings.getBaseUrl(),
-      model: deps.settings.getModel(),
+      model: deps.settings.getImageModel(),
       fromSettings: deps.settings.isFromSettings(),
       /** 生效中的对话模型（可能是环境变量默认值） */
       textModel: await deps.settings.getTextModel(),
       /** 后台覆写值，空串表示没覆写；控制台输入框绑定这个 */
       textModelOverride: deps.settings.getTextModelOverride(),
       textModelFromSettings: deps.settings.isTextModelFromSettings(),
+      /** 生效中的生图模型（可能是 MAGPIE_IMAGE_MODEL 默认值） */
+      imageModel: deps.settings.getImageModel(),
+      imageModelOverride: deps.settings.getImageModelOverride(),
+      imageModelFromSettings: deps.settings.isImageModelFromSettings(),
+      /** 客户端可选的模型全集与当前勾选值，控制台据此画勾选框 */
+      imageModels: config.imageModels,
+      enabledImageModels: deps.settings.getEnabledImageModels(),
+      enabledImageModelsFromSettings: deps.settings.isEnabledImageModelsFromSettings(),
     }
   })
 
@@ -94,19 +127,34 @@ export function registerUpstreamRoutes(
 
   app.put('/api/admin/upstream', async (request, reply) => {
     requireAdmin(request)
-    const body = (request.body ?? {}) as { baseUrl?: unknown; textModel?: unknown }
+    const body = (request.body ?? {}) as {
+      baseUrl?: unknown
+      textModel?: unknown
+      imageModel?: unknown
+      enabledImageModels?: unknown
+    }
     const baseUrl = parseBaseUrl(body.baseUrl)
 
-    // 两项都校验完再落盘，否则模型名不合法时地址已经被写进去一半
-    const textModel = body.textModel === undefined ? undefined : parseTextModel(body.textModel)
+    // 全部校验完再落盘，否则模型名不合法时地址已经被写进去一半
+    const textModel = body.textModel === undefined ? undefined : parseModelId(body.textModel, '对话模型')
+    const imageModel = body.imageModel === undefined ? undefined : parseModelId(body.imageModel, '生图模型')
+    const enabledImageModels = parseEnabledModels(body.enabledImageModels)
 
     await deps.settings.setBaseUrl(baseUrl)
     request.log.info({ baseUrl }, '上游地址已更新')
 
-    // 对话模型是后加的，旧客户端不会传，不能因此报错
+    // 模型字段是后加的，旧客户端不会传，不能因此报错
     if (textModel !== undefined) {
       await deps.settings.setTextModel(textModel)
       request.log.info({ textModel }, '提示词优化模型已更新')
+    }
+    if (imageModel !== undefined) {
+      await deps.settings.setImageModel(imageModel)
+      request.log.info({ imageModel }, '生图模型已更新')
+    }
+    if (enabledImageModels !== undefined) {
+      await deps.settings.setEnabledImageModels(enabledImageModels)
+      request.log.info({ enabledImageModels }, '客户端可选生图模型已更新')
     }
 
     return reply.send({
@@ -115,6 +163,12 @@ export function registerUpstreamRoutes(
       textModel: await deps.settings.getTextModel(),
       textModelOverride: deps.settings.getTextModelOverride(),
       textModelFromSettings: deps.settings.isTextModelFromSettings(),
+      imageModel: deps.settings.getImageModel(),
+      imageModelOverride: deps.settings.getImageModelOverride(),
+      imageModelFromSettings: deps.settings.isImageModelFromSettings(),
+      imageModels: config.imageModels,
+      enabledImageModels: deps.settings.getEnabledImageModels(),
+      enabledImageModelsFromSettings: deps.settings.isEnabledImageModelsFromSettings(),
     })
   })
 
@@ -135,7 +189,7 @@ export function registerUpstreamRoutes(
 
     const health = await checkHealth({
       baseUrl,
-      model: deps.settings.getModel(),
+      model: deps.settings.getImageModel(),
       timeoutMs: config.requestTimeoutMs,
     })
 

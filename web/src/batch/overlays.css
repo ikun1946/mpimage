@@ -221,6 +221,13 @@
   margin-top: 6px;
 }
 
+/* 自由创作风格弹窗：描述是多行文本，跟输入框之间留一点距离 */
+#free-style-desc {
+  min-height: 132px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
 /* 意见反馈弹窗：撰写区 + 可展开的历史记录区 */
 .modal-sheet.feedback-sheet {
   width: min(560px, 100%);

@@ -13,6 +13,8 @@ export interface UsageEntry {
   category: string
   name: string
   ratio: string
+  /** 实际使用的生图模型；老记录没有这个字段 */
+  model?: string
   width: number
   height: number
   bytes: number

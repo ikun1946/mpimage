@@ -254,9 +254,38 @@
 
 .free-params {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
   margin-top: 16px;
+}
+
+/* 生图模型单独占一整行，比例和风格并排 */
+.free-params-wide {
+  grid-column: 1 / -1;
+}
+
+.free-style-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.free-style-control .select {
+  flex: 1;
+  min-width: 0;
+}
+
+.free-style-edit {
+  flex: none;
+  padding: 0 12px;
+  height: 40px;
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .free-params {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .field-label {

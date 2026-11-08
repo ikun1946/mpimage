@@ -371,7 +371,7 @@ if (config.host === '127.0.0.1' || config.host === 'localhost' || config.host ==
 }
 
 app.log.info(`Magpie 图片 API: ${await settings.getBaseUrl()}/v1/images/generations`)
-app.log.info(`模型: ${settings.getModel()}`)
+app.log.info(`模型: ${settings.getImageModel()}`)
 app.log.info(`存储目录: ${storageDirectory}`)
 app.log.info(`风格库目录: ${styleLibraryRoot}`)
 app.log.info(`账号库文件: ${userDatabasePath}`)

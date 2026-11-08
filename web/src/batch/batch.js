@@ -166,8 +166,12 @@ import { setupTablist } from '../lib/tabs.js'
       freeBusy: false,
       freeImageUrl: '',
       freeImageExtension: 'png',
-      // 自由创作的画面比例与提示词草稿，刷新后保持
+      // 自由创作的画面比例、生图模型与提示词草稿，刷新后保持
       freeRatio: '1:1',
+      freeModel: '',
+      // 自由创作的自定义风格：和「风格设定」里的风格库互相独立，只存在本机
+      freeStyles: [],
+      freeStyleId: '',
       freePrompt: '',
       // 自由创作的参考图（可多张）：只存相对路径与可预览地址，快照里不塞 base64
       freeReferences: [],
@@ -293,6 +297,19 @@ import { setupTablist } from '../lib/tabs.js'
       freePrompt: document.querySelector('#free-prompt'),
       freeCount: document.querySelector('#free-count'),
       freeRatio: document.querySelector('#free-ratio'),
+      freeModel: document.querySelector('#free-model'),
+      freeStyle: document.querySelector('#free-style'),
+      freeStyleEdit: document.querySelector('#free-style-edit'),
+      freeStyleModal: document.querySelector('#free-style-modal'),
+      freeStyleForm: document.querySelector('#free-style-form'),
+      freeStyleTitle: document.querySelector('#free-style-title'),
+      freeStyleName: document.querySelector('#free-style-name'),
+      freeStyleDesc: document.querySelector('#free-style-desc'),
+      freeStyleMsg: document.querySelector('#free-style-msg'),
+      freeStyleSave: document.querySelector('#free-style-save'),
+      freeStyleDelete: document.querySelector('#free-style-delete'),
+      freeStyleClose: document.querySelector('#free-style-close'),
+      freeStyleCancel: document.querySelector('#free-style-cancel'),
       freeSubmit: document.querySelector('#free-submit'),
       freeStatus: document.querySelector('#free-status'),
       freeProgress: document.querySelector('#free-progress'),
@@ -380,6 +397,17 @@ import { setupTablist } from '../lib/tabs.js'
         // 恢复自由创作的画面比例选择（配合服务端配置渲染后回填）
         if (typeof saved.freeRatio === 'string' && saved.freeRatio) {
           state.freeRatio = saved.freeRatio
+        }
+        // 空串表示跟随服务端默认模型
+        if (typeof saved.freeModel === 'string') {
+          state.freeModel = saved.freeModel
+        }
+        state.freeStyles = normalizeFreeStyles(saved.freeStyles)
+        if (typeof saved.freeStyleId === 'string') {
+          state.freeStyleId = saved.freeStyleId
+        }
+        if (state.freeStyleId && !state.freeStyles.some(style => style.id === state.freeStyleId)) {
+          state.freeStyleId = ''
         }
         // 恢复自由创作的提示词草稿与上次生成结果，刷新不清空
         if (typeof saved.freePrompt === 'string') {
@@ -519,6 +547,25 @@ import { setupTablist } from '../lib/tabs.js'
     }
 
     /** 恢复工具栏的批量比例/风格选择，兼容旧数据（没有这个字段时用空对象）。 */
+    /** 自由创作风格：只存本机快照，不进风格库、也不参与后端同步 */
+    function normalizeFreeStyles(saved) {
+      if (!Array.isArray(saved)) return []
+      const result = []
+      const seen = new Set()
+      for (const style of saved) {
+        if (!style || typeof style.id !== 'string' || !style.id || seen.has(style.id)) continue
+        const description = String(style.description || '').trim()
+        if (!description) continue
+        seen.add(style.id)
+        result.push({
+          id: style.id,
+          name: String(style.name || '未命名风格').slice(0, 40),
+          description,
+        })
+      }
+      return result
+    }
+
     function normalizeBulkParams(saved) {
       const result = { role: {}, scene: {}, prop: {} }
       if (!saved || typeof saved !== 'object') return result
@@ -528,6 +575,7 @@ import { setupTablist } from '../lib/tabs.js'
           result[type] = {
             ratio: typeof item.ratio === 'string' ? item.ratio : '',
             styleId: typeof item.styleId === 'string' ? item.styleId : '',
+            model: typeof item.model === 'string' ? item.model : '',
           }
         }
       }
@@ -607,6 +655,9 @@ import { setupTablist } from '../lib/tabs.js'
           concurrency: state.concurrency,
           concurrencyCustom: state.concurrencyCustom,
           freeRatio: state.freeRatio,
+          freeModel: state.freeModel,
+          freeStyles: state.freeStyles,
+          freeStyleId: state.freeStyleId,
           freePrompt: state.freePrompt,
           freeReferences: state.freeReferences.map(ref => ({ path: ref.path, url: ref.url, name: ref.name })),
           freeImageUrl: state.freeImageUrl,
@@ -1429,6 +1480,7 @@ import { setupTablist } from '../lib/tabs.js'
       renderQueuePanel()
       refreshSelectionLabels()
       renderFreeResult()
+      renderFreeStyleSelect()
       renderFaceResult()
     }
 
@@ -1579,6 +1631,16 @@ import { setupTablist } from '../lib/tabs.js'
       saveButton.textContent = state.styleDirty ? '保存风格（有未保存修改）' : '保存风格'
     }
 
+    /** 批量工具栏的生图模型下拉；空值表示跟随服务端默认模型 */
+    function imageModelOptions(selected) {
+      const { options, defaultId } = imageModelChoices()
+      if (!options.length) return '<option value="">没有可用的生图模型</option>'
+      const next = options.some(option => option.id === selected) ? selected : defaultId
+      return options
+        .map(option => `<option value="${escapeAttr(option.id)}" ${option.id === next ? 'selected' : ''}>${escapeHtml(option.label)}</option>`)
+        .join('')
+    }
+
     function renderAssetPage(type) {
       const meta = TYPE_META[type]
       const panel = dom.panels[type]
@@ -1617,6 +1679,12 @@ import { setupTablist } from '../lib/tabs.js'
                 <span>画幅</span>
                 <select class="select" id="bulk-ratio-${type}" aria-label="批量画面比例">
                   ${ratioOptions(state.bulkParams[type]?.ratio || meta.defaultRatio, serverConfig?.ratios)}
+                </select>
+              </label>
+              <label class="toolbar-field toolbar-field-model">
+                <span>模型</span>
+                <select class="select" id="bulk-model-${type}" aria-label="批量生图模型">
+                  ${imageModelOptions(state.bulkParams[type]?.model || '')}
                 </select>
               </label>
               <label class="toolbar-field toolbar-field-style">
@@ -2073,10 +2141,11 @@ import { setupTablist } from '../lib/tabs.js'
       }
       const ratio = document.querySelector(`#bulk-ratio-${type}`)?.value
       const styleId = document.querySelector(`#bulk-style-${type}`)?.value
+      const model = document.querySelector(`#bulk-model-${type}`)?.value
       if (!ratio) return
 
       // 记住工具栏当前选择，刷新后仍然生效
-      state.bulkParams[type] = { ...state.bulkParams[type], ratio, styleId: styleId || '' }
+      state.bulkParams[type] = { ...state.bulkParams[type], ratio, styleId: styleId || '', model: model || '' }
 
       let changed = 0
       state.assets.forEach(asset => {
@@ -2240,6 +2309,156 @@ import { setupTablist } from '../lib/tabs.js'
         const current = select === dom.freeRatio ? state.freeRatio : select.value
         select.innerHTML = ratioOptions(current, serverConfig?.ratios)
       })
+      // 模型和比例总是跟着服务端配置一起刷新
+      renderModelSelects()
+    }
+
+    /** 服务端下发的可用模型 + 默认模型；关掉的模型不会出现在列表里 */
+    function imageModelChoices() {
+      const models = Array.isArray(serverConfig?.imageModels) ? serverConfig.imageModels : []
+      const defaultModel = serverConfig?.defaultImageModel || ''
+      const defaultVisible = models.some(model => model.id === defaultModel)
+      const options = models.map(model => ({
+        id: model.id,
+        label: model.label ? `${model.label} · ${model.id}` : model.id,
+      }))
+      // 只有默认模型本身对客户端可见时，才提供「跟随服务端默认」；
+      // 否则显示它等于把后台关掉的模型又露出来
+      if (defaultVisible) {
+        options.unshift({ id: '', label: `跟随服务端默认（${defaultModel}）` })
+      }
+      return { options, defaultId: options[0]?.id || '' }
+    }
+
+    /**
+     * 生图模型下拉：第一项是「跟随服务端默认」（默认模型可见时），其余是服务端白名单。
+     * 只渲染 data-model-select 的独立下拉；批量工具栏的模型下拉由各自的 type 页面渲染。
+     */
+    function renderModelSelects() {
+      const { options, defaultId } = imageModelChoices()
+      document.querySelectorAll('[data-model-select]').forEach(select => {
+        const current = select === dom.freeModel ? state.freeModel : select.value
+        select.innerHTML = options
+          .map(option => `<option value="${escapeAttr(option.id)}">${escapeHtml(option.label)}</option>`)
+          .join('') || '<option value="">没有可用的生图模型</option>'
+        const valid = options.some(option => option.id === current)
+        const next = valid ? current : defaultId
+        select.value = next
+        // 之前选的模型被后台关掉时，把自由创作的选择同步到新默认值
+        if (select === dom.freeModel && !valid) state.freeModel = next
+      })
+    }
+
+    const FREE_STYLE_NEW = '__new__'
+
+    /** 自由创作的风格下拉：无 → 自定义风格 → 新建；编辑按钮只在选中自定义风格时出现 */
+    function renderFreeStyleSelect() {
+      if (!dom.freeStyle) return
+      const options = ['<option value="">无</option>']
+      for (const style of state.freeStyles) {
+        options.push(`<option value="${escapeAttr(style.id)}">${escapeHtml(style.name)}</option>`)
+      }
+      options.push(`<option value="${FREE_STYLE_NEW}">＋ 新建风格…</option>`)
+      dom.freeStyle.innerHTML = options.join('')
+
+      const valid = state.freeStyles.some(style => style.id === state.freeStyleId)
+      if (!valid) state.freeStyleId = ''
+      dom.freeStyle.value = valid ? state.freeStyleId : ''
+      dom.freeStyleEdit.hidden = !valid
+    }
+
+    function selectedFreeStyle() {
+      return state.freeStyles.find(style => style.id === state.freeStyleId) || null
+    }
+
+    /** 风格描述接在画面描述前面，作为最高优先级的风格指令 */
+    function composeFreePrompt(text, style) {
+      if (!style) return text
+      return [
+        '【风格指令｜最高优先级】',
+        `本图采用以下风格：${style.name}`,
+        '风格描述优先级高于画面描述中与之冲突的视觉表达。',
+        style.description,
+        '',
+        '【画面内容】',
+        text,
+      ].join('\n')
+    }
+
+    /* ===== 自由创作风格弹窗 ===== */
+
+    let freeStyleOverlayHandle = null
+    let freeStyleEditingId = ''
+
+    function openFreeStyleModal(id) {
+      freeStyleEditingId = id || ''
+      const editing = id ? state.freeStyles.find(style => style.id === id) : null
+      dom.freeStyleTitle.textContent = editing ? '编辑风格' : '新建风格'
+      dom.freeStyleName.value = editing ? editing.name : ''
+      dom.freeStyleDesc.value = editing ? editing.description : ''
+      dom.freeStyleDelete.hidden = !editing
+      dom.freeStyleMsg.textContent = ''
+      dom.freeStyleModal.classList.add('visible')
+      if (!freeStyleOverlayHandle) {
+        freeStyleOverlayHandle = activateOverlay(dom.freeStyleModal, {
+          onRequestClose: closeFreeStyleModal,
+          initialFocus: dom.freeStyleName,
+        })
+      }
+      dom.freeStyleName.focus()
+    }
+
+    function closeFreeStyleModal() {
+      freeStyleOverlayHandle?.release()
+      freeStyleOverlayHandle = null
+      dom.freeStyleModal.classList.remove('visible')
+      freeStyleEditingId = ''
+      // 取消时把下拉恢复到已保存的选择
+      renderFreeStyleSelect()
+    }
+
+    function saveFreeStyle(event) {
+      event.preventDefault()
+      const name = dom.freeStyleName.value.trim()
+      const description = dom.freeStyleDesc.value.trim()
+      if (!name) {
+        dom.freeStyleMsg.textContent = '请填写风格名称'
+        dom.freeStyleName.focus()
+        return
+      }
+      if (!description) {
+        dom.freeStyleMsg.textContent = '请填写风格描述'
+        dom.freeStyleDesc.focus()
+        return
+      }
+
+      const editingId = freeStyleEditingId
+      if (editingId) {
+        state.freeStyles = state.freeStyles.map(style =>
+          style.id === editingId ? { ...style, name, description } : style)
+        state.freeStyleId = editingId
+      } else {
+        const id = `free-style-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+        state.freeStyles = [...state.freeStyles, { id, name, description }]
+        state.freeStyleId = id
+      }
+
+      persistSoon()
+      closeFreeStyleModal()
+      renderFreeStyleSelect()
+      showToast(editingId ? '风格已更新' : '风格已保存')
+    }
+
+    function deleteFreeStyle() {
+      if (!freeStyleEditingId) return
+      const target = state.freeStyles.find(style => style.id === freeStyleEditingId)
+      if (!window.confirm(`删除风格「${target?.name || ''}」？`)) return
+      state.freeStyles = state.freeStyles.filter(style => style.id !== freeStyleEditingId)
+      if (state.freeStyleId === freeStyleEditingId) state.freeStyleId = ''
+      persistSoon()
+      closeFreeStyleModal()
+      renderFreeStyleSelect()
+      showToast('风格已删除')
     }
 
     /* ===== 分组动画 ===== */
@@ -2440,6 +2659,7 @@ import { setupTablist } from '../lib/tabs.js'
             const result = await generateImage({
               prompt: composeGenerationPrompt(asset),
               ratio: asset.ratio,
+              model: state.bulkParams[asset.type]?.model || undefined,
               category: TYPE_META[asset.type].singular,
               name: asset.name,
               source: 'batch',
@@ -4352,10 +4572,17 @@ import { setupTablist } from '../lib/tabs.js'
       const references = state.freeReferences
       const typed = dom.freePrompt.value.trim()
       // 只给参考图也能生成：补一句默认描述（服务端仍然要求非空提示词）
-      const prompt = typed || (references.length ? '以参考图为基础生成画面，保持参考图的主体与构图' : '')
-      if (!prompt) {
+      const typedPrompt = typed || (references.length ? '以参考图为基础生成画面，保持参考图的主体与构图' : '')
+      if (!typedPrompt) {
         dom.freePrompt.focus()
         dom.freeStatus.textContent = '请先写下画面描述，或粘贴一张参考图'
+        return
+      }
+      // 选中的风格作为最高优先级指令接到画面描述前面
+      const prompt = composeFreePrompt(typedPrompt, selectedFreeStyle())
+      const promptLimit = Number(serverConfig?.maxPromptLength) || 12000
+      if (prompt.length > promptLimit) {
+        dom.freeStatus.textContent = `画面描述加风格描述超过 ${promptLimit} 字，请精简后再生成`
         return
       }
       if (state.processing) {
@@ -4379,6 +4606,7 @@ import { setupTablist } from '../lib/tabs.js'
         const result = await generateImage({
           prompt,
           ratio: dom.freeRatio.value,
+          model: dom.freeModel?.value || undefined,
           category: '自由创作',
           name: `自由创作-${timestamp()}`,
           source: 'free',
@@ -4696,6 +4924,15 @@ import { setupTablist } from '../lib/tabs.js'
       })
 
       dom.freeForm.addEventListener('submit', generateFreeImage)
+
+      // 自由创作风格：编辑当前风格、弹窗保存/删除/关闭
+      dom.freeStyleEdit.addEventListener('click', () => {
+        if (state.freeStyleId) openFreeStyleModal(state.freeStyleId)
+      })
+      dom.freeStyleForm.addEventListener('submit', saveFreeStyle)
+      dom.freeStyleDelete.addEventListener('click', deleteFreeStyle)
+      dom.freeStyleClose.addEventListener('click', closeFreeStyleModal)
+      dom.freeStyleCancel.addEventListener('click', closeFreeStyleModal)
 
       // 捏脸页：表单提交生成方案，结果区负责复制、下载与看大图
       dom.faceForm.addEventListener('submit', runFaceDesign)
@@ -5082,11 +5319,39 @@ import { setupTablist } from '../lib/tabs.js'
         return
       }
 
+      if (event.target === dom.freeModel) {
+        state.freeModel = dom.freeModel.value
+        persistSoon()
+        return
+      }
+
+      if (event.target === dom.freeStyle) {
+        if (dom.freeStyle.value === FREE_STYLE_NEW) {
+          // 新建入口不是真实选项：先还原下拉，再用弹窗录入
+          dom.freeStyle.value = state.freeStyleId || ''
+          openFreeStyleModal('')
+        } else {
+          state.freeStyleId = dom.freeStyle.value
+          persistSoon()
+          renderFreeStyleSelect()
+        }
+        return
+      }
+
       // 工具栏批量比例/风格：记住选择，刷新后保持
       const bulkRatio = event.target.closest('[id^="bulk-ratio-"]')
       if (bulkRatio) {
         const type = bulkRatio.id.replace('bulk-ratio-', '')
         state.bulkParams[type] = { ...state.bulkParams[type], ratio: bulkRatio.value }
+        refreshBulkSummary(type)
+        persistSoon()
+        return
+      }
+
+      const bulkModel = event.target.closest('[id^="bulk-model-"]')
+      if (bulkModel) {
+        const type = bulkModel.id.replace('bulk-model-', '')
+        state.bulkParams[type] = { ...state.bulkParams[type], model: bulkModel.value }
         refreshBulkSummary(type)
         persistSoon()
         return
