@@ -4,6 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>画境 · 资产批量生图</title>
+  <script>
+    // 首屏前定主题，避免暗色用户先闪一下浅色
+    ;(function () {
+      try {
+        var pref = localStorage.getItem('huajing-theme') || 'system'
+        var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      } catch (_) {}
+    })()
+  </script>
   <link rel="stylesheet" href="/src/ui/tokens.css">
   <link rel="stylesheet" href="/src/ui/base.css">
   <link rel="stylesheet" href="/src/ui/components.css">
@@ -78,6 +88,31 @@
                       </svg>
                       <span>意见反馈</span>
                     </button>
+                    <button class="history-entry" id="settings-menu-button" type="button" role="menuitem" aria-expanded="false" aria-controls="avatar-settings">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.89a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 8.96 4.6a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V8.96a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1z"></path>
+                      </svg>
+                      <span>设置</span>
+                    </button>
+                    <div class="avatar-settings" id="avatar-settings" hidden>
+                      <div class="settings-block">
+                        <p class="settings-label">结果视图</p>
+                        <div class="settings-segment" id="settings-result-view" role="group" aria-label="结果视图">
+                          <button type="button" data-result-view="collage" aria-pressed="true">拼图</button>
+                          <button type="button" data-result-view="single" aria-pressed="false">单图</button>
+                        </div>
+                        <p class="settings-hint">拼图展示全部生成结果，可拖动排序；单图只显示最近一张。</p>
+                      </div>
+                      <div class="settings-block">
+                        <p class="settings-label">外观</p>
+                        <div class="settings-segment" id="settings-theme" role="group" aria-label="外观">
+                          <button type="button" data-theme-choice="system" aria-pressed="true">系统</button>
+                          <button type="button" data-theme-choice="light" aria-pressed="false">浅色</button>
+                          <button type="button" data-theme-choice="dark" aria-pressed="false">深色</button>
+                        </div>
+                      </div>
+                    </div>
                     <button class="history-entry" id="about-button" type="button" role="menuitem">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <circle cx="12" cy="12" r="9"></circle>
@@ -116,9 +151,11 @@
                     <span>导入资产 JSON</span>
                   </button>
         </div>
+        <div class="topbar-actions">
         <div class="layout-switch" id="free-layout-switch" role="group" aria-label="创作布局" hidden>
           <button type="button" data-free-layout="stack" aria-pressed="true" title="预览在上、输入条贴底">上下</button>
           <button type="button" data-free-layout="split" aria-pressed="false" title="表单在左、预览在右">左右</button>
+        </div>
         </div>
       </header>
 
@@ -555,6 +592,32 @@
             </div>
             <div class="free-collage" id="free-collage" hidden>
               <div class="free-collage-grid" id="free-collage-grid"></div>
+            </div>
+            <div class="free-single" id="free-single" hidden>
+              <img id="free-image" alt="自由创作生成的图片" />
+              <div class="free-single-loading" id="free-single-loading" hidden>
+                <span class="free-tile-spinner" aria-hidden="true"></span>
+                <span>正在绘制</span>
+              </div>
+              <div class="image-tools">
+                <button class="glass-button" id="free-download" type="button" disabled>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3v12"></path>
+                    <path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path>
+                    <path d="M5 20h14"></path>
+                  </svg>
+                  下载
+                </button>
+                <button class="glass-button" id="free-maximize" type="button" disabled>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8.5 3.5h-5v5"></path>
+                    <path d="M15.5 3.5h5v5"></path>
+                    <path d="M20.5 15.5v5h-5"></path>
+                    <path d="M3.5 15.5v5h5"></path>
+                  </svg>
+                  最大化
+                </button>
+              </div>
             </div>
             <button class="collage-to-bottom" id="free-to-bottom" type="button" aria-label="回到底部" title="回到底部">
               <svg viewBox="0 0 24 24" aria-hidden="true">

@@ -59,6 +59,7 @@ import { requireLogin } from '../lib/guard.js'
 import { setupAvatarMenu } from '../lib/avatar-menu.js'
 import { HISTORY_LIMIT, assetFilename, assetHistory, primaryEntry, primaryFilename, primaryImageOf } from '../lib/format.js'
 import { markAiBusyStill, startAiBusy } from '../lib/ai-busy.js'
+import { mountGenerationAnimation, pickGenerationVariant } from '../lib/generation-anim.js'
 import { activateOverlay } from '../lib/overlay.js'
 import { ratioOptions } from '../lib/ratio.js'
 import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
@@ -170,6 +171,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       // 自由创作的画面比例、生图模型与提示词草稿，刷新后保持
       freeRatio: '1:1',
       freeLayout: 'stack',
+      freeResultView: 'collage',
       freeModel: '',
       // 自由创作的自定义风格：和「风格设定」里的风格库互相独立，只存在本机
       freeStyles: [],
@@ -304,6 +306,13 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       freeRatio: document.querySelector('#free-ratio'),
       freeLayout: document.querySelector('.free-layout'),
       freeLayoutSwitch: document.querySelector('#free-layout-switch'),
+      settingsMenuButton: document.querySelector('#settings-menu-button'),
+      avatarSettings: document.querySelector('#avatar-settings'),
+      freeSingle: document.querySelector('#free-single'),
+      freeSingleLoading: document.querySelector('#free-single-loading'),
+      freeImage: document.querySelector('#free-image'),
+      freeDownload: document.querySelector('#free-download'),
+      freeMaximize: document.querySelector('#free-maximize'),
       freeModel: document.querySelector('#free-model'),
       freeStyle: document.querySelector('#free-style'),
       freeStyleEdit: document.querySelector('#free-style-edit'),
@@ -376,6 +385,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     /* 自由创作的拼图结果墙：最新在前，拖动只改当前顺序 */
     let freeCollageItems = []
     let freeCollageLoaded = false
+    /* 拼图视图下生成中的随机画布动画 */
+    let freeGenAnim = null
     /* 从拼图拖到输入框时携带的图片来源 */
     const FREE_COLLAGE_DRAG_TYPE = 'application/x-huajing-free-image'
 
@@ -410,6 +421,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         }
         if (saved.freeLayout === 'split' || saved.freeLayout === 'stack') {
           state.freeLayout = saved.freeLayout
+        }
+        if (saved.freeResultView === 'single' || saved.freeResultView === 'collage') {
+          state.freeResultView = saved.freeResultView
         }
         // 老快照可能是空串，渲染时会自动落到服务端默认模型
         if (typeof saved.freeModel === 'string') {
@@ -669,6 +683,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           concurrencyCustom: state.concurrencyCustom,
           freeRatio: state.freeRatio,
           freeLayout: state.freeLayout,
+          freeResultView: state.freeResultView,
           freeModel: state.freeModel,
           freeStyles: state.freeStyles,
           freeStyleId: state.freeStyleId,
@@ -1570,6 +1585,78 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       applyFreeLayout()
       // 列宽变了，换行和输入框高度要重算
       requestAnimationFrame(resizeFreePrompt)
+    }
+
+    /* ===== 外观：跟随系统 / 浅色 / 深色（独立键，登录页也读） ===== */
+
+    const THEME_STORAGE_KEY = 'huajing-theme'
+    let themePreference = 'system'
+
+    function applyTheme(preference = themePreference) {
+      themePreference =
+        preference === 'light' || preference === 'dark' ? preference : 'system'
+      const dark =
+        themePreference === 'dark' ||
+        (themePreference === 'system' &&
+          Boolean(window.matchMedia?.('(prefers-color-scheme: dark)').matches))
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      document.querySelectorAll('[data-theme-choice]').forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.themeChoice === themePreference))
+      })
+    }
+
+    function setThemeChoice(preference) {
+      if (!['system', 'light', 'dark'].includes(preference)) return
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, preference)
+      } catch {
+        // 隐私模式禁用存储时只影响下次启动
+      }
+      applyTheme(preference)
+    }
+
+    function initTheme() {
+      let saved = 'system'
+      try {
+        saved = localStorage.getItem(THEME_STORAGE_KEY) || 'system'
+      } catch {
+        // 读不到就用系统外观
+      }
+      applyTheme(saved)
+      window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
+        if (themePreference === 'system') applyTheme('system')
+      })
+      window.addEventListener('storage', event => {
+        if (event.key === THEME_STORAGE_KEY) applyTheme(event.newValue || 'system')
+      })
+    }
+
+    /* ===== 设置弹层：结果视图与外观 ===== */
+
+    function setSettingsOpen(open) {
+      if (!dom.avatarSettings || !dom.settingsMenuButton) return
+      dom.avatarSettings.hidden = !open
+      dom.settingsMenuButton.setAttribute('aria-expanded', String(open))
+    }
+
+    function applyFreeResultView() {
+      const view = state.freeResultView === 'single' ? 'single' : 'collage'
+      state.freeResultView = view
+      document.querySelectorAll('[data-result-view]').forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.resultView === view))
+      })
+      renderFreeCollage()
+    }
+
+    function setFreeResultView(view) {
+      if ((view !== 'single' && view !== 'collage') || view === state.freeResultView) return
+      state.freeResultView = view
+      persistSoon()
+      if (state.freeBusy) {
+        if (view === 'collage') startFreeCanvasAnimation()
+        else stopFreeCanvasAnimation()
+      }
+      applyFreeResultView()
     }
 
     function switchMode(mode) {
@@ -4339,6 +4426,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           stopFreeProgress()
           dom.freeProgressLabel.textContent = '图像已生成'
           setFreeProgress(100)
+          finishFreeCanvasAnimation()
           state.freeImageUrl = data.result.imageUrl
           state.freeImageExtension = getImageExtension(data.result.imageUrl)
           persistSoon()
@@ -4359,6 +4447,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         // 失败
         clearPendingJob()
         stopFreeProgress()
+        stopFreeCanvasAnimation()
         dom.freeProgressLabel.textContent = '生成中断'
         dom.freeStatus.textContent = data.error?.message || '生成失败，请重新尝试'
         finishResume()
@@ -4368,6 +4457,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           return
         }
         clearPendingJob()
+        stopFreeCanvasAnimation()
         finishResume()
         dom.freeStatus.textContent = '无法查询生成状态，请重新生成'
       }
@@ -4738,6 +4828,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         stopFreeProgress()
         dom.freeProgressLabel.textContent = '图像已生成'
         setFreeProgress(100)
+        finishFreeCanvasAnimation()
         await sleep(320)
         state.freeImageUrl = result.imageUrl
         state.freeImageExtension = getImageExtension(result.imageUrl)
@@ -4756,6 +4847,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       } catch (error) {
         clearPendingJob()
         stopFreeProgress()
+        stopFreeCanvasAnimation()
         dom.freeProgressLabel.textContent = '生成中断'
         dom.freeStatus.textContent = error.message || '生成失败，请稍后重试'
       } finally {
@@ -4880,36 +4972,90 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       if (!host || !button) return
       const overflow = host.scrollHeight - host.clientHeight
       const atBottom = host.scrollTop + host.clientHeight >= host.scrollHeight - 8
-      button.classList.toggle('visible', !host.hidden && overflow > 24 && !atBottom)
+      button.classList.toggle(
+        'visible',
+        !host.hidden && !state.freeBusy && overflow > 24 && !atBottom,
+      )
+    }
+
+    /** 单图视图：只展示最近一张，生成中且还没有图时给一个加载态 */
+    function renderFreeSingle() {
+      const item = freeCollageItems[0] || null
+      const url = item?.url || ''
+      const image = dom.freeImage
+      if (!image) return
+      if (url) {
+        if (image.getAttribute('src') !== url) image.src = url
+        image.hidden = false
+      } else {
+        image.hidden = true
+        image.removeAttribute('src')
+      }
+      if (dom.freeSingleLoading) {
+        dom.freeSingleLoading.hidden = Boolean(url) || !state.freeBusy
+      }
+      if (dom.freeDownload) dom.freeDownload.disabled = !url
+      if (dom.freeMaximize) dom.freeMaximize.disabled = !url
+    }
+
+    /* ===== 生成中的随机画布动画（拼图视图） ===== */
+
+    function startFreeCanvasAnimation() {
+      stopFreeCanvasAnimation()
+      if (!dom.freePreview || state.freeResultView !== 'collage') return
+      freeGenAnim = mountGenerationAnimation(dom.freePreview, pickGenerationVariant())
+      freeGenAnim.setProgress(freeProgressValue)
+    }
+
+    function stopFreeCanvasAnimation() {
+      freeGenAnim?.destroy()
+      freeGenAnim = null
+    }
+
+    function finishFreeCanvasAnimation() {
+      if (!freeGenAnim) return
+      freeGenAnim.finish()
+      freeGenAnim = null
     }
 
     function renderFreeCollage() {
       const host = dom.freeCollage
       const grid = dom.freeCollageGrid
       if (!host || !grid) return
+      const single = state.freeResultView === 'single'
       const show = freeCollageItems.length > 0 || state.freeBusy
-      const wasHidden = host.hidden
-      host.hidden = !show
       dom.freePreview?.classList.toggle('has-image', show)
+      if (dom.freeSingle) dom.freeSingle.hidden = !show || !single
+
       if (!show) {
+        host.hidden = true
         grid.replaceChildren()
+        if (dom.freeSingleLoading) dom.freeSingleLoading.hidden = true
         syncFreeToBottom()
         return
       }
 
-      // 首次显示不吸底；只有本来就在底部时才跟着新卡片一起到底
-      const stick = !wasHidden && isFreeCollageAtBottom()
+      if (single) {
+        host.hidden = true
+        renderFreeSingle()
+        syncFreeToBottom()
+        return
+      }
+
+      host.hidden = false
+      // 新图始终排在数组最前面；重排时保留用户当前的滚动位置
       const scrollTop = host.scrollTop
       grid.innerHTML =
         freeCollageItems.map(freeTileHtml).join('') +
         (state.freeBusy ? freeGeneratingTileHtml() : '')
-      host.scrollTop = stick ? host.scrollHeight : scrollTop
+      host.scrollTop = scrollTop
       syncFreeToBottom()
     }
 
     function addFreeCollageItem(item, { prepend = true } = {}) {
       if (!item?.url) return
       const index = freeCollageItems.findIndex(existing => existing.url === item.url)
+      const isNew = index < 0
       if (index >= 0) {
         freeCollageItems[index] = { ...freeCollageItems[index], ...item }
       } else if (prepend) {
@@ -4918,6 +5064,11 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         freeCollageItems.push(item)
       }
       renderFreeCollage()
+      // 最新一张在最前，生成完成就把视图带回顶部，不用再手动往上翻
+      if (isNew && prepend && state.freeResultView === 'collage' && dom.freeCollage) {
+        dom.freeCollage.scrollTop = 0
+        syncFreeToBottom()
+      }
     }
 
     /** 拼图顺序以 DOM 为准，拖动松手后写回状态 */
@@ -4949,6 +5100,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
             freeCollageItems.push(item)
           }
         }
+        freeCollageItems.sort(
+          (a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0),
+        )
         renderFreeCollage()
       } catch {
         freeCollageLoaded = false
@@ -5087,6 +5241,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       freeProgressValue = 3
       freeStartedAt = Date.now()
       setFreeProgress(freeProgressValue)
+      startFreeCanvasAnimation()
       renderFreeCollage()
       dom.freeProgress.classList.add('visible')
       dom.freeProgressLabel.textContent = '正在理解画面'
@@ -5118,6 +5273,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
     function setFreeProgress(value) {
       dom.freeProgressBar.style.width = `${Math.round(value)}%`
+      freeGenAnim?.setProgress(value)
     }
 
     /* ===== 启动 ===== */
@@ -5125,6 +5281,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     const historyPanel = setupHistoryPanel()
     const avatarMenu = setupAvatarMenu({
       shouldIgnoreOutsideClick: event => event.target.closest?.('#history-panel'),
+      // 菜单收起时把设置区一起收掉，下次打开不会顶得很高
+      onClose: () => setSettingsOpen(false),
     })
 
     document.querySelector('#logout-button')?.addEventListener('click', async () => {
@@ -5200,6 +5358,36 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       document.addEventListener('click', handleClick)
       document.addEventListener('change', handleChange)
       document.addEventListener('input', handleInput)
+
+      // 设置收在头像菜单里：点「设置」展开结果视图与外观，菜单本身不收起
+      dom.settingsMenuButton?.addEventListener('click', event => {
+        event.stopPropagation()
+        setSettingsOpen(Boolean(dom.avatarSettings?.hidden))
+      })
+      // 头像菜单会在自己的点击处理里拦住冒泡，这里的选项要直接监听
+      dom.avatarSettings?.addEventListener('click', event => {
+        const resultView = event.target.closest('[data-result-view]')
+        if (resultView) {
+          setFreeResultView(resultView.dataset.resultView)
+          return
+        }
+        const theme = event.target.closest('[data-theme-choice]')
+        if (theme) setThemeChoice(theme.dataset.themeChoice)
+      })
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') return
+        if (!dom.avatarSettings || dom.avatarSettings.hidden) return
+        setSettingsOpen(false)
+      })
+
+      // 单图视图的两个按钮：作用于最近一张结果
+      dom.freeDownload?.addEventListener('click', () => {
+        if (!state.freeImageUrl) return
+        downloadImage(state.freeImageUrl, `画境-自由创作-${timestamp()}.${state.freeImageExtension}`)
+      })
+      dom.freeMaximize?.addEventListener('click', () => {
+        if (state.freeImageUrl) openLightbox(state.freeImageUrl, '自由创作生成图')
+      })
 
       // 页签组：方向键 / Home / End 只在当前模式可见的页签之间切换，
       // 和鼠标点击走同一个 switchTab；点击由 data-tab 分发处理
@@ -5570,6 +5758,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     const CLICK_DISPATCH = [
       ['.mode-switch [data-mode]', target => switchMode(target.dataset.mode)],
       ['[data-free-layout]', target => setFreeLayout(target.dataset.freeLayout)],
+      ['[data-result-view]', target => setFreeResultView(target.dataset.resultView)],
+      ['[data-theme-choice]', target => setThemeChoice(target.dataset.themeChoice)],
       ['[data-tab]', target => switchTab(target.dataset.tab)],
       ['[data-history-action]', handleHistoryActionClick],
       ['[data-ref-action]', handleRefActionClick],
@@ -5901,11 +6091,14 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       await adoptLegacySnapshotIfOwned()
       await adoptLegacyPendingJobIfOwned()
       restoreState()
+      // 外观偏好存在独立键里；首屏脚本已经定过一次，这里同步设置里的选中态
+      initTheme()
       // 捏脸表单先按快照回填；服务端配置到达后再决定按钮是否可用
       hydrateFaceForm()
       // 比例下拉先按本地选择渲染；服务端配置到达后再刷一次
       renderRatioSelects()
       renderAll()
+      applyFreeResultView()
       // 拼图结果墙：先显示本地记住的结果图，再把本账号的自由创作记录并进来
       void loadFreeCollage()
       // 刷新前若有正在生成的图片，自动接回进度与结果（只接本账号自己的）

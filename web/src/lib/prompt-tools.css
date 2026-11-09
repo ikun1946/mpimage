@@ -24,6 +24,7 @@
 /* 只在鼠标进入输入框右上角的热区时浮现（热区由 JS 打 .tools-near 类），
    键盘 Tab 聚焦到按钮本身时也显示，保证可访问性 */
 .prompt-shell.tools-near .prompt-float-tools,
+.prompt-shell:focus-within .prompt-float-tools,
 .prompt-float-tools:focus-within {
   opacity: 1;
   transform: translateY(0);
@@ -265,7 +266,7 @@ html.prompt-editor-open body {
   }
 }
 
-@media (prefers-color-scheme: dark) {
+html[data-theme="dark"] {
   .prompt-editor-card {
     background: var(--surface-solid, #1c211d);
   }

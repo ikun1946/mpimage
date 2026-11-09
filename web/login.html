@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>画境 · 登录</title>
+  <script>
+    // 登录页也沿用客户端选过的外观，未选则跟随系统
+    ;(function () {
+      try {
+        var pref = localStorage.getItem('huajing-theme') || 'system'
+        var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      } catch (_) {}
+    })()
+  </script>
   <link rel="stylesheet" href="/src/ui/tokens.css">
   <link rel="stylesheet" href="/src/ui/base.css">
   <link rel="stylesheet" href="/src/ui/components.css">

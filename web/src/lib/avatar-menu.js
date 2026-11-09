@@ -6,7 +6,7 @@
  * 菜单就会在弹窗关掉的一瞬间自己弹出来。dismissed 这个标记专门挡这件事，
  * 同时用 .is-dismissed 盖住 :hover / :focus-within 的展开样式。
  */
-export function setupAvatarMenu({ shouldIgnoreOutsideClick } = {}) {
+export function setupAvatarMenu({ shouldIgnoreOutsideClick, onClose } = {}) {
   const avatar = document.querySelector('#user-avatar')
   if (!avatar) return { close() {} }
 
@@ -34,6 +34,7 @@ export function setupAvatarMenu({ shouldIgnoreOutsideClick } = {}) {
     avatar.classList.remove('is-open')
     if (dismiss) dismissed = true
     applyState()
+    if (dismiss) onClose?.()
   }
 
   avatar.addEventListener('pointerenter', () => {
@@ -50,8 +51,10 @@ export function setupAvatarMenu({ shouldIgnoreOutsideClick } = {}) {
     syncExpanded()
   })
 
-  // 菜单项在捕获阶段先收起菜单：业务处理函数里的 stopPropagation 拦不到这一步
+  // 菜单项在捕获阶段先收起菜单：业务处理函数里的 stopPropagation 拦不到这一步。
+  // 「设置」及其展开区留在菜单里操作，不能点一下就收起。
   avatar.addEventListener('click', event => {
+    if (event.target.closest?.('#avatar-settings, #settings-menu-button')) return
     if (!event.target.closest?.('#avatar-menu [role="menuitem"], #avatar-menu button, #avatar-menu a')) return
     close(true)
   }, true)

@@ -1,6 +1,6 @@
 /* 暗色主题：两层暗色覆盖按级联合并为唯一实现，只保留仍有实际效果的规则 */
-@media (prefers-color-scheme: dark) {
-  :root {
+html[data-theme="dark"] {
+  
     color-scheme: dark;
     --paper: #151915;
     --paper-deep: #101310;
@@ -21,7 +21,7 @@
     --danger: #cf8574;
     --on-accent: #fffaf5;
     --shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
-  }
+  
 
   body {
     background:
@@ -243,18 +243,18 @@
   .free-preview { border-color: rgba(255, 255, 255, 0.1); }
 
   /* 拼图卡片与磨砂回到底部按钮 */
-  .free-tile { border-color: rgba(255, 255, 255, 0.08); }
-  .free-tile-thumb { background: rgba(255, 255, 255, 0.05); }
-  .free-tile.is-generating .free-tile-thumb {
+  #panel-free .free-tile { border-color: rgba(255, 255, 255, 0.08); }
+  #panel-free .free-tile-thumb { background: rgba(255, 255, 255, 0.05); }
+  #panel-free .free-tile.is-generating .free-tile-thumb {
     background: linear-gradient(110deg, rgba(255, 255, 255, 0.05) 32%, rgba(255, 255, 255, 0.1) 45%, rgba(255, 255, 255, 0.05) 58%);
     background-size: 220% 100%;
   }
-  .collage-to-bottom {
+  #panel-free .collage-to-bottom {
     border-color: rgba(255, 255, 255, 0.12);
     background: rgba(46, 51, 47, 0.72);
     color: rgba(255, 253, 248, 0.82);
   }
-  .collage-to-bottom:hover {
+  #panel-free .collage-to-bottom:hover {
     background: rgba(52, 58, 53, 0.9);
     color: #fffdf8;
   }
@@ -307,4 +307,6 @@
 
   /* 暗色下的字重：标题与强调回补，正文保持细一档（.button/.tab 由浅色层的 600 接管） */
   h1, h2, h3, .brand-mark, .stat-value, .type-card strong { font-weight: 500; }
+
+
 }

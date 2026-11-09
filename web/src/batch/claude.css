@@ -245,8 +245,24 @@
   right: auto;
   bottom: calc(100% + 8px);
   left: 0;
-  min-width: 200px;
+  min-width: 224px;
   transform-origin: bottom left;
+}
+
+/* 设置区嵌在头像菜单里：展开后不关闭菜单，直接切换视图与外观 */
+.rail-foot .avatar-settings {
+  margin: 4px 0 2px;
+  padding: 8px 6px 4px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.rail-foot .avatar-settings[hidden] {
+  display: none;
+}
+
+.rail-foot .avatar-settings .settings-block + .settings-block {
+  margin-top: 10px;
+  padding-top: 10px;
 }
 
 /* ===== 顶栏 ===== */
@@ -376,6 +392,51 @@ body[data-mode="create"] .app-main main {
   padding: 12px;
   columns: 330px;
   column-gap: 12px;
+}
+
+/* 单图视图：保留旧版「一张图铺满预览、contain 不裁切」的观感 */
+#panel-free .free-single {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+#panel-free .free-single[hidden] {
+  display: none;
+}
+
+#panel-free .free-single img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+  object-fit: contain;
+  box-shadow: 0 10px 30px rgba(20, 26, 22, 0.12);
+  animation: free-tile-in 260ms ease both;
+}
+
+#panel-free .free-single img[hidden] {
+  display: none;
+}
+
+#panel-free .free-single-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+#panel-free .free-single-loading[hidden] {
+  display: none;
 }
 
 #panel-free .free-collage[hidden] {
@@ -872,6 +933,66 @@ body[data-mode="create"] .app-main main {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
+/* ===== 顶栏右侧：布局切换 + 设置 ===== */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-block + .settings-block {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.settings-label {
+  margin: 0 0 6px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.settings-segment {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: rgba(29, 36, 32, 0.055);
+}
+
+.settings-segment button {
+  flex: 1;
+  height: 26px;
+  padding: 0 8px;
+  color: var(--ink-soft);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11.5px;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.settings-segment button:hover {
+  color: var(--ink);
+}
+
+.settings-segment button[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--surface-raised);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.settings-hint {
+  margin: 7px 0 0;
+  color: var(--ink-faint);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
 /* 左右两列：表单在左，预览在右 */
 #panel-free .free-layout[data-layout="split"] {
   display: grid;
@@ -1234,7 +1355,7 @@ body[data-mode="create"] .app-main main {
   }
 }
 
-@media (prefers-color-scheme: dark) {
+html[data-theme="dark"] {
   .mode-switch {
     background: rgba(255, 255, 255, 0.06);
   }
@@ -1264,6 +1385,14 @@ body[data-mode="create"] .app-main main {
   }
 
   .rail-nav .tab.active .tab-count {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .settings-segment {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .settings-segment button[aria-pressed="true"] {
     background: rgba(255, 255, 255, 0.1);
   }
 }

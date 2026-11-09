@@ -245,7 +245,7 @@ body {
 }
 
 /* ---------- 暗色：只调字重，配色全部跟随 tokens.css ---------- */
-@media (prefers-color-scheme: dark) {
+html[data-theme="dark"] {
   body {
     background:
       radial-gradient(120% 60% at 50% -10%, rgba(138, 170, 143, 0.06), transparent 60%),
