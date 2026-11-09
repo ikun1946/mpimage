@@ -389,6 +389,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     let freeGenAnim = null
     /* 本次生成挑中的动画方案：切视图重建时沿用，不重新抽签 */
     let freeGenVariant = ''
+    /* 页面正在刷新/关闭：此时请求中断不代表任务失败，不能清掉接回标记 */
+    let pageUnloading = false
     /* 从拼图拖到输入框时携带的图片来源 */
     const FREE_COLLAGE_DRAG_TYPE = 'application/x-huajing-free-image'
 
@@ -4388,12 +4390,10 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       dom.freePrompt.disabled = true
       setFreeSubmitBusy(true)
       dom.freeStatus.textContent = '检测到未完成的生成任务，正在接回…'
-      freeProgressValue = Math.max(12, freeProgressValue)
       freeStartedAt = pending.startedAt || Date.now()
-      dom.freeProgress.classList.add('visible')
-      dom.freeProgressLabel.textContent = '后台仍在生成'
-      setFreeProgress(Math.max(freeProgressValue, 20))
-      startFreeProgress()
+      freeProgressValue = Math.max(freeProgressValue, 20)
+      // 接回时保留已有时长与进度，别把「后台仍在生成」重置成 0%
+      startFreeProgress({ resume: true })
 
       pollPendingJob(pending.jobId, 0)
     }
@@ -4867,11 +4867,23 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         // 自由创作的图同样进服务端记录，面板下次打开要重新拉
         historyPanel.invalidate()
       } catch (error) {
-        clearPendingJob()
+        // 刷新/跳转会把在途请求中断，但服务端任务仍在跑：保留标记，下次载入接回。
+        // 只有服务端明确失败的响应才清掉，避免「一刷新就丢任务」。
+        const interrupted =
+          pageUnloading ||
+          error?.name === 'AbortError' ||
+          /aborted|Failed to fetch|NetworkError|Load failed/i.test(String(error?.message || ''))
+        if (!interrupted) clearPendingJob()
         stopFreeProgress()
         stopFreeCanvasAnimation()
-        dom.freeProgressLabel.textContent = '生成中断'
-        dom.freeStatus.textContent = friendlyGenerationError(error.message)
+        dom.freeProgressLabel.textContent = interrupted ? '正在后台生成' : '生成中断'
+        if (interrupted && !pageUnloading) {
+          // 网络抖动但页面还在：留个提示，稍后自动接回服务端任务
+          dom.freeStatus.textContent = '连接中断，正在尝试接回生成进度…'
+          window.setTimeout(() => resumePendingJobIfAny(), 1500)
+        } else if (!interrupted) {
+          dom.freeStatus.textContent = friendlyGenerationError(error.message)
+        }
       } finally {
         state.freeBusy = false
         dom.freePrompt.disabled = false
@@ -5260,17 +5272,19 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       renderFreeReferences()
     }
 
-    function startFreeProgress() {
+    function startFreeProgress({ resume = false } = {}) {
       stopFreeProgress()
-      // 新的一次生成重新抽一套动画
-      freeGenVariant = ''
-      freeProgressValue = 3
-      freeStartedAt = Date.now()
+      if (!resume) {
+        // 新的一次生成重新抽一套动画
+        freeGenVariant = ''
+        freeProgressValue = 3
+        freeStartedAt = Date.now()
+      }
       setFreeProgress(freeProgressValue)
       startFreeCanvasAnimation()
       renderFreeCollage()
       dom.freeProgress.classList.add('visible')
-      dom.freeProgressLabel.textContent = '正在理解画面'
+      dom.freeProgressLabel.textContent = resume ? '后台仍在生成' : '正在理解画面'
       const stages = [
         [0, '正在理解画面'],
         [18, '正在搭建构图'],
@@ -5740,7 +5754,13 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         ;[dom.freeModel, dom.freeRatio, dom.freeStyle].forEach(enhanceMenuSelect)
 
         // 窗口变宽/变窄会改变换行，输入条高度跟着重算
-        window.addEventListener('resize', resizeFreePrompt)
+        window.addEventListener('pagehide', () => {
+      pageUnloading = true
+    })
+    window.addEventListener('beforeunload', () => {
+      pageUnloading = true
+    })
+    window.addEventListener('resize', resizeFreePrompt)
       }
 
       // 拼图结果墙：拖动排序、拖到输入框作参考图、悬停查看/下载
