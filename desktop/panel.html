@@ -1653,6 +1653,18 @@
       <p class="current" id="upstream-model-status" role="status" aria-live="polite">还没获取模型列表。打开控制台会自动拉一次，也可以点「获取模型」强制刷新。</p>
       <p class="hint">用于自由创作的 AI 优化提示词，需与上面地址是同一个网关；留空表示使用环境变量默认值。</p>
       <div class="form-row">
+        <label class="grow">卡片标题模型
+          <select id="upstream-title-model" class="model-select" aria-describedby="upstream-title-model-status"></select>
+        </label>
+      </div>
+      <div class="form-row" id="upstream-title-model-custom-row" hidden>
+        <label class="grow">自定义标题模型 ID
+          <input type="text" id="upstream-title-model-custom" placeholder="留空则跟随提示词优化模型" spellcheck="false" autocomplete="off" aria-describedby="upstream-title-model-status" />
+        </label>
+      </div>
+      <p class="current" id="upstream-title-model-status" role="status" aria-live="polite"></p>
+      <p class="hint">只用于生成拼图卡片左下角的短名（最多 7 个字）；留空即跟随提示词优化模型。标题与生图并行，不会拖慢出图。</p>
+      <div class="form-row">
         <label class="grow">生图模型
           <select id="upstream-image-model" class="model-select" aria-describedby="upstream-image-model-status"></select>
         </label>
@@ -1913,6 +1925,10 @@
     upstreamTextModel: $('upstream-text-model'),
     upstreamTextModelCustomRow: $('upstream-text-model-custom-row'),
     upstreamTextModelCustom: $('upstream-text-model-custom'),
+    upstreamTitleModel: $('upstream-title-model'),
+    upstreamTitleModelCustomRow: $('upstream-title-model-custom-row'),
+    upstreamTitleModelCustom: $('upstream-title-model-custom'),
+    upstreamTitleModelStatus: $('upstream-title-model-status'),
     upstreamModelsRefresh: $('upstream-models-refresh'),
     upstreamModelStatus: $('upstream-model-status'),
     upstreamImageModel: $('upstream-image-model'),
@@ -2024,6 +2040,10 @@
   let upstreamSavedTextModel = ''
   /** 当前生效的优化模型，用来写「跟随环境变量默认（…）」的文案 */
   let upstreamEffectiveTextModel = ''
+  /** 已保存的标题模型覆写值；空串表示跟随提示词优化模型 */
+  let upstreamSavedTitleModel = ''
+  /** 用户在下拉里选中的标题模型；null 表示还没动过 */
+  let upstreamTitleModelSelection = null
   /** 用户在下拉里选中的值；null 表示还没动过，跟随已保存值 */
   let upstreamModelSelection = null
   /** 自动拉取只做一次，避免每次刷新都打上游 */
@@ -2803,16 +2823,18 @@
     dom.upstreamUrl.value = data.baseUrl || ''
     upstreamSavedTextModel = String(data.textModelOverride || '').trim()
     upstreamEffectiveTextModel = String(data.textModel || '').trim()
+    upstreamSavedTitleModel = String(data.titleModelOverride || '').trim()
     upstreamSavedImageModel = String(data.imageModelOverride || '').trim()
     upstreamEffectiveImageModel = String(data.imageModel || data.model || '').trim()
     upstreamImageModels = Array.isArray(data.imageModels) ? data.imageModels : []
     upstreamEnabledImageModels = Array.isArray(data.enabledImageModels) ? data.enabledImageModels : []
     renderUpstreamModelOptions()
+    renderUpstreamTitleModelOptions()
     renderUpstreamImageModelOptions()
     renderClientModelFlags()
     setCurrent(
       dom.upstreamMeta,
-      `生图模型：${data.imageModel || data.model || '—'}（${data.imageModelFromSettings ? '后台设置' : '环境变量默认值'}） · 地址来源：${data.fromSettings ? '后台设置（settings.json）' : '环境变量默认值'} · 优化模型：${data.textModel || '未设置'}（${data.textModelFromSettings ? '后台设置' : '环境变量默认值'}）`,
+      `生图模型：${data.imageModel || data.model || '—'}（${data.imageModelFromSettings ? '后台设置' : '环境变量默认值'}） · 地址来源：${data.fromSettings ? '后台设置（settings.json）' : '环境变量默认值'} · 优化模型：${data.textModel || '未设置'}（${data.textModelFromSettings ? '后台设置' : '环境变量默认值'}） · 标题模型：${data.titleModel || '未设置'}（${data.titleModelFromSettings ? '独立设置' : '跟随优化模型'}）`,
     )
     setCurrent(dom.upstreamResult, '')
   }
@@ -2864,6 +2886,61 @@
     const selected = dom.upstreamTextModel.value
     if (selected === CUSTOM_MODEL_VALUE) return dom.upstreamTextModelCustom.value.trim()
     return selected.trim()
+  }
+
+  /** 重画「卡片标题模型」下拉：跟随优化模型 → 上游模型 → 已保存 → 自定义 */
+  function renderUpstreamTitleModelOptions() {
+    const options = [{
+      value: '',
+      label: upstreamEffectiveTextModel
+        ? `跟随提示词优化模型（${upstreamEffectiveTextModel}）`
+        : '跟随提示词优化模型',
+    }]
+
+    for (const model of upstreamModels) {
+      const vision = model.capabilities ? model.capabilities.vision : null
+      const suffix = vision === true ? ' · 支持看图' : vision === false ? ' · 仅文本' : ''
+      options.push({ value: model.id, label: `${model.id}${suffix}` })
+    }
+
+    if (upstreamSavedTitleModel && !upstreamModels.some(model => model.id === upstreamSavedTitleModel)) {
+      options.push({ value: upstreamSavedTitleModel, label: `${upstreamSavedTitleModel} · 已保存` })
+    }
+    options.push({ value: CUSTOM_MODEL_VALUE, label: '自定义模型 ID…' })
+
+    dom.upstreamTitleModel.innerHTML = options
+      .map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+      .join('')
+
+    const wanted = upstreamTitleModelSelection === null ? upstreamSavedTitleModel : upstreamTitleModelSelection
+    dom.upstreamTitleModel.value = options.some(option => option.value === wanted) ? wanted : ''
+    syncTitleModelInput()
+    renderUpstreamTitleModelStatus()
+  }
+
+  /** 标题模型选了「自定义」才露出输入框，并填入已保存值 */
+  function syncTitleModelInput() {
+    const custom = dom.upstreamTitleModel.value === CUSTOM_MODEL_VALUE
+    dom.upstreamTitleModelCustomRow.hidden = !custom
+    if (custom && !dom.upstreamTitleModelCustom.value.trim()) {
+      dom.upstreamTitleModelCustom.value = upstreamSavedTitleModel
+    }
+  }
+
+  function currentTitleModelValue() {
+    const selected = dom.upstreamTitleModel.value
+    if (selected === CUSTOM_MODEL_VALUE) return dom.upstreamTitleModelCustom.value.trim()
+    return selected.trim()
+  }
+
+  function renderUpstreamTitleModelStatus() {
+    const chosen = currentTitleModelValue()
+    setCurrent(
+      dom.upstreamTitleModelStatus,
+      chosen
+        ? `标题将使用 ${chosen}`
+        : `跟随提示词优化模型：${upstreamEffectiveTextModel || '未设置'}`,
+    )
   }
 
   /** 重画生图模型下拉：空值项 → 常用清单 → 已保存但清单里没有的值 → 自定义 */
@@ -2977,6 +3054,7 @@
 
       upstreamModels = models
       renderUpstreamModelOptions()
+      renderUpstreamTitleModelOptions()
 
       if (!models.length) {
         upstreamModelStatusNotes = []
@@ -3054,6 +3132,16 @@
       return
     }
 
+    const titleModel = currentTitleModelValue()
+    if (titleModel.length > 120) {
+      setCurrent(dom.upstreamResult, '卡片标题模型最多 120 个字符', 'error')
+      return
+    }
+    if (/\s/.test(titleModel)) {
+      setCurrent(dom.upstreamResult, '卡片标题模型里不能有空格', 'error')
+      return
+    }
+
     const imageModel = currentImageModelValue()
     if (imageModel.length > 120) {
       setCurrent(dom.upstreamResult, '生图模型最多 120 个字符', 'error')
@@ -3074,7 +3162,7 @@
     await withBusy(dom.upstreamSave, async () => {
       const result = await api('/api/admin/upstream', {
         method: 'PUT',
-        body: { baseUrl, textModel, imageModel, enabledImageModels },
+        body: { baseUrl, textModel, titleModel, imageModel, enabledImageModels },
       })
       if (isAuthFailure(result)) {
         setCurrent(dom.upstreamResult, AUTH_HINT, 'error')
@@ -3089,8 +3177,10 @@
       const fromSettings = Boolean(result.data && result.data.textModelFromSettings)
       const effectiveImageModel = (result.data && result.data.imageModel) || '未设置'
       const imageFromSettings = Boolean(result.data && result.data.imageModelFromSettings)
+      const effectiveTitleModel = (result.data && result.data.titleModel) || '未设置'
+      const titleFromSettings = Boolean(result.data && result.data.titleModelFromSettings)
       flash(
-        `上游地址已保存：${saved} · 生图模型：${effectiveImageModel}（${imageFromSettings ? '后台设置' : '环境变量默认值'}） · 提示词优化模型：${effectiveModel}（${fromSettings ? '后台设置' : '环境变量默认值'}）`,
+        `上游地址已保存：${saved} · 生图模型：${effectiveImageModel}（${imageFromSettings ? '后台设置' : '环境变量默认值'}） · 提示词优化模型：${effectiveModel}（${fromSettings ? '后台设置' : '环境变量默认值'}） · 标题模型：${effectiveTitleModel}（${titleFromSettings ? '独立设置' : '跟随优化模型'}）`,
       )
       await loadUpstream()
       // 地址可能换过，上游可用的模型也跟着换，保存后强制回源一次
@@ -3697,6 +3787,12 @@
       renderUpstreamModelStatus()
     })
     dom.upstreamTextModelCustom.addEventListener('input', () => renderUpstreamModelStatus())
+    dom.upstreamTitleModel.addEventListener('change', () => {
+      upstreamTitleModelSelection = dom.upstreamTitleModel.value
+      syncTitleModelInput()
+      renderUpstreamTitleModelStatus()
+    })
+    dom.upstreamTitleModelCustom.addEventListener('input', () => renderUpstreamTitleModelStatus())
     dom.upstreamImageModel.addEventListener('change', () => {
       upstreamImageModelSelection = dom.upstreamImageModel.value
       syncCustomImageModelInput()

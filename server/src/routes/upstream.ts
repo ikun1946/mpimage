@@ -107,6 +107,10 @@ export function registerUpstreamRoutes(
       /** 后台覆写值，空串表示没覆写；控制台输入框绑定这个 */
       textModelOverride: deps.settings.getTextModelOverride(),
       textModelFromSettings: deps.settings.isTextModelFromSettings(),
+      /** 拼图卡片标题模型：留空时跟随 textModel */
+      titleModel: await deps.settings.getTitleModel(),
+      titleModelOverride: deps.settings.getTitleModelOverride(),
+      titleModelFromSettings: deps.settings.isTitleModelFromSettings(),
       /** 生效中的生图模型（可能是 MAGPIE_IMAGE_MODEL 默认值） */
       imageModel: deps.settings.getImageModel(),
       imageModelOverride: deps.settings.getImageModelOverride(),
@@ -135,6 +139,7 @@ export function registerUpstreamRoutes(
     const body = (request.body ?? {}) as {
       baseUrl?: unknown
       textModel?: unknown
+      titleModel?: unknown
       imageModel?: unknown
       enabledImageModels?: unknown
     }
@@ -142,6 +147,7 @@ export function registerUpstreamRoutes(
 
     // 全部校验完再落盘，否则模型名不合法时地址已经被写进去一半
     const textModel = body.textModel === undefined ? undefined : parseModelId(body.textModel, '对话模型')
+    const titleModel = body.titleModel === undefined ? undefined : parseModelId(body.titleModel, '标题模型')
     const imageModel = body.imageModel === undefined ? undefined : parseModelId(body.imageModel, '生图模型')
     const catalog = await imageModelCatalog.list(baseUrl)
     const enabledImageModels = parseEnabledModels(body.enabledImageModels, catalog.map(model => model.id))
@@ -153,6 +159,10 @@ export function registerUpstreamRoutes(
     if (textModel !== undefined) {
       await deps.settings.setTextModel(textModel)
       request.log.info({ textModel }, '提示词优化模型已更新')
+    }
+    if (titleModel !== undefined) {
+      await deps.settings.setTitleModel(titleModel)
+      request.log.info({ titleModel }, '卡片标题模型已更新')
     }
     if (imageModel !== undefined) {
       await deps.settings.setImageModel(imageModel)
@@ -169,6 +179,9 @@ export function registerUpstreamRoutes(
       textModel: await deps.settings.getTextModel(),
       textModelOverride: deps.settings.getTextModelOverride(),
       textModelFromSettings: deps.settings.isTextModelFromSettings(),
+      titleModel: await deps.settings.getTitleModel(),
+      titleModelOverride: deps.settings.getTitleModelOverride(),
+      titleModelFromSettings: deps.settings.isTitleModelFromSettings(),
       imageModel: deps.settings.getImageModel(),
       imageModelOverride: deps.settings.getImageModelOverride(),
       imageModelFromSettings: deps.settings.isImageModelFromSettings(),

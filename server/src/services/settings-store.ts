@@ -11,6 +11,8 @@ import { config } from '../config.js'
 interface SettingsFile {
   magpieBaseUrl?: unknown
   magpieTextModel?: unknown
+  /** 拼图卡片标题模型；留空跟随提示词优化模型 */
+  magpieTitleModel?: unknown
   magpieImageModel?: unknown
   /** 客户端可选生图模型 id 列表；缺省表示全部可用 */
   magpieEnabledImageModels?: unknown
@@ -113,6 +115,24 @@ export class SettingsStore {
     return typeof stored === 'string' && stored.trim().length > 0
   }
 
+  /** 卡片标题模型的后台覆写值；空串表示跟随提示词优化模型 */
+  getTitleModelOverride(): string {
+    const stored = this.cache.magpieTitleModel
+    return typeof stored === 'string' ? stored.trim() : ''
+  }
+
+  /** 拼图卡片标题模型：后台单独选过就用它，否则跟随提示词优化模型 */
+  async getTitleModel(): Promise<string> {
+    const override = this.getTitleModelOverride()
+    if (override) return override
+    return this.getTextModel()
+  }
+
+  isTitleModelFromSettings(): boolean {
+    const stored = this.cache.magpieTitleModel
+    return typeof stored === 'string' && stored.trim().length > 0
+  }
+
   async setBaseUrl(url: string): Promise<string> {
     const baseUrl = trimTrailingSlash(url.trim())
     await this.write({ magpieBaseUrl: baseUrl })
@@ -123,6 +143,12 @@ export class SettingsStore {
     const textModel = model.trim()
     await this.write({ magpieTextModel: textModel })
     return textModel
+  }
+
+  async setTitleModel(model: string): Promise<string> {
+    const titleModel = model.trim()
+    await this.write({ magpieTitleModel: titleModel })
+    return titleModel
   }
 
   async setImageModel(model: string): Promise<string> {

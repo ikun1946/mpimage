@@ -248,7 +248,7 @@ export function registerImageRoutes(
         return await generateImageTitle(
           {
             baseUrl: await deps.settings.getBaseUrl(),
-            model: await deps.settings.getTextModel(),
+            model: await deps.settings.getTitleModel(),
           },
           prompt,
         )
