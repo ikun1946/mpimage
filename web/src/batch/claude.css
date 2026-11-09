@@ -171,6 +171,16 @@
   display: none;
 }
 
+.rail-nav-extra {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.rail-action {
+  cursor: pointer;
+}
+
 .rail-nav .tab-count {
   min-width: 0;
   margin-left: auto;
@@ -333,8 +343,19 @@ body[data-mode="create"] #header-actions {
   background: var(--surface-subtle);
 }
 
+#panel-free .free-preview.has-image {
+  background: var(--surface-subtle);
+}
+
 #panel-free .free-preview img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
   max-height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 
 #panel-free .free-form {
@@ -424,15 +445,26 @@ body[data-mode="create"] #header-actions {
   box-shadow: none;
 }
 
-/* 参考图单独占输入条上方的一条，不再压在提示词文字上 */
+/* 参考图回到旧手感：上半截露在输入条上方，下半截藏到输入条后面。
+   输入条自身是 z-index:1 的不透明面板，正好盖住卡片下半截，不会挡文字。 */
+#panel-free .free-form {
+  position: relative;
+}
+
 #panel-free .free-ref-stack {
-  top: -106px;
-  left: 8px;
+  top: 8px;
+  left: 52px;
+  z-index: 0;
   gap: 10px;
 }
 
 #panel-free .free-form.has-ref {
-  padding-top: 112px;
+  padding-top: 56px;
+}
+
+#panel-free .input-bar {
+  position: relative;
+  z-index: 1;
 }
 
 /* 参考图卡片的白色画框放在白底上会看不见，补一圈细边和落地阴影 */
@@ -500,6 +532,98 @@ body[data-mode="create"] #header-actions {
     transform: rotate(360deg);
   }
 }
+
+/* 顶栏的创作布局切换：上下（预览在上） / 左右（表单左、预览右） */
+.layout-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(29, 36, 32, 0.055);
+}
+
+.layout-switch[hidden] {
+  display: none;
+}
+
+.layout-switch button {
+  height: 24px;
+  padding: 0 9px;
+  color: var(--ink-soft);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+  transition: background 120ms cubic-bezier(0.165, 0.84, 0.44, 1),
+    color 120ms cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.layout-switch button:hover {
+  color: var(--ink);
+}
+
+.layout-switch button[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--surface-raised);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* 左右两列：表单在左，预览在右 */
+#panel-free .free-layout[data-layout="split"] {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.86fr) minmax(360px, 1.14fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+#panel-free .free-layout[data-layout="split"] .free-form {
+  order: 1;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  padding: 16px;
+  overflow-y: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  background: var(--surface-subtle);
+}
+
+/* 左栏让输入条吃掉剩余高度，写作区更大，不在卡片底部留一大片空白 */
+#panel-free .free-layout[data-layout="split"] .input-bar {
+  flex: 1;
+  min-height: 0;
+}
+
+#panel-free .free-layout[data-layout="split"] .input-main {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-self: stretch;
+}
+
+#panel-free .free-layout[data-layout="split"] .free-form .input-main .textarea {
+  flex: 1;
+  height: 100% !important;
+  min-height: 0;
+  max-height: none;
+}
+
+#panel-free .free-layout[data-layout="split"] .free-preview {
+  order: 2;
+  min-height: 0;
+}
+
+#panel-free .free-layout[data-layout="split"] .free-form.has-ref {
+  padding-top: 72px;
+}
+
+#panel-free .free-layout[data-layout="split"] .free-ref-stack {
+  top: 24px;
+  left: 68px;
+}
+
 
 /* 参数行：纯文字胶囊，悬停才浮现底色 */
 .composer-meta {
@@ -729,6 +853,30 @@ body[data-mode="create"] #header-actions {
 
   #panel-free .free-preview {
     min-height: 220px;
+  }
+
+  #panel-free .free-layout[data-layout="split"] {
+    grid-template-columns: minmax(260px, 1fr) minmax(280px, 1fr);
+  }
+}
+
+/* 窄窗口下左右两列放不下，自动退回上下，避免横向溢出 */
+@media (max-width: 900px) {
+  #panel-free .free-layout[data-layout="split"] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #panel-free .free-layout[data-layout="split"] .free-preview {
+    order: 1;
+    flex: 1;
+    min-height: 260px;
+  }
+
+  #panel-free .free-layout[data-layout="split"] .free-form {
+    order: 2;
+    flex: 0 0 auto;
+    overflow: visible;
   }
 }
 

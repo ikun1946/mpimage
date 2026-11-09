@@ -51,6 +51,11 @@
           <button class="tab" id="tab-free" data-tab="free" type="button" role="tab" aria-selected="false" aria-controls="panel-free" tabindex="-1">自由创作</button>
           <button class="tab" id="tab-face" data-tab="face" type="button" role="tab" aria-selected="false" aria-controls="panel-face" tabindex="-1">捏脸</button>
         </nav>
+        <div class="tabs rail-nav rail-nav-extra">
+          <button class="tab rail-action" id="history-button" type="button" role="button" aria-haspopup="dialog" title="查看生成记录">
+            生成记录
+          </button>
+        </div>
       </div>
 
       <div class="rail-foot">
@@ -58,13 +63,6 @@
                   <span class="avatar-letter" id="avatar-letter" aria-hidden="true">境</span>
                   <div class="avatar-menu" id="avatar-menu" role="menu">
                     <span class="avatar-name" id="header-user"></span>
-                    <button class="history-entry" id="history-button" type="button" role="menuitem">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="9"></circle>
-                        <path d="M12 7v5l3 3"></path>
-                      </svg>
-                      <span>生成记录</span>
-                    </button>
                     <button class="history-entry" id="rename-button" type="button" role="menuitem">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M4 20h4l10-10-4-4L4 16v4Z"></path>
@@ -117,6 +115,10 @@
                     </svg>
                     <span>导入资产 JSON</span>
                   </button>
+        </div>
+        <div class="layout-switch" id="free-layout-switch" role="group" aria-label="创作布局" hidden>
+          <button type="button" data-free-layout="stack" aria-pressed="true" title="预览在上、输入条贴底">上下</button>
+          <button type="button" data-free-layout="split" aria-pressed="false" title="表单在左、预览在右">左右</button>
         </div>
       </header>
 
@@ -400,8 +402,9 @@
       <section class="page" id="panel-style" role="tabpanel" aria-labelledby="tab-style" data-panel="style" hidden></section>
 
       <section class="page" id="panel-free" role="tabpanel" aria-labelledby="tab-free" data-panel="free" hidden>
-        <div class="free-layout">
+        <div class="free-layout" data-layout="stack">
           <form class="free-form composer" id="free-form">
+            <div class="free-ref-stack" id="free-ref-stack" hidden></div>
             <div class="input-bar prompt-shell" id="free-prompt-shell">
               <button class="input-add" id="free-add-ref" type="button" title="添加参考图" aria-label="添加参考图">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -418,7 +421,6 @@
                   placeholder="描述你想看见的画面，可直接粘贴或拖入参考图"
                   required
                 ></textarea>
-                <div class="free-ref-stack" id="free-ref-stack" hidden></div>
                 <div class="free-ref-busy" id="free-ref-busy" hidden>
                   <span class="free-ref-spinner" aria-hidden="true"></span>
                   <span>参考图上传中…</span>

@@ -170,6 +170,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       freeImageExtension: 'png',
       // 自由创作的画面比例、生图模型与提示词草稿，刷新后保持
       freeRatio: '1:1',
+      freeLayout: 'stack',
       freeModel: '',
       // 自由创作的自定义风格：和「风格设定」里的风格库互相独立，只存在本机
       freeStyles: [],
@@ -302,6 +303,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       freePrompt: document.querySelector('#free-prompt'),
       freeCount: document.querySelector('#free-count'),
       freeRatio: document.querySelector('#free-ratio'),
+      freeLayout: document.querySelector('.free-layout'),
+      freeLayoutSwitch: document.querySelector('#free-layout-switch'),
       freeModel: document.querySelector('#free-model'),
       freeStyle: document.querySelector('#free-style'),
       freeStyleEdit: document.querySelector('#free-style-edit'),
@@ -402,6 +405,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         // 恢复自由创作的画面比例选择（配合服务端配置渲染后回填）
         if (typeof saved.freeRatio === 'string' && saved.freeRatio) {
           state.freeRatio = saved.freeRatio
+        }
+        if (saved.freeLayout === 'split' || saved.freeLayout === 'stack') {
+          state.freeLayout = saved.freeLayout
         }
         // 老快照可能是空串，渲染时会自动落到服务端默认模型
         if (typeof saved.freeModel === 'string') {
@@ -660,6 +666,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           concurrency: state.concurrency,
           concurrencyCustom: state.concurrencyCustom,
           freeRatio: state.freeRatio,
+          freeLayout: state.freeLayout,
           freeModel: state.freeModel,
           freeStyles: state.freeStyles,
           freeStyleId: state.freeStyleId,
@@ -1538,6 +1545,29 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       // 创作页只留画布与输入条，项目 / 导入按钮收进批量模式
       if (dom.headerActions) dom.headerActions.hidden = mode === 'create'
       if (dom.pageTitle) dom.pageTitle.textContent = PAGE_TITLES[state.activeTab] || ''
+      applyFreeLayout()
+    }
+
+    /* ===== 自由创作布局：上下（预览在上）/ 左右（表单在左） ===== */
+
+    function applyFreeLayout() {
+      const layout = state.freeLayout === 'split' ? 'split' : 'stack'
+      state.freeLayout = layout
+      if (dom.freeLayout) dom.freeLayout.dataset.layout = layout
+      document.querySelectorAll('[data-free-layout]').forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.freeLayout === layout))
+      })
+      // 切换只在自由创作页出现；捏脸页不需要
+      if (dom.freeLayoutSwitch) dom.freeLayoutSwitch.hidden = state.activeTab !== 'free'
+    }
+
+    function setFreeLayout(layout) {
+      if ((layout !== 'stack' && layout !== 'split') || layout === state.freeLayout) return
+      state.freeLayout = layout
+      persistSoon()
+      applyFreeLayout()
+      // 列宽变了，换行和输入框高度要重算
+      requestAnimationFrame(resizeFreePrompt)
     }
 
     function switchMode(mode) {
@@ -1554,7 +1584,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         const tab = event.target.closest('.rail-nav .tab')
         if (!tab) return
         const group = document.querySelector('.rail-nav-group:not([hidden])')
-        const tabs = group ? [...group.querySelectorAll('.tab')].filter(item => !item.disabled) : []
+        const tabs = group ? [...group.querySelectorAll('.tab[data-tab]')].filter(item => !item.disabled) : []
         const index = tabs.indexOf(tab)
         if (index === -1) return
         let next = null
@@ -5244,6 +5274,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
        handler，行为与原先的 if 链等价；整行打开详情放在最后兜底。 */
     const CLICK_DISPATCH = [
       ['.mode-switch [data-mode]', target => switchMode(target.dataset.mode)],
+      ['[data-free-layout]', target => setFreeLayout(target.dataset.freeLayout)],
       ['[data-tab]', target => switchTab(target.dataset.tab)],
       ['[data-history-action]', handleHistoryActionClick],
       ['[data-ref-action]', handleRefActionClick],
