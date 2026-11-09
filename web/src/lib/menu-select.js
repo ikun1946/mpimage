@@ -82,6 +82,11 @@ export function enhanceMenuSelect(select) {
     openWrap = wrap
   }
 
+  // 滚轮在菜单上时只允许菜单自己滚，不能把后面的页面/输入框一起带着滚
+  menu.addEventListener('wheel', event => {
+    event.stopPropagation()
+  }, { passive: true })
+
   trigger.addEventListener('click', event => {
     event.stopPropagation()
     if (menu.hidden) open()

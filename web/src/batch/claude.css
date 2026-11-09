@@ -324,10 +324,15 @@ body[data-mode="create"] #header-actions {
   display: none !important;
 }
 
+body[data-mode="create"] .app-main main {
+  padding-bottom: 8px;
+}
+
 /* ===== 自由创作：预览在上，输入条贴底 ===== */
 
 #panel-free {
-  height: calc(100vh - 48px - 30px);
+  /* 底部留白收窄到 8px，输入条整体往下靠，同时不把自由创作页撑出滚动条 */
+  height: calc(100vh - 48px - 22px);
   margin-top: 0;
 }
 
@@ -431,7 +436,7 @@ body[data-mode="create"] #header-actions {
   width: 100%;
   min-height: 34px;
   max-height: 180px;
-  padding: 7px 132px 7px 4px;
+  padding: 12px 132px 7px 4px;
   overflow-y: auto;
   color: var(--ink);
   border: 0;
@@ -457,9 +462,19 @@ body[data-mode="create"] #header-actions {
 
 #panel-free .free-ref-stack {
   top: 8px;
+  right: 16px;
   left: 52px;
   z-index: 0;
   gap: 10px;
+}
+
+/* 6 张参考图要全部看见：卡片允许等比收窄，而不是把最后一排挤出可视区 */
+#panel-free .free-ref-stack .free-ref {
+  flex: 0 1 76px;
+  width: 76px;
+  min-width: 38px;
+  height: auto;
+  aspect-ratio: 76 / 96;
 }
 
 #panel-free .free-form.has-ref {
@@ -580,39 +595,27 @@ body[data-mode="create"] #header-actions {
   grid-template-columns: minmax(320px, 0.86fr) minmax(360px, 1.14fr);
   gap: 16px;
   align-items: stretch;
+  /* 给参考图上浮留出头顶空间，同时让输入框整体往下靠 */
+  padding-top: 96px;
 }
 
 #panel-free .free-layout[data-layout="split"] .free-form {
   order: 1;
-  display: flex;
   min-height: 0;
-  flex-direction: column;
+  align-self: start;
   padding: 16px;
-  overflow-y: auto;
+  overflow: visible;
   border: 1px solid var(--line-soft);
   border-radius: 16px;
   background: var(--surface-subtle);
 }
 
-/* 左栏让输入条吃掉剩余高度，写作区更大，不在卡片底部留一大片空白 */
-#panel-free .free-layout[data-layout="split"] .input-bar {
-  flex: 1;
-  min-height: 0;
-}
-
-#panel-free .free-layout[data-layout="split"] .input-main {
-  display: flex;
-  height: 100%;
-  flex-direction: column;
-  align-self: stretch;
-}
-
+/* 左右布局的输入框保持正常高度：过长会把预览挤没，滚动条和发送键也会离正文很远 */
 #panel-free .free-layout[data-layout="split"] .free-form .input-main .textarea {
-  flex: 1;
-  height: 100% !important;
-  min-height: 0;
-  max-height: none;
-  /* 左右布局的输入区更窄，不能再为悬浮工具留 132px 右边距，否则正文会被挤成细长一条 */
+  min-height: 240px;
+  max-height: 360px;
+  /* 输入区更窄，不能再为悬浮工具留 132px 右边距，否则正文会被挤成细长一条 */
+  padding-top: 14px;
   padding-right: 20px;
   font-size: 14px;
   line-height: 1.8;
@@ -769,6 +772,7 @@ body[data-mode="create"] #header-actions {
   bottom: calc(100% + 8px);
   left: 0;
   z-index: 80;
+  overscroll-behavior: contain;
   min-width: 216px;
   max-height: 320px;
   padding: 6px;
@@ -876,6 +880,7 @@ body[data-mode="create"] #header-actions {
 @media (max-width: 900px) {
   #panel-free .free-layout[data-layout="split"] {
     display: flex;
+    padding-top: 0;
     flex-direction: column;
   }
 
