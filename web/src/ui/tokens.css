@@ -19,27 +19,6 @@
   --ui-vh: 100vh;
 }
 
-@media (min-width: 1600px) {
-  :root {
-    --ui-zoom: 1.08;
-    --ui-vh: calc(100vh / 1.08);
-  }
-}
-
-@media (min-width: 1760px) {
-  :root {
-    --ui-zoom: 1.16;
-    --ui-vh: calc(100vh / 1.16);
-  }
-}
-
-@media (min-width: 1920px) {
-  :root {
-    --ui-zoom: 1.25;
-    --ui-vh: calc(100vh / 1.25);
-  }
-}
-
 :root {
 
   /* ---------- 底色与表面（只声明一层层次：边框 + 极淡投影） ---------- */

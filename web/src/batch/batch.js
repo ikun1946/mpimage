@@ -4453,7 +4453,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         stopFreeProgress()
         stopFreeCanvasAnimation()
         dom.freeProgressLabel.textContent = '生成中断'
-        dom.freeStatus.textContent = data.error?.message || '生成失败，请重新尝试'
+        dom.freeStatus.textContent = friendlyGenerationError(data.error?.message)
         finishResume()
       } catch (error) {
         if (attempt < 20) {
@@ -4465,6 +4465,22 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         finishResume()
         dom.freeStatus.textContent = '无法查询生成状态，请重新生成'
       }
+    }
+
+    /** 把上游报错压成一句人话：去掉请求地址、英文栈和冗长细节 */
+    function friendlyGenerationError(message) {
+      const raw = String(message || '').trim()
+      if (!raw) return '生成失败，请稍后重试'
+      if (/timeout|超时|ETIMEDOUT|aborted/i.test(raw)) return '生成超时，请稍后重试'
+      if (/fetch failed|ECONN|ENOTFOUND|Failed to connect|network/i.test(raw)) {
+        return '连接上游失败，请检查网络后重试'
+      }
+      const status = raw.match(/\b(4\d{2}|5\d{2})\b/)
+      if (status) return `上游服务返回 ${status[1]}，请稍后重试`
+      // 已经是中文短句就保留，避免把正常提示也盖掉
+      const plain = raw.replace(/^Post\s+"[^"]*"\s*[:：]?\s*/i, '').trim()
+      if (/^[一-龥]/.test(plain) && [...plain].length <= 40) return plain
+      return '生成失败，请稍后重试'
     }
 
     function finishResume() {
@@ -4855,7 +4871,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         stopFreeProgress()
         stopFreeCanvasAnimation()
         dom.freeProgressLabel.textContent = '生成中断'
-        dom.freeStatus.textContent = error.message || '生成失败，请稍后重试'
+        dom.freeStatus.textContent = friendlyGenerationError(error.message)
       } finally {
         state.freeBusy = false
         dom.freePrompt.disabled = false

@@ -6,7 +6,8 @@
 /* ===== 外壳 ===== */
 
 :root {
-  --rail-width: 288px;
+  /* 侧栏连续伸缩：1024 不再被写死成 240，跨断点也不会忽宽忽窄 */
+  --rail-width: clamp(232px, 20vw, 300px);
 }
 
 .app {
@@ -400,9 +401,10 @@ body[data-mode="create"] .app-main main {
 
 /* 列容器必须保持 auto 高度：给多列容器定高会把卡片排到可视区右侧，而不是向下滚动 */
 #panel-free .free-collage-grid {
-  padding: 12px;
-  columns: 330px;
-  column-gap: 12px;
+  padding: clamp(10px, 1.2vw, 18px);
+  /* 列宽跟着视口连续变化，避免跨列数阈值时卡片忽大忽小 */
+  columns: clamp(220px, 20vw, 280px);
+  column-gap: clamp(10px, 1vw, 16px);
 }
 
 /* 单图视图：保留旧版「一张图铺满预览、contain 不裁切」的观感 */
@@ -681,7 +683,7 @@ body[data-mode="create"] .app-main main {
 
 /* 左右布局的预览更窄，列宽跟着收，避免一张卡占满整列 */
 #panel-free .free-layout[data-layout="split"] .free-collage-grid {
-  columns: 240px;
+  columns: clamp(170px, 16vw, 240px);
 }
 
 @keyframes free-tile-in {
@@ -1066,14 +1068,19 @@ body[data-mode="create"] .app-main main {
   grid-template-columns: minmax(320px, 0.86fr) minmax(360px, 1.14fr);
   gap: 16px;
   align-items: stretch;
-  /* 给参考图上浮留出头顶空间，同时让输入框整体往下靠 */
-  padding-top: 96px;
+  /* 只有带参考图时才需要头顶空间；没有参考图就贴顶，别留 96px 死区 */
+  padding-top: 16px;
+}
+
+#panel-free .free-layout[data-layout="split"]:has(.free-form.has-ref) {
+  padding-top: clamp(64px, 8vh, 96px);
 }
 
 #panel-free .free-layout[data-layout="split"] .free-form {
   order: 1;
   min-height: 0;
-  align-self: start;
+  /* 左右布局要求两侧等高：表单卡片拉满整行，和右侧预览同高 */
+  align-self: stretch;
   padding: 16px;
   overflow: visible;
   border: 1px solid var(--line-soft);
@@ -1081,10 +1088,23 @@ body[data-mode="create"] .app-main main {
   background: var(--surface-subtle);
 }
 
-/* 左右布局的输入框保持正常高度：过长会把预览挤没，滚动条和发送键也会离正文很远 */
+/* 左右布局：输入条撑满左栏，白框与右侧预览同高；文字多时在框内滚动 */
+#panel-free .free-layout[data-layout="split"] .free-form .input-bar {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#panel-free .free-layout[data-layout="split"] .free-form .input-main {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 #panel-free .free-layout[data-layout="split"] .free-form .input-main .textarea {
+  flex: 1 1 auto;
+  height: auto !important;
   min-height: 34px;
-  max-height: 360px;
+  max-height: none;
   padding: 12px 10px 2px;
   font-size: 14px;
   line-height: 1.8;
@@ -1137,7 +1157,8 @@ body[data-mode="create"] .app-main main {
 
 .meta-info {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   white-space: nowrap;
@@ -1148,6 +1169,8 @@ body[data-mode="create"] .app-main main {
 }
 
 #panel-free .free-status {
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 360px;
   overflow: hidden;
   color: var(--ink-faint);
@@ -1328,14 +1351,6 @@ body[data-mode="create"] .app-main main {
 /* ===== 窄窗口 ===== */
 
 @media (max-width: 1100px) {
-  :root {
-    --rail-width: 240px;
-  }
-
-  .app {
-    grid-template-columns: var(--rail-width) minmax(0, 1fr);
-  }
-
   #panel-free .free-preview {
     min-height: 220px;
   }
@@ -1439,17 +1454,35 @@ body[data-mode="create"] .app-main main {
     white-space: nowrap;
   }
 
+  /* 手机：主区和自由创作改成确定高度的 flex 链。
+     结果墙在自己内部滚动，输入条固定在底部，不会随结果数量被顶到几千像素外 */
+  .app-main main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
   #panel-free {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
     height: auto;
-    min-height: calc(var(--ui-vh, 100vh) - 48px - 200px);
+    min-height: 0;
   }
 
   #panel-free .free-layout {
+    flex: 1 1 auto;
+    height: auto;
     min-height: 0;
   }
 
   #panel-free .free-preview {
-    min-height: 240px;
+    flex: 1 1 auto;
+    min-height: 180px;
+  }
+
+  #panel-free .free-collage {
+    height: 100%;
   }
 
   .composer-meta {
