@@ -1,6 +1,6 @@
 {
   "name": "mpimage",
-  "version": "1.0.31",
+  "version": "1.0.32",
   "private": true,
   "type": "module",
   "description": "画境生图：前后端分离的单张工作台与资产批量工作台",
@@ -25,6 +25,11 @@
   "build": {
     "appId": "com.huajing.desktop",
     "productName": "画境",
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "compression": "maximum",
     "directories": {
       "output": "release",
       "buildResources": "build"

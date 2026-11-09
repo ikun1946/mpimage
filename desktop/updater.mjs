@@ -14,25 +14,39 @@ function httpFetch(url, init) {
   return net.fetch(url, init)
 }
 
+/**
+ * 直连：主进程里 Node 的 fetch 不读 Windows 系统代理，走裸网络。
+ * 更新慢通常不是带宽不够，而是系统代理把 GitHub CDN 限速了；
+ * 直连往往能快一个数量级，代理只作为直连不通时的兜底。
+ */
+function directFetch(url, init) {
+  return fetch(url, init)
+}
+
 const UPDATES_DIR_NAME = 'updates'
 
 const PROBE_BYTES = 1024 * 1024
 const MIN_SEGMENT_BYTES = 1024 * 1024
 const RESOLVE_TIMEOUT_MS = 15000
+// 直连被墙或黑洞时不能陪它等满 15 秒，留给代理兜底
+const DIRECT_RESOLVE_TIMEOUT_MS = 6000
+const DIRECT_PROBE_TIMEOUT_MS = 8000
+// 直连探测达到这个速度就不必再试代理，直接开多段下载
+const DIRECT_GOOD_BYTES_PER_SECOND = 1.2 * 1024 * 1024
 const PROBE_TIMEOUT_MS = 60000
 // 一条连接 30 秒没有新字节就认定卡死；链路差但还活着的时候重试比干等更划算
 const STALL_TIMEOUT_MS = 30000
 const RETRY_DELAYS = [200, 600, 1500]
 const MAX_REFRESH = 3
-const AUTO_CONNECTIONS = 4
-const AUTO_FAST_BYTES_PER_SECOND = 2.5 * 1024 * 1024
+// 直连 2 段就能跑满带宽，4 段留余量；代理并发反而互相挤，给 2 段
+const DIRECT_CONNECTIONS = 4
+const PROXY_CONNECTIONS = 2
 const AUTO_MIN_TOTAL_BYTES = 8 * 1024 * 1024
 // 速度用 2 秒滚动窗口平滑：单块瞬时值抖动太大，直接显示会让窗口里的数字来回跳
 const SPEED_WINDOW_MS = 2000
 // 分段各自一个文件，续传时靠文件长度判断每段下到哪了，不依赖易失的内存状态
 const SEGMENT_DIR_SUFFIX = '.segments'
 const LAYOUT_FILE = 'layout.json'
-const PROBE_FILE = 'probe.bin'
 
 /**
  * 更新信息由主服务去 GitHub 查（服务端只读回环请求免登录），
@@ -170,6 +184,11 @@ function combineSignals(signals) {
   return controller.signal
 }
 
+/** 给某一次尝试套上超时，不影响外层传入的取消信号 */
+function withTimeout(signal, ms) {
+  return combineSignals([signal, AbortSignal.timeout(ms)])
+}
+
 async function sleep(ms, signal) {
   if (signal?.aborted) throw abortError()
   await new Promise((resolvePromise, rejectPromise) => {
@@ -280,12 +299,12 @@ function createProgress(onProgress) {
  * 先 HEAD 拿跳转后的签名直链与长度；HEAD 被 CDN 拒绝或没有长度时，
  * 用 Range: bytes=0-0 的 GET 从 content-range 里取总大小。
  */
-async function resolveDirectUrl(url, headers, signal) {
+async function resolveDirectUrl(url, headers, signal, fetcher = httpFetch) {
   let total = 0
   let direct = ''
 
   try {
-    const response = await httpFetch(url, {
+    const response = await fetcher(url, {
       method: 'HEAD',
       redirect: 'follow',
       headers,
@@ -303,7 +322,7 @@ async function resolveDirectUrl(url, headers, signal) {
 
   let response
   try {
-    response = await httpFetch(url, {
+    response = await fetcher(url, {
       redirect: 'follow',
       headers: { ...headers, range: 'bytes=0-0' },
       signal: combineSignals([signal, AbortSignal.timeout(RESOLVE_TIMEOUT_MS)]),
@@ -340,10 +359,13 @@ async function resolveDirectUrl(url, headers, signal) {
   return { direct, total }
 }
 
-/** 前 1MB 既用来量吞吐，也直接当作文件开头写盘，单流时不必重下 */
-async function probeRange({ url, headers, handle, signal, progress }) {
+/**
+ * 前 1MB 只用来量吞吐，不写盘：直连/代理两条线路都要试，写盘反而难分归属。
+ * 真正的下载从第 0 字节开始，多下这 1MB 换线路选择，值。
+ */
+async function probeRange({ url, headers, signal, fetcher = httpFetch }) {
   const started = Date.now()
-  const response = await httpFetch(url, {
+  const response = await fetcher(url, {
     redirect: 'follow',
     headers: { ...headers, range: `bytes=0-${PROBE_BYTES - 1}` },
     signal: combineSignals([signal, AbortSignal.timeout(PROBE_TIMEOUT_MS)]),
@@ -373,40 +395,79 @@ async function probeRange({ url, headers, handle, signal, progress }) {
     return { ranged: false, bytes: 0, speed: 0, total }
   }
 
-  let written = 0
+  let received = 0
   const reader = response.body.getReader()
   try {
-    while (written < PROBE_BYTES) {
+    while (received < PROBE_BYTES) {
       const { done, value } = await reader.read()
       if (done) break
-      const take = Math.min(value.byteLength, PROBE_BYTES - written)
-      await handle.write(value, 0, take, written)
-      written += take
-      progress.add(take)
-      if (take < value.byteLength) break
+      received += value.byteLength
     }
   } finally {
     await reader.cancel().catch(() => {})
   }
 
   const seconds = Math.max((Date.now() - started) / 1000, 0.001)
-  return { ranged: true, bytes: written, speed: written / seconds, total }
+  return { ranged: true, bytes: received, speed: received / seconds, total }
 }
 
-function pickConnections({ setting, speed, total, start, ranged }) {
+function pickConnections({ setting, total, start, ranged, route }) {
   if (!ranged || !total) return 1
   const remaining = total - start
   if (remaining <= 0) return 1
   const maxBySize = Math.max(1, Math.floor(remaining / MIN_SEGMENT_BYTES))
 
-  if (setting === '1') return 1
-  if (setting === '2' || setting === '4' || setting === '6') {
-    return Math.min(Number(setting), maxBySize)
+  const explicit = { 1: 1, 2: 2, 4: 4, 6: 6, 8: 8, 12: 12, 16: 16 }
+  if (explicit[setting]) return Math.min(explicit[setting], maxBySize)
+  if (total <= AUTO_MIN_TOTAL_BYTES) return 1
+
+  // 直连多段能叠加带宽；代理对多连接不友好，实测并发反而更慢
+  const auto = route === 'direct' ? DIRECT_CONNECTIONS : PROXY_CONNECTIONS
+  return Math.min(auto, maxBySize)
+}
+
+/**
+ * 线路选择：直连（Node fetch，绕过系统代理）先试；够快就直接用。
+ * 直连被墙 / 失败 / 明显慢时再试系统代理，两条都测完取更快的。
+ */
+async function chooseRoute({ sourceUrl, headers, signal }) {
+  const routes = [
+    { label: 'direct', fetcher: directFetch, timeout: DIRECT_RESOLVE_TIMEOUT_MS },
+    { label: 'proxy', fetcher: httpFetch, timeout: RESOLVE_TIMEOUT_MS },
+  ]
+  let best = null
+
+  for (const route of routes) {
+    try {
+      const resolved = await resolveDirectUrl(
+        sourceUrl,
+        headers,
+        withTimeout(signal, route.timeout),
+        route.fetcher,
+      )
+      const probe = await probeRange({
+        url: resolved.direct,
+        headers,
+        fetcher: route.fetcher,
+        signal: withTimeout(
+          signal,
+          route.label === 'direct' ? DIRECT_PROBE_TIMEOUT_MS : PROBE_TIMEOUT_MS,
+        ),
+      })
+      const candidate = { ...route, resolved, probe }
+      if (!best || probe.speed > best.probe.speed) best = candidate
+      // 直连已经够快，没必要再花时间测代理
+      if (route.label === 'direct' && probe.ranged && probe.speed >= DIRECT_GOOD_BYTES_PER_SECOND) break
+    } catch (error) {
+      if (signal?.aborted) throw abortError()
+    }
   }
-  if (speed > 0 && speed < AUTO_FAST_BYTES_PER_SECOND && total > AUTO_MIN_TOTAL_BYTES) {
-    return Math.min(AUTO_CONNECTIONS, maxBySize)
-  }
-  return 1
+
+  if (!best) throw new DownloadError('下载地址不可用')
+  note(
+    `更新线路：${best.label === 'direct' ? '直连' : '系统代理'}（${(best.probe.speed / 1048576).toFixed(1)} MB/s）`,
+  )
+  return best
 }
 
 /** 把总长平均切成 count 段；最后一段吃掉余数 */
@@ -457,26 +518,6 @@ async function openSegmentFile(file) {
   }
 }
 
-async function copyFileRange(source, target, offset, length) {
-  if (length <= 0) return
-  const input = await open(source, 'r')
-  const output = await open(target, 'w')
-  try {
-    const buffer = Buffer.alloc(Math.min(Math.max(length, 1), 1024 * 1024))
-    let copied = 0
-    while (copied < length) {
-      const want = Math.min(buffer.length, length - copied)
-      const { bytesRead } = await input.read(buffer, 0, want, offset + copied)
-      if (!bytesRead) break
-      await output.write(buffer, 0, bytesRead)
-      copied += bytesRead
-    }
-  } finally {
-    await input.close().catch(() => {})
-    await output.close().catch(() => {})
-  }
-}
-
 /**
  * 下载一段。段内用 Range 从已下好的位置续传：
  * - 206：正常续传；
@@ -484,7 +525,7 @@ async function copyFileRange(source, target, offset, length) {
  * - 416：这段已经下完就收工，否则这段从头再来。
  */
 async function downloadSegment({
-  file, start, end, wholeFile, headers, urlRef, refresh, generation,
+  file, start, end, wholeFile, headers, fetcher, urlRef, refresh, generation,
   progress, signal, stopSignal, segment,
 }) {
   let position = start + segment.bytes
@@ -515,7 +556,7 @@ async function downloadSegment({
       const startedGeneration = generation()
 
       try {
-        const response = await httpFetch(urlRef(), {
+        const response = await fetcher(urlRef(), {
           redirect: 'follow',
           headers: { ...headers, range: rangeHeader(position, end) },
           signal: combineSignals([signal, stopSignal, controller.signal]),
@@ -703,12 +744,12 @@ export async function downloadInstaller({ url, apiUrl, name, onProgress, signal,
     await mkdir(dir, { recursive: true })
 
     progress.set({ phase: 'resolve' })
-    let resolved = null
+    let route = null
     let sourceUrl = ''
     let resolveError = null
     for (const candidate of candidates) {
       try {
-        resolved = await resolveDirectUrl(candidate.url, headers, signal)
+        route = await chooseRoute({ sourceUrl: candidate.url, headers, signal })
         sourceUrl = candidate.url
         progress.set({ mirror: candidate.mirror })
         break
@@ -717,8 +758,10 @@ export async function downloadInstaller({ url, apiUrl, name, onProgress, signal,
         resolveError = error
       }
     }
-    if (!resolved) throw resolveError || new DownloadError('下载地址不可用')
+    if (!route) throw resolveError || new DownloadError('下载地址不可用')
 
+    const resolved = route.resolved
+    const fetcher = route.fetcher
     let directUrl = resolved.direct
     let refreshing = null
     // 每换一次直链就加一：并发段靠它判断「别人已经换过链」，避免同时 403 时反复 HEAD
@@ -727,7 +770,7 @@ export async function downloadInstaller({ url, apiUrl, name, onProgress, signal,
     const currentGeneration = () => generation
     const refresh = () => {
       if (!refreshing) {
-        refreshing = resolveDirectUrl(sourceUrl, headers, signal)
+        refreshing = resolveDirectUrl(sourceUrl, headers, signal, fetcher)
           .then((next) => { directUrl = next.direct; generation += 1 })
           .finally(() => { refreshing = null })
       }
@@ -737,7 +780,7 @@ export async function downloadInstaller({ url, apiUrl, name, onProgress, signal,
     let total = resolved.total
     progress.set({ total })
 
-    const explicitCount = ['1', '2', '4', '6'].includes(connectionSetting)
+    const explicitCount = ['1', '2', '4', '6', '8', '12', '16'].includes(connectionSetting)
       ? Number(connectionSetting)
       : 0
 
@@ -769,45 +812,26 @@ export async function downloadInstaller({ url, apiUrl, name, onProgress, signal,
       await rm(segmentDir, { recursive: true, force: true })
       await mkdir(segmentDir, { recursive: true })
 
-      const probeFile = join(segmentDir, PROBE_FILE)
-      const probeHandle = await open(probeFile, 'w')
-      let probe
-      try {
-        probe = await probeRange({ url: directUrl, headers, handle: probeHandle, signal, progress })
-      } catch (error) {
-        if (signal?.aborted) throw abortError()
-        if (error instanceof DownloadError && error.message.includes('过期')) {
-          await refresh()
-          probe = await probeRange({ url: directUrl, headers, handle: probeHandle, signal, progress })
-        } else {
-          // 探测失败不等于下载失败：退回整份单流
-          note(`吞吐探测失败，回退单流下载：${error.message}`)
-          probe = { ranged: false, bytes: 0, speed: 0, total: 0 }
-        }
-      } finally {
-        await probeHandle.close().catch(() => {})
-      }
-
+      // 线路和吞吐在 chooseRoute 里已经测过，这里直接按结果分段，
+      // 探测读到的 1MB 不写盘，真正的下载从第 0 字节开始。
+      const probe = route.probe || { ranged: false, speed: 0, total: 0 }
       total = total || probe.total || 0
       progress.set({ total })
+      progress.reset()
 
       const count = pickConnections({
-        setting: connectionSetting, speed: probe.speed, total, start: 0, ranged: probe.ranged,
+        setting: connectionSetting,
+        total,
+        start: 0,
+        ranged: probe.ranged,
+        route: route.label,
       })
       const ranges = total > 0 ? planRanges(total, count) : [{ start: 0, end: -1 }]
       segments = ranges.map((range, index) => ({
         index, start: range.start, end: range.end, bytes: 0, done: false,
       }))
-
-      // 探测时读到的前 1MB 就是文件开头，留在第 0 段里不用重下
-      progress.reset()
-      if (probe.ranged && probe.bytes > 0 && segments[0].end >= 0) {
-        const keep = Math.min(probe.bytes, segments[0].end - segments[0].start + 1)
-        await copyFileRange(probeFile, join(segmentDir, '0.bin'), 0, keep)
-        segments[0].bytes = keep
-        progress.add(keep)
-      }
-      await rm(probeFile, { force: true })
+      progress.set({ connections: segments.length })
+      note(`下载线路 ${route.label}，并发 ${segments.length} 段`)
       await writeLayout(segmentDir, { total, count: segments.length })
     }
 
@@ -823,6 +847,7 @@ export async function downloadInstaller({ url, apiUrl, name, onProgress, signal,
           end: segment.end,
           wholeFile: list.length === 1,
           headers,
+          fetcher,
           urlRef,
           refresh,
           generation: currentGeneration,

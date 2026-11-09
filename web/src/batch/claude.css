@@ -8,6 +8,8 @@
 .app {
   display: grid;
   grid-template-columns: 288px minmax(0, 1fr);
+  /* 行高必须锁死：否则长页面会把整行撑高，侧栏跟着下移、主区也无法内部滚动 */
+  grid-template-rows: minmax(0, 1fr);
   width: 100%;
   max-width: none;
   height: 100vh;
@@ -24,6 +26,7 @@
   flex-direction: column;
   gap: 14px;
   min-width: 0;
+  min-height: 0;
   padding: 16px 12px 10px;
   overflow: hidden;
   border-right: 1px solid var(--line-soft);
@@ -122,15 +125,6 @@
 
 .rail-nav-group[hidden] {
   display: none;
-}
-
-.rail-nav-title {
-  margin: 0;
-  padding: 0 8px;
-  color: var(--ink-faint);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
 }
 
 .tabs.rail-nav {
@@ -246,6 +240,7 @@
 .app-main {
   display: flex;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
 }
 
@@ -360,15 +355,15 @@ body[data-mode="create"] #header-actions {
   border-radius: 20px;
   background: var(--surface-raised);
   box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.035),
-    inset 0 0 0 1px var(--line-soft);
+    0 4px 20px rgba(0, 0, 0, 0.05),
+    inset 0 0 0 1px var(--line);
   transition: box-shadow 120ms cubic-bezier(0.165, 0.84, 0.44, 1);
 }
 
 #panel-free .input-bar:focus-within {
   box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.06),
-    inset 0 0 0 1px var(--line);
+    0 4px 24px rgba(0, 0, 0, 0.07),
+    inset 0 0 0 1px rgba(32, 39, 34, 0.28);
 }
 
 .input-add {
@@ -429,14 +424,23 @@ body[data-mode="create"] #header-actions {
   box-shadow: none;
 }
 
-/* 参考图在输入条上方压边排开 */
+/* 参考图单独占输入条上方的一条，不再压在提示词文字上 */
 #panel-free .free-ref-stack {
-  top: -46px;
-  left: 6px;
+  top: -106px;
+  left: 8px;
+  gap: 10px;
 }
 
 #panel-free .free-form.has-ref {
-  padding-top: 0;
+  padding-top: 112px;
+}
+
+/* 参考图卡片的白色画框放在白底上会看不见，补一圈细边和落地阴影 */
+#panel-free .free-ref-frame {
+  border-color: var(--surface-raised);
+  box-shadow:
+    0 0 0 1px var(--line-soft),
+    0 8px 18px rgba(20, 26, 22, 0.16);
 }
 
 .input-send {
@@ -690,6 +694,32 @@ body[data-mode="create"] #header-actions {
   }
 }
 
+/* 风格库标题与导入导出按钮挤在一行：标题不许折行，按钮收小 */
+.style-library-head h3 {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.style-library-head .button {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+/* 侧栏占了 288px 后，常见 1440 宽度下表格放不下全部列。
+   提示词预览只是辅助信息（点开资产弹窗能看到全文），先收起它，
+   保证比例、状态、结果和操作列始终在视野内。 */
+@media (max-width: 1699px) {
+  .col-prompt {
+    display: none;
+  }
+
+  table {
+    min-width: 1090px;
+  }
+}
+
 /* ===== 窄窗口 ===== */
 
 @media (max-width: 1100px) {
@@ -715,8 +745,7 @@ body[data-mode="create"] #header-actions {
   }
 
   .rail-brand,
-  .rail-foot,
-  .rail-nav-title {
+  .rail-foot {
     display: none;
   }
 
@@ -771,8 +800,19 @@ body[data-mode="create"] #header-actions {
     background: rgba(232, 230, 223, 0.08);
   }
 
+  .rail-nav .tab.active {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
   .rail-nav .tab-count {
     background: rgba(255, 255, 255, 0.07);
+  }
+
+  /* 资产行里的风格下拉有独立的浅色底，暗色下要压回深色 */
+  .row-select.style-select {
+    border-color: rgba(255, 255, 255, 0.14);
+    background: var(--surface-raised);
+    color: var(--ink);
   }
 
   .rail-nav .tab.active .tab-count {
