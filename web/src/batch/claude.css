@@ -5,9 +5,13 @@
 
 /* ===== 外壳 ===== */
 
+:root {
+  --rail-width: 288px;
+}
+
 .app {
   display: grid;
-  grid-template-columns: 288px minmax(0, 1fr);
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
   /* 行高必须锁死：否则长页面会把整行撑高，侧栏跟着下移、主区也无法内部滚动 */
   grid-template-rows: minmax(0, 1fr);
   width: 100%;
@@ -608,6 +612,10 @@ body[data-mode="create"] #header-actions {
   height: 100% !important;
   min-height: 0;
   max-height: none;
+  /* 左右布局的输入区更窄，不能再为悬浮工具留 132px 右边距，否则正文会被挤成细长一条 */
+  padding-right: 20px;
+  font-size: 14px;
+  line-height: 1.8;
 }
 
 #panel-free .free-layout[data-layout="split"] .free-preview {
@@ -847,8 +855,12 @@ body[data-mode="create"] #header-actions {
 /* ===== 窄窗口 ===== */
 
 @media (max-width: 1100px) {
+  :root {
+    --rail-width: 240px;
+  }
+
   .app {
-    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-columns: var(--rail-width) minmax(0, 1fr);
   }
 
   #panel-free .free-preview {
@@ -972,5 +984,57 @@ body[data-mode="create"] #header-actions {
   .menu-select-menu,
   .input-send.is-busy::after {
     animation: none;
+  }
+}
+
+
+/* ===== 生成记录面板：入口在侧栏左下，面板贴着侧栏右侧展开 ===== */
+
+.batch-shell .history-panel {
+  top: 60px;
+  right: auto;
+  bottom: 16px;
+  left: calc(var(--rail-width) + 20px);
+  width: min(480px, calc(100vw - var(--rail-width) - 40px));
+  max-height: none;
+}
+
+.batch-shell .history-panel.visible {
+  animation-name: history-panel-in-left;
+}
+
+.batch-shell .history-panel.is-closing {
+  animation-name: history-panel-out-left;
+}
+
+@keyframes history-panel-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes history-panel-out-left {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-8px) scale(0.99);
+  }
+}
+
+@media (max-width: 760px) {
+  .batch-shell .history-panel {
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
   }
 }

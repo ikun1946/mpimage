@@ -106,17 +106,52 @@
 
   /* ---------- 顶栏：服务状态常驻 ---------- */
 
+  /* 顶栏随页面滚动，不再固定吸顶；高度也收成两行，地址设置折进「更多」 */
   .masthead {
-    position: sticky;
-    top: 0;
-    z-index: 6;
+    position: static;
+    z-index: auto;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 12px 20px 10px;
+    gap: 8px;
+    padding: 12px 20px;
     border-bottom: 1px solid var(--line);
     background: var(--surface);
-    box-shadow: var(--shadow-soft);
+    box-shadow: none;
+  }
+
+  .masthead-more {
+    margin-top: 2px;
+  }
+
+  .masthead-more > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    color: var(--ink-soft);
+    cursor: pointer;
+    font-size: 11.5px;
+    list-style: none;
+  }
+
+  .masthead-more > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .masthead-more > summary::before {
+    content: "▸";
+    color: var(--ink-faint);
+    font-size: 10px;
+    transition: transform 120ms ease;
+  }
+
+  .masthead-more[open] > summary::before {
+    transform: rotate(90deg);
+  }
+
+  .masthead-more[open] .url-pin,
+  .masthead-more[open] .url-alias {
+    margin-top: 8px;
   }
 
   .masthead-row {
@@ -1517,6 +1552,8 @@
     </div>
   </div>
   <p class="url-hint" id="url-label">还没有可用的地址</p>
+  <details class="masthead-more" id="masthead-more">
+    <summary>局域网与固定地址</summary>
   <div class="url-pin" role="group" aria-labelledby="lan-pin-title">
     <span class="sr-only" id="lan-pin-title">固定局域网地址</span>
     <label for="lan-host-input">固定地址</label>
@@ -1533,6 +1570,7 @@
     <button class="button mini" type="button" id="btn-copy-mdns">复制名称地址</button>
     <span class="url-pin-hint">同一 Wi-Fi 下 iPhone、Android 和电脑浏览器都能用这个名字，换 IP 不用改链接。</span>
   </div>
+  </details>
   <p class="line-result" id="service-result" role="status" aria-live="polite"></p>
   <p class="flash" id="admin-flash" role="status" aria-live="polite" hidden></p>
 </header>

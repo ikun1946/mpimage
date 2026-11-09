@@ -4527,7 +4527,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
      * 已抬起的那张优先（迟滞），并且它的右边界要额外盖住删除按钮；
      * 删除按钮的浮现也改由几何判定，不再依赖会跟着抬起跑掉的 CSS :hover。
      */
-    function wireFreeRefHover(shell) {
+    function wireFreeRefHover(root) {
       const RAISE_Y = 84 // 与 free.css 里 .free-ref.is-raised 的 translateY 一致
       const RAISE_S = 1.3 // 与 free.css 里的 scale 一致
       const TILT_SKEW = 6 // 倾斜 ±7deg 时卡片角点横向外扩的上限
@@ -4555,13 +4555,13 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       /** 卡片几何：布局盒换算成视口坐标，再附上倾斜与缩放后的可见范围 */
       function measure(stack) {
         const stackRect = stack.getBoundingClientRect()
-        const stackTop = stack.offsetTop // 相对文本框顶边，CSS 里是负的
         return [...stack.querySelectorAll('.free-ref')].map(card => {
           const width = card.offsetWidth
           const height = card.offsetHeight
           const left = stackRect.left + card.offsetLeft
           const centerX = left + width / 2
-          const centerY = stackTop + card.offsetTop + height / 2
+          // 全部用视口坐标：参考图现在是输入条的兄弟节点，不再相对输入条偏移
+          const centerY = stackRect.top + card.offsetTop + height / 2
           const spare = (width * RAISE_S - width) / 2
           const wide = spare + TILT_SKEW + EDGE_GRACE
           // 抬起后的样子：顶边、右边界，以及长在右上角的删除热区
@@ -4594,19 +4594,22 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         )
       }
 
-      shell.addEventListener('mousemove', event => {
-        const stack = shell.querySelector('.free-ref-stack')
-        if (!stack || stack.hidden) return
+      root.addEventListener('mousemove', event => {
+        const stack = root.querySelector('.free-ref-stack')
+        const bar = root.querySelector('#free-prompt-shell')
+        if (!stack || stack.hidden || !bar) return
         const cards = [...stack.querySelectorAll('.free-ref')]
         if (!cards.length) return
 
-        const shellRect = shell.getBoundingClientRect()
+        const barRect = bar.getBoundingClientRect()
+        const stackRect = stack.getBoundingClientRect()
         const items = measure(stack)
         const x = event.clientX
-        const y = event.clientY - shellRect.top
+        const y = event.clientY
         const bandTop = Math.min(...items.map(item => item.cornerTop)) - EDGE_GRACE
+        const bandBottom = barRect.top + EDGE_GRACE
 
-        if (y < bandTop || y > EDGE_GRACE) {
+        if (y < bandTop || y > bandBottom) {
           resetCards(cards)
           return
         }
@@ -4617,7 +4620,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         //   3. 停在它抬起后的右上角删除按钮那片 → 继续用它；
         //   4. 以上都不成立才按「谁近」换人。
         let picked = null
-        if (y < stack.offsetTop) {
+        if (y < stackRect.top) {
           const raised = items.find(
             item => item.raised && x >= item.wideLeft && x <= item.cornerRight + EDGE_GRACE
           )
@@ -4676,8 +4679,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         }
       })
 
-      shell.addEventListener('mouseleave', () => {
-        resetCards([...shell.querySelectorAll('.free-ref')])
+      root.addEventListener('mouseleave', () => {
+        resetCards([...root.querySelectorAll('.free-ref')])
       })
     }
 
@@ -5217,7 +5220,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           if (url) openLightbox(url, ref?.name || '参考图', card)
         })
 
-        wireFreeRefHover(freeShell)
+        wireFreeRefHover(dom.freeForm)
 
         dom.freeRefFile.addEventListener('change', () => {
           const file = dom.freeRefFile.files && dom.freeRefFile.files[0]
