@@ -49,6 +49,18 @@ const imageModels: ImageModelSpec[] = [
   { id: 'ai-studio/gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image' },
 ]
 
+/**
+ * 默认不勾选给客户端的生图模型。
+ * 这些模型 Magpie 的清单里有，但当前实测不可用（qwen 解析不到、grok 被限流），
+ * 控制台里仍然能看到并手动打开。
+ */
+const defaultDisabledImageModels: string[] = [
+  'qwen-cn/qwen-image-3.0-pro',
+  'qwen-cn/qwen-image-3.0',
+  'grok/grok-imagine-image',
+  'grok/grok-imagine-image-quality',
+]
+
 const ratios: RatioSpec[] = [
   {
     id: '1:1',
@@ -275,6 +287,7 @@ export const config = {
   ]),
   ratios,
   imageModels,
+  defaultDisabledImageModels,
   defaultRatio: '1:1',
   defaultRoleRatio: '3:4',
   defaultSceneRatio: '16:9',

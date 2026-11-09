@@ -6,6 +6,7 @@ import type { SerialGate } from '../lib/serial-gate.js'
 import { auditFailure, auditLog } from '../lib/audit.js'
 import { buildFileUrl } from '../lib/url.js'
 import { requestImage, requestImageEdit } from '../services/magpie.js'
+import { ImageModelCatalog } from '../services/image-model-catalog.js'
 import { detectImageType, readImageSize } from '../services/imaging.js'
 import { MAX_REFERENCE_IMAGES, loadReferenceImages } from '../services/reference-images.js'
 import { REFERENCE_CATEGORY, type ImageStorage } from '../services/storage.js'
@@ -70,6 +71,7 @@ export function registerImageRoutes(
    * 客户端凭 jobId 回来查询即可拿到结果，避免「刷新后进度归零、图也丢了」。
    * 只保留最近 30 分钟、最多 100 条，按账号隔离查询。
    */
+  const imageModelCatalog = new ImageModelCatalog()
   const jobs = new Map<string, GenerationJob>()
   const JOB_TTL_MS = 30 * 60 * 1000
   const JOB_LIMIT = 100
@@ -148,10 +150,13 @@ export function registerImageRoutes(
     }
 
     // 客户端只能选服务端开启的模型；不传就跟随服务端当前配置
+    const catalog = await imageModelCatalog.list(await deps.settings.getBaseUrl())
+    const catalogIds = catalog.map(model => model.id)
     const requestedModel = typeof body.model === 'string' ? body.model.trim() : ''
     if (requestedModel) {
-      const enabledModels = deps.settings.getEnabledImageModels()
-      if (!findImageModel(requestedModel) || !enabledModels.includes(requestedModel)) {
+      const enabledModels = deps.settings.getEnabledImageModels(catalogIds)
+      const known = catalogIds.includes(requestedModel) || Boolean(findImageModel(requestedModel))
+      if (!known || !enabledModels.includes(requestedModel)) {
         throw new ApiError('MODEL_INVALID', '这个生图模型当前不可用，请重新选择')
       }
     }
@@ -251,7 +256,7 @@ export function registerImageRoutes(
       const upstreamOptions = {
         baseUrl: await deps.settings.getBaseUrl(),
         // 客户端选了就用客户端的，否则每次重读服务端配置（后台改完立即生效）
-        model: requestedModel || deps.settings.getClientImageModel(),
+        model: requestedModel || deps.settings.getClientImageModel(catalogIds),
         timeoutMs: config.requestTimeoutMs,
       }
       const upstream = references.length

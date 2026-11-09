@@ -398,7 +398,7 @@ import { setupTablist } from '../lib/tabs.js'
         if (typeof saved.freeRatio === 'string' && saved.freeRatio) {
           state.freeRatio = saved.freeRatio
         }
-        // 空串表示跟随服务端默认模型
+        // 老快照可能是空串，渲染时会自动落到服务端默认模型
         if (typeof saved.freeModel === 'string') {
           state.freeModel = saved.freeModel
         }
@@ -1631,7 +1631,7 @@ import { setupTablist } from '../lib/tabs.js'
       saveButton.textContent = state.styleDirty ? '保存风格（有未保存修改）' : '保存风格'
     }
 
-    /** 批量工具栏的生图模型下拉；空值表示跟随服务端默认模型 */
+    /** 批量工具栏的生图模型下拉；选中的一定是具体模型，空值时自动落到默认模型 */
     function imageModelOptions(selected) {
       const { options, defaultId } = imageModelChoices()
       if (!options.length) return '<option value="">没有可用的生图模型</option>'
@@ -2317,23 +2317,21 @@ import { setupTablist } from '../lib/tabs.js'
     function imageModelChoices() {
       const models = Array.isArray(serverConfig?.imageModels) ? serverConfig.imageModels : []
       const defaultModel = serverConfig?.defaultImageModel || ''
-      const defaultVisible = models.some(model => model.id === defaultModel)
       // 客户端只显示模型名称，不显示带厂商前缀的 ID
       const options = models.map(model => ({
         id: model.id,
         label: model.label || model.id,
       }))
-      // 只有默认模型本身对客户端可见时，才提供「跟随服务端默认」；
-      // 否则显示它等于把后台关掉的模型又露出来
-      if (defaultVisible) {
-        const defaultLabel = models.find(model => model.id === defaultModel)?.label || defaultModel
-        options.unshift({ id: '', label: `跟随服务端默认（${defaultLabel}）` })
-      }
-      return { options, defaultId: options[0]?.id || '' }
+      // 默认模型直接选中它本身，不再额外造一条「跟随服务端默认」，
+      // 否则同一个模型会在下拉里出现两次
+      const defaultId = options.some(option => option.id === defaultModel)
+        ? defaultModel
+        : (options[0]?.id || '')
+      return { options, defaultId }
     }
 
     /**
-     * 生图模型下拉：第一项是「跟随服务端默认」（默认模型可见时），其余是服务端白名单。
+     * 生图模型下拉：直接列出服务端白名单，默认模型预先选中，不再单独提供「跟随默认」项。
      * 只渲染 data-model-select 的独立下拉；批量工具栏的模型下拉由各自的 type 页面渲染。
      */
     function renderModelSelects() {

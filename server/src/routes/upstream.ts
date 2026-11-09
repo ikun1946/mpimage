@@ -3,11 +3,13 @@ import { config, findImageModel } from '../config.js'
 import { ApiError } from '../lib/errors.js'
 import { checkHealth } from '../services/magpie.js'
 import { ModelCatalog } from '../services/model-catalog.js'
+import { ImageModelCatalog } from '../services/image-model-catalog.js'
 import type { SettingsStore } from '../services/settings-store.js'
 import { requireAdmin } from './auth.js'
 
 /** 缓存按上游地址分键，放在模块级才能跨请求复用 */
 const modelCatalog = new ModelCatalog()
+const imageModelCatalog = new ImageModelCatalog()
 
 /**
  * 上游地址必须是 http/https 绝对地址，且不带账号密码——
@@ -61,7 +63,7 @@ function parseModelId(raw: unknown, label: string): string {
  * 客户端可用模型：必须是白名单里的模型，且至少留一个，
  * 否则客户端会一个模型都选不了、完全没法生图。
  */
-function parseEnabledModels(raw: unknown): string[] | undefined {
+function parseEnabledModels(raw: unknown, allowedIds: string[]): string[] | undefined {
   if (raw === undefined) return undefined
   if (!Array.isArray(raw)) {
     throw new ApiError('UPSTREAM_INVALID', '客户端可用模型必须是数组', 400)
@@ -71,7 +73,7 @@ function parseEnabledModels(raw: unknown): string[] | undefined {
     if (typeof item !== 'string') continue
     const id = item.trim()
     if (!id || ids.includes(id)) continue
-    if (!findImageModel(id)) {
+    if (!allowedIds.includes(id) && !findImageModel(id)) {
       throw new ApiError('UPSTREAM_INVALID', `未知的生图模型：${id}`, 400)
     }
     ids.push(id)
@@ -93,8 +95,11 @@ export function registerUpstreamRoutes(
 ): void {
   app.get('/api/admin/upstream', async request => {
     requireAdmin(request)
+    const baseUrl = await deps.settings.getBaseUrl()
+    const catalog = await imageModelCatalog.list(baseUrl)
+    const catalogIds = catalog.map(model => model.id)
     return {
-      baseUrl: await deps.settings.getBaseUrl(),
+      baseUrl,
       model: deps.settings.getImageModel(),
       fromSettings: deps.settings.isFromSettings(),
       /** 生效中的对话模型（可能是环境变量默认值） */
@@ -106,9 +111,9 @@ export function registerUpstreamRoutes(
       imageModel: deps.settings.getImageModel(),
       imageModelOverride: deps.settings.getImageModelOverride(),
       imageModelFromSettings: deps.settings.isImageModelFromSettings(),
-      /** 客户端可选的模型全集与当前勾选值，控制台据此画勾选框 */
-      imageModels: config.imageModels,
-      enabledImageModels: deps.settings.getEnabledImageModels(),
+      /** 客户端可选的模型全集（Magpie 实际返回）与当前勾选值，控制台据此画勾选框 */
+      imageModels: catalog,
+      enabledImageModels: deps.settings.getEnabledImageModels(catalogIds),
       enabledImageModelsFromSettings: deps.settings.isEnabledImageModelsFromSettings(),
     }
   })
@@ -138,7 +143,8 @@ export function registerUpstreamRoutes(
     // 全部校验完再落盘，否则模型名不合法时地址已经被写进去一半
     const textModel = body.textModel === undefined ? undefined : parseModelId(body.textModel, '对话模型')
     const imageModel = body.imageModel === undefined ? undefined : parseModelId(body.imageModel, '生图模型')
-    const enabledImageModels = parseEnabledModels(body.enabledImageModels)
+    const catalog = await imageModelCatalog.list(baseUrl)
+    const enabledImageModels = parseEnabledModels(body.enabledImageModels, catalog.map(model => model.id))
 
     await deps.settings.setBaseUrl(baseUrl)
     request.log.info({ baseUrl }, '上游地址已更新')
@@ -166,8 +172,8 @@ export function registerUpstreamRoutes(
       imageModel: deps.settings.getImageModel(),
       imageModelOverride: deps.settings.getImageModelOverride(),
       imageModelFromSettings: deps.settings.isImageModelFromSettings(),
-      imageModels: config.imageModels,
-      enabledImageModels: deps.settings.getEnabledImageModels(),
+      imageModels: catalog,
+      enabledImageModels: deps.settings.getEnabledImageModels(catalog.map(model => model.id)),
       enabledImageModelsFromSettings: deps.settings.isEnabledImageModelsFromSettings(),
     })
   })

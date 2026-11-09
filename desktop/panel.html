@@ -2837,9 +2837,11 @@
         : '跟随环境变量默认',
     }]
 
-    for (const preset of IMAGE_MODEL_PRESETS) {
-      const suffix = preset.label ? ` · ${preset.label}` : ''
-      options.push({ value: preset.id, label: `${preset.id}${suffix}` })
+    // 优先用 Magpie 实际返回的生图模型；拿不到时退回内置清单
+    const source = upstreamImageModels.length ? upstreamImageModels : IMAGE_MODEL_PRESETS
+    for (const model of source) {
+      const suffix = model.label ? ` · ${model.label}` : ''
+      options.push({ value: model.id, label: `${model.id}${suffix}` })
     }
 
     if (upstreamSavedImageModel && !IMAGE_MODEL_PRESETS.some(preset => preset.id === upstreamSavedImageModel)) {

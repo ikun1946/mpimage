@@ -65,17 +65,21 @@ export class SettingsStore {
    * 文件里没有配置、或配置成了空数组时，都回落到全部可用模型，
    * 避免一次误写让客户端一个模型都选不了。
    */
-  getEnabledImageModels(): string[] {
-    const all = config.imageModels.map(model => model.id)
+  getEnabledImageModels(allIds?: string[]): string[] {
+    const all = allIds && allIds.length ? allIds : config.imageModels.map(model => model.id)
     const stored = this.cache.magpieEnabledImageModels
-    if (!Array.isArray(stored)) return all
+    if (!Array.isArray(stored)) {
+      // 没保存过勾选时，默认隐藏当前不可用的模型；全被隐藏了就退回全部
+      const usable = all.filter(id => !config.defaultDisabledImageModels.includes(id))
+      return usable.length ? usable : all
+    }
     const picked = stored.filter((id): id is string => typeof id === 'string' && all.includes(id))
     return picked.length ? picked : all
   }
 
   /** 客户端没指定模型时实际使用的模型：默认模型可见就用它，否则用第一个可见模型 */
-  getClientImageModel(): string {
-    const enabled = this.getEnabledImageModels()
+  getClientImageModel(allIds?: string[]): string {
+    const enabled = this.getEnabledImageModels(allIds)
     const configured = this.getImageModel()
     return enabled.includes(configured) ? configured : (enabled[0] || configured)
   }

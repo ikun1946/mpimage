@@ -1,18 +1,30 @@
 import type { FastifyInstance } from 'fastify'
 import { config } from '../config.js'
 import { checkHealth } from '../services/magpie.js'
+import { ImageModelCatalog } from '../services/image-model-catalog.js'
 import type { SettingsStore } from '../services/settings-store.js'
+
+const imageModelCatalog = new ImageModelCatalog()
 
 export function registerMetaRoutes(
   app: FastifyInstance,
   deps: { concurrency?: () => number; settings: SettingsStore },
 ): void {
   app.get('/api/config', async () => {
-    const enabled = new Set(deps.settings.getEnabledImageModels())
-    const imageModels = config.imageModels
+    // 生图模型以 Magpie 实际返回的清单为准（X-Magpie-Drawers），拿不到时回落静态清单
+    const catalog = await imageModelCatalog.list(await deps.settings.getBaseUrl())
+    const allIds = catalog.map(model => model.id)
+    const enabled = new Set(deps.settings.getEnabledImageModels(allIds))
+    const imageModels = catalog
       .filter(model => enabled.has(model.id))
       .map(({ id, label }) => ({ id, label }))
-    const configuredModel = deps.settings.getClientImageModel()
+    const configuredModel = deps.settings.getClientImageModel(allIds)
+    // 默认模型排第一位，客户端下拉打开就能看到它
+    const defaultIndex = imageModels.findIndex(model => model.id === configuredModel)
+    if (defaultIndex > 0) {
+      const [defaultModel] = imageModels.splice(defaultIndex, 1)
+      if (defaultModel) imageModels.unshift(defaultModel)
+    }
     return {
       ratios: config.ratios.map(({ id, label, shortLabel, width, height, nativeWidth, nativeHeight, promptHint }) => ({
         id,

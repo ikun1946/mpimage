@@ -1,5 +1,29 @@
 /* 自由创作页：参数表单、预览舞台与图上工具 */
 
+/* 去掉页头后直接接导航栏，贴近 Claude 那种紧凑工作区：
+   内容只留一点呼吸感，卡片改为平面浅底 + 细边框，不再有多余留白 */
+#panel-free {
+  margin-top: -14px;
+}
+
+#panel-free .free-layout {
+  gap: 20px;
+}
+
+#panel-free .free-form {
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+#panel-free .free-form.has-ref {
+  padding-top: 52px;
+}
+
+#panel-free .free-form .textarea {
+  min-height: 260px;
+}
+
 .free-layout {
   display: grid;
   grid-template-columns: minmax(340px, 0.86fr) minmax(420px, 1.14fr);
