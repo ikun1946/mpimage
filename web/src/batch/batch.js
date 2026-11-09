@@ -62,7 +62,7 @@ import { markAiBusyStill, startAiBusy } from '../lib/ai-busy.js'
 import { mountGenerationAnimation, pickGenerationVariant } from '../lib/generation-anim.js'
 import { activateOverlay } from '../lib/overlay.js'
 import { ratioOptions } from '../lib/ratio.js'
-import { setupTablist } from '../lib/tabs.js'
+import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
     /* ===== 状态与存储 ===== */
 
@@ -143,6 +143,8 @@ import { setupTablist } from '../lib/tabs.js'
       styles: { role: [], scene: [], prop: [] },
       defaultStyle: { role: '', scene: '', prop: '' },
       activeTab: 'import',
+      // 每个模式上次停留的页签，切回模式时回到原地
+      lastTabByMode: { batch: 'import', create: 'free' },
       selected: new Set(),
       search: { role: '', scene: '', prop: '' },
       page: { role: 1, scene: 1, prop: 1 },
@@ -293,6 +295,9 @@ import { setupTablist } from '../lib/tabs.js'
       lightboxImage: document.querySelector('#lightbox-image'),
       lightboxClose: document.querySelector('#lightbox-close'),
       toast: document.querySelector('#toast'),
+      pageTitle: document.querySelector('#page-title'),
+      headerActions: document.querySelector('#header-actions'),
+      freeAddRef: document.querySelector('#free-add-ref'),
       freeForm: document.querySelector('#free-form'),
       freePrompt: document.querySelector('#free-prompt'),
       freeCount: document.querySelector('#free-count'),
@@ -1500,6 +1505,68 @@ import { setupTablist } from '../lib/tabs.js'
         const type = element.dataset.count
         element.textContent = String(type === 'all' ? state.assets.length : countType(type))
       })
+      applyMode()
+    }
+
+    /* ===== 批量 / 创作 模式：侧栏只露出当前模式的一组页签 ===== */
+
+    const PAGE_TITLES = {
+      import: '资产导入',
+      role: '角色资产',
+      scene: '场景资产',
+      prop: '道具资产',
+      free: '自由创作',
+      face: '捏脸',
+      style: '风格设定',
+    }
+    const CREATE_TABS = new Set(['free', 'face'])
+
+    function currentMode() {
+      return CREATE_TABS.has(state.activeTab) ? 'create' : 'batch'
+    }
+
+    function applyMode() {
+      const mode = currentMode()
+      state.lastTabByMode[mode] = state.activeTab
+      document.body.dataset.mode = mode
+      document.querySelectorAll('[data-mode]').forEach(button => {
+        button.setAttribute('aria-selected', String(button.dataset.mode === mode))
+      })
+      document.querySelectorAll('[data-mode-group]').forEach(group => {
+        group.hidden = group.dataset.modeGroup !== mode
+      })
+      // 创作页只留画布与输入条，项目 / 导入按钮收进批量模式
+      if (dom.headerActions) dom.headerActions.hidden = mode === 'create'
+      if (dom.pageTitle) dom.pageTitle.textContent = PAGE_TITLES[state.activeTab] || ''
+    }
+
+    function switchMode(mode) {
+      if (!mode || currentMode() === mode) return
+      const remembered = state.lastTabByMode[mode] || (mode === 'create' ? 'free' : 'import')
+      switchTab(remembered)
+      // 记住的页签当前不可用（例如资产页已清空）时退回该模式的首屏
+      if (currentMode() !== mode) switchTab(mode === 'create' ? 'free' : 'import')
+    }
+
+    /* 方向键 / Home / End 只在当前模式可见的页签之间循环 */
+    function wireRailKeys() {
+      document.querySelector('.side-rail')?.addEventListener('keydown', event => {
+        const tab = event.target.closest('.rail-nav .tab')
+        if (!tab) return
+        const group = document.querySelector('.rail-nav-group:not([hidden])')
+        const tabs = group ? [...group.querySelectorAll('.tab')].filter(item => !item.disabled) : []
+        const index = tabs.indexOf(tab)
+        if (index === -1) return
+        let next = null
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = tabs[(index + 1) % tabs.length]
+        else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = tabs[(index - 1 + tabs.length) % tabs.length]
+        else if (event.key === 'Home') next = tabs[0]
+        else if (event.key === 'End') next = tabs[tabs.length - 1]
+        if (!next) return
+        event.preventDefault()
+        switchTab(next.dataset.tab)
+        next.focus()
+      })
     }
 
     function renderDatasetBar() {
@@ -2304,6 +2371,22 @@ import { setupTablist } from '../lib/tabs.js'
     }
 
     /** 带 data-ratio-select 的下拉统一从这里渲染；free-ratio 保留用户上次的选择 */
+    /** 输入条按内容长高，超过 180px 后内部滚动 */
+    function resizeFreePrompt() {
+      const input = dom.freePrompt
+      if (!input) return
+      input.style.height = 'auto'
+      input.style.height = `${Math.min(input.scrollHeight, 180)}px`
+    }
+
+    /** 生成中的发送键：图标换成转圈，文案交给 aria-label */
+    function setFreeSubmitBusy(busy) {
+      dom.freeSubmit.disabled = busy
+      dom.freeSubmit.classList.toggle('is-busy', busy)
+      dom.freeSubmit.setAttribute('aria-label', busy ? '正在生成…' : '生成图像')
+      dom.freeSubmit.title = busy ? '正在生成…' : '生成图像'
+    }
+
     function renderRatioSelects() {
       document.querySelectorAll('[data-ratio-select]').forEach(select => {
         const current = select === dom.freeRatio ? state.freeRatio : select.value
@@ -2311,6 +2394,7 @@ import { setupTablist } from '../lib/tabs.js'
       })
       // 模型和比例总是跟着服务端配置一起刷新
       renderModelSelects()
+      refreshMenuSelect(dom.freeRatio)
     }
 
     /** 服务端下发的可用模型 + 默认模型；关掉的模型不会出现在列表里 */
@@ -2347,6 +2431,7 @@ import { setupTablist } from '../lib/tabs.js'
         // 之前选的模型被后台关掉时，把自由创作的选择同步到新默认值
         if (select === dom.freeModel && !valid) state.freeModel = next
       })
+      refreshMenuSelect(dom.freeModel)
     }
 
     const FREE_STYLE_NEW = '__new__'
@@ -2365,6 +2450,7 @@ import { setupTablist } from '../lib/tabs.js'
       if (!valid) state.freeStyleId = ''
       dom.freeStyle.value = valid ? state.freeStyleId : ''
       dom.freeStyleEdit.hidden = !valid
+      refreshMenuSelect(dom.freeStyle)
     }
 
     function selectedFreeStyle() {
@@ -4177,8 +4263,7 @@ import { setupTablist } from '../lib/tabs.js'
       }
       state.freeBusy = true
       dom.freePrompt.disabled = true
-      dom.freeSubmit.disabled = true
-      dom.freeSubmit.textContent = '正在生成…'
+      setFreeSubmitBusy(true)
       dom.freeStatus.textContent = '检测到未完成的生成任务，正在接回…'
       freeProgressValue = Math.max(12, freeProgressValue)
       freeStartedAt = pending.startedAt || Date.now()
@@ -4260,8 +4345,7 @@ import { setupTablist } from '../lib/tabs.js'
       window.clearTimeout(resumeTimer)
       state.freeBusy = false
       dom.freePrompt.disabled = false
-      dom.freeSubmit.disabled = false
-      dom.freeSubmit.textContent = '生成图像'
+      setFreeSubmitBusy(false)
     }
 
     /* ===== 自由创作的参考图：可多张，粘贴 / 拖入追加，不占按钮位 ===== */
@@ -4593,8 +4677,7 @@ import { setupTablist } from '../lib/tabs.js'
 
       state.freeBusy = true
       dom.freePrompt.disabled = true
-      dom.freeSubmit.disabled = true
-      dom.freeSubmit.textContent = '正在生成…'
+      setFreeSubmitBusy(true)
       dom.freeStatus.textContent = 'Magpie 正在绘制'
       renderFreeReferences()
       startFreeProgress()
@@ -4640,8 +4723,7 @@ import { setupTablist } from '../lib/tabs.js'
       } finally {
         state.freeBusy = false
         dom.freePrompt.disabled = false
-        dom.freeSubmit.disabled = false
-        dom.freeSubmit.textContent = '生成图像'
+        setFreeSubmitBusy(false)
         renderFreeReferences()
       }
     }
@@ -4651,6 +4733,7 @@ import { setupTablist } from '../lib/tabs.js'
       if (dom.freePrompt && dom.freePrompt.value !== state.freePrompt) {
         dom.freePrompt.value = state.freePrompt
         dom.freeCount.textContent = String(state.freePrompt.length)
+        resizeFreePrompt()
       }
       if (state.freeImageUrl) {
         dom.freeImage.src = state.freeImageUrl
@@ -4801,14 +4884,9 @@ import { setupTablist } from '../lib/tabs.js'
       document.addEventListener('change', handleChange)
       document.addEventListener('input', handleInput)
 
-      // 页签组：方向键 / Home / End 切换，和鼠标点击走同一个 switchTab；
-      // 点击仍由上面的 data-tab 分发处理，这里只管键盘，避免重复 switchTab
-      setupTablist(document.querySelector('.tabs'), {
-        onChange: switchTab,
-        initialId: state.activeTab,
-        hash: false,
-        click: false,
-      })
+      // 页签组：方向键 / Home / End 只在当前模式可见的页签之间切换，
+      // 和鼠标点击走同一个 switchTab；点击由 data-tab 分发处理
+      wireRailKeys()
 
       dom.headerImport.addEventListener('click', openFilePicker)
       dom.headerProjects?.addEventListener('click', openProjectsDrawer)
@@ -5115,6 +5193,18 @@ import { setupTablist } from '../lib/tabs.js'
           const file = dom.freeRefFile.files && dom.freeRefFile.files[0]
           if (file) void attachFreeReference(file)
         })
+
+        // 输入条左侧「+」：等同于点参考图上传
+        dom.freeAddRef?.addEventListener('click', () => {
+          dom.freeRefFile.value = ''
+          dom.freeRefFile.click()
+        })
+
+        // 参数下拉包成 Claude 风格圆角菜单，原生 select 仍是状态源
+        ;[dom.freeModel, dom.freeRatio, dom.freeStyle].forEach(enhanceMenuSelect)
+
+        // 窗口变宽/变窄会改变换行，输入条高度跟着重算
+        window.addEventListener('resize', resizeFreePrompt)
       }
 
       /* 悬浮工具只在输入框右上角热区出现：热区 = 右侧 150px、顶部 56px */
@@ -5153,6 +5243,7 @@ import { setupTablist } from '../lib/tabs.js'
     /* 委托点击的 data-* 分发表：自上而下取第一个命中的选择器并交给对应
        handler，行为与原先的 if 链等价；整行打开详情放在最后兜底。 */
     const CLICK_DISPATCH = [
+      ['.mode-switch [data-mode]', target => switchMode(target.dataset.mode)],
       ['[data-tab]', target => switchTab(target.dataset.tab)],
       ['[data-history-action]', handleHistoryActionClick],
       ['[data-ref-action]', handleRefActionClick],
@@ -5457,6 +5548,7 @@ import { setupTablist } from '../lib/tabs.js'
       if (event.target === dom.freePrompt) {
         state.freePrompt = dom.freePrompt.value
         dom.freeCount.textContent = String(state.freePrompt.length)
+        resizeFreePrompt()
         persistSoon()
       }
     }

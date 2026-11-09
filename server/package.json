@@ -1,6 +1,6 @@
 {
   "name": "mpimage-server",
-  "version": "1.0.30",
+  "version": "1.0.31",
   "private": true,
   "type": "module",
   "description": "画境生图后端：Fastify API，代理 Magpie 生图并按比例裁切",
