@@ -308,5 +308,30 @@ html[data-theme="dark"] {
   /* 暗色下的字重：标题与强调回补，正文保持细一档（.button/.tab 由浅色层的 600 接管） */
   h1, h2, h3, .brand-mark, .stat-value, .type-card strong { font-weight: 500; }
 
+  /* 输入框内的细滚动条与提示词工具条：暗底上用浅色半透明 */
+  #panel-free .free-form .input-main .textarea {
+    scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
+  }
 
+  #panel-free .free-form .input-main .textarea::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.24);
+  }
+
+  #panel-free .free-form .input-main .prompt-float-button {
+    color: rgba(240, 242, 238, 0.88);
+    border-color: rgba(255, 255, 255, 0.14);
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04)),
+      rgba(255, 255, 255, 0.03);
+    box-shadow:
+      0 4px 14px rgba(0, 0, 0, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  #panel-free .free-form .input-main .prompt-float-button:hover {
+    border-color: rgba(255, 255, 255, 0.24);
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08)),
+      rgba(255, 255, 255, 0.05);
+  }
 }

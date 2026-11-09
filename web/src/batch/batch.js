@@ -387,6 +387,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     let freeCollageLoaded = false
     /* 拼图视图下生成中的随机画布动画 */
     let freeGenAnim = null
+    /* 本次生成挑中的动画方案：切视图重建时沿用，不重新抽签 */
+    let freeGenVariant = ''
     /* 从拼图拖到输入框时携带的图片来源 */
     const FREE_COLLAGE_DRAG_TYPE = 'application/x-huajing-free-image'
 
@@ -1652,10 +1654,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       if ((view !== 'single' && view !== 'collage') || view === state.freeResultView) return
       state.freeResultView = view
       persistSoon()
-      if (state.freeBusy) {
-        if (view === 'collage') startFreeCanvasAnimation()
-        else stopFreeCanvasAnimation()
-      }
+      // 两种结果视图都要有生成动画：单图视图也不能只剩一个小转圈
+      if (state.freeBusy) startFreeCanvasAnimation()
       applyFreeResultView()
     }
 
@@ -3466,6 +3466,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           dom.freePrompt.value = editorText.value
           state.freePrompt = editorText.value
           dom.freeCount.textContent = String(state.freePrompt.length)
+          // 最大化编辑器里改完的字数可能比进来时多，回填后同样要重算高度
+          resizeFreePrompt()
           persistSoon()
           editor.classList.remove('visible')
           document.documentElement.classList.remove('prompt-editor-open')
@@ -3520,6 +3522,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       dom.freePrompt.value = value
       state.freePrompt = value
       dom.freeCount.textContent = String(value.length)
+      // 程序化写入不触发 input 事件，不手动重算高度，长文本会憋在原来的小框里
+      resizeFreePrompt()
       persistSoon()
     }
 
@@ -4814,6 +4818,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       try {
         const result = await generateImage({
           prompt,
+          // 起名只看用户写的画面描述；风格前缀是给生图模型的指令，不该混进标题
+          titlePrompt: typedPrompt,
           ratio: dom.freeRatio.value,
           model: dom.freeModel?.value || undefined,
           category: '自由创作',
@@ -5002,8 +5008,10 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
     function startFreeCanvasAnimation() {
       stopFreeCanvasAnimation()
-      if (!dom.freePreview || state.freeResultView !== 'collage') return
-      freeGenAnim = mountGenerationAnimation(dom.freePreview, pickGenerationVariant())
+      // 拼图和单图共用同一块画布：动画挂在 .free-preview 上，两种视图都盖得住
+      if (!dom.freePreview) return
+      if (!freeGenVariant) freeGenVariant = pickGenerationVariant()
+      freeGenAnim = mountGenerationAnimation(dom.freePreview, freeGenVariant)
       freeGenAnim.setProgress(freeProgressValue)
     }
 
@@ -5238,6 +5246,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
     function startFreeProgress() {
       stopFreeProgress()
+      // 新的一次生成重新抽一套动画
+      freeGenVariant = ''
       freeProgressValue = 3
       freeStartedAt = Date.now()
       setFreeProgress(freeProgressValue)

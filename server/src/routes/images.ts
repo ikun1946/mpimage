@@ -57,6 +57,8 @@ interface GenerateBody {
   referencePaths?: unknown
   /** 客户端选中的生图模型；不传则用服务端当前配置的模型 */
   model?: unknown
+  /** 起标题用的原始画面描述（不含风格前缀）；不传则退回 prompt */
+  titlePrompt?: unknown
 }
 
 export function registerImageRoutes(
@@ -245,12 +247,16 @@ export function registerImageRoutes(
     const titleTask = (async () => {
       if (source !== 'free') return ''
       try {
+        const titleSource =
+          typeof body.titlePrompt === 'string' && body.titlePrompt.trim()
+            ? body.titlePrompt.trim()
+            : prompt
         return await generateImageTitle(
           {
             baseUrl: await deps.settings.getBaseUrl(),
             model: await deps.settings.getTitleModel(),
           },
-          prompt,
+          titleSource,
         )
       } catch {
         return ''

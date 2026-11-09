@@ -770,7 +770,10 @@ body[data-mode="create"] .app-main main {
 
 .input-main {
   position: relative;
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -779,7 +782,9 @@ body[data-mode="create"] .app-main main {
   width: 100%;
   min-height: 34px;
   max-height: 180px;
-  padding: 12px 132px 7px 4px;
+  /* 工具条已经挪到输入框下方独立一行，正文用满整行宽度，
+     滚动条才会贴在右边，而不是竖在输入框中间 */
+  padding: 10px 10px 2px;
   overflow-y: auto;
   color: var(--ink);
   border: 0;
@@ -789,6 +794,17 @@ body[data-mode="create"] .app-main main {
   font-size: 13.5px;
   line-height: 1.7;
   resize: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(29, 36, 32, 0.2) transparent;
+}
+
+#panel-free .free-form .input-main .textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+#panel-free .free-form .input-main .textarea::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: rgba(29, 36, 32, 0.2);
 }
 
 #panel-free .free-form .input-main .textarea:focus {
@@ -836,6 +852,29 @@ body[data-mode="create"] .app-main main {
   box-shadow:
     0 0 0 1px var(--line-soft),
     0 8px 18px rgba(20, 26, 22, 0.16);
+}
+
+/* 提示词工具条：输入框底部右侧一行，常驻但低调，聚焦/悬停时提亮。
+   放在正文下方而不是压在文字上，长提示词也不会被按钮挡住 */
+#panel-free .free-form .input-main .prompt-float-tools {
+  position: static;
+  align-self: flex-end;
+  gap: 4px;
+  padding: 0 2px 1px 0;
+  opacity: 0.72;
+  transform: none;
+  pointer-events: auto;
+  transition: opacity 140ms ease;
+}
+
+#panel-free .free-form .input-main .prompt-float-tools:hover,
+#panel-free .free-form .input-bar:focus-within .prompt-float-tools {
+  opacity: 1;
+}
+
+#panel-free .free-form .input-main .prompt-float-button {
+  width: 24px;
+  height: 22px;
 }
 
 .input-send {
@@ -1018,9 +1057,7 @@ body[data-mode="create"] .app-main main {
 #panel-free .free-layout[data-layout="split"] .free-form .input-main .textarea {
   min-height: 240px;
   max-height: 360px;
-  /* 输入区更窄，不能再为悬浮工具留 132px 右边距，否则正文会被挤成细长一条 */
-  padding-top: 14px;
-  padding-right: 20px;
+  padding: 14px 10px 2px;
   font-size: 14px;
   line-height: 1.8;
 }
