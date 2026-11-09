@@ -8,6 +8,7 @@ import { buildFileUrl } from '../lib/url.js'
 import { requestImage, requestImageEdit } from '../services/magpie.js'
 import { ImageModelCatalog } from '../services/image-model-catalog.js'
 import { detectImageType, readImageSize } from '../services/imaging.js'
+import { generateImageTitle } from '../services/image-title.js'
 import { MAX_REFERENCE_IMAGES, loadReferenceImages } from '../services/reference-images.js'
 import { REFERENCE_CATEGORY, type ImageStorage } from '../services/storage.js'
 import type { QuotaStore } from '../services/quota-store.js'
@@ -26,6 +27,8 @@ interface GenerationJob {
   result?: {
     id: string
     imageUrl: string
+    /** 服务端按提示词生成的短名（拼图卡片左下角） */
+    name: string
     model: string
     mimeType: string
     bytes: number
@@ -237,6 +240,23 @@ export function registerImageRoutes(
         ? body.source
         : 'studio'
 
+    // 拼图卡片名：和生图并行跑，图出来时标题通常已经好了，不额外等待。
+    // 只有自由创作需要；失败时退回提示词短句，绝不阻塞生图。
+    const titleTask = (async () => {
+      if (source !== 'free') return ''
+      try {
+        return await generateImageTitle(
+          {
+            baseUrl: await deps.settings.getBaseUrl(),
+            model: await deps.settings.getTextModel(),
+          },
+          prompt,
+        )
+      } catch {
+        return ''
+      }
+    })()
+
     // 生图闸门：最多同时放行 IMAGE_CONCURRENCY 个请求打向 Magpie
     const startedAt = Date.now()
     auditLog(request.log, 'info', 'image.generate.start', auth, '开始生图', {
@@ -290,6 +310,8 @@ export function registerImageRoutes(
 
     const width = generated.size?.width ?? ratio.nativeWidth
     const height = generated.size?.height ?? ratio.nativeHeight
+    // 标题已在生图期间并行生成；模型失败时 generateImageTitle 自己会兜底
+    const displayName = (await titleTask) || assetName
 
     // 记录本次生图归属与详情，供生成记录与管理端统计
     await deps.usage.record({
@@ -298,7 +320,7 @@ export function registerImageRoutes(
       displayName: auth.displayName,
       source,
       category,
-      name: assetName,
+      name: displayName,
       ratio: ratio.id,
       model: generated.model,
       width,
@@ -317,7 +339,7 @@ export function registerImageRoutes(
       jobId,
       source,
       category,
-      name: assetName,
+      name: displayName,
       ratio: ratio.id,
       model: generated.model,
       references: referencePaths.length,
@@ -340,6 +362,7 @@ export function registerImageRoutes(
     const payload = {
       id: generated.stored.id,
       imageUrl: buildFileUrl(request, generated.stored.relativePath),
+      name: displayName,
       model: generated.model,
       mimeType: generated.mimeType,
       bytes: generated.stored.bytes,

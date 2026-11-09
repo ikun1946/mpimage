@@ -242,6 +242,23 @@
 
   .free-preview { border-color: rgba(255, 255, 255, 0.1); }
 
+  /* 拼图卡片与磨砂回到底部按钮 */
+  .free-tile { border-color: rgba(255, 255, 255, 0.08); }
+  .free-tile-thumb { background: rgba(255, 255, 255, 0.05); }
+  .free-tile.is-generating .free-tile-thumb {
+    background: linear-gradient(110deg, rgba(255, 255, 255, 0.05) 32%, rgba(255, 255, 255, 0.1) 45%, rgba(255, 255, 255, 0.05) 58%);
+    background-size: 220% 100%;
+  }
+  .collage-to-bottom {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(46, 51, 47, 0.72);
+    color: rgba(255, 253, 248, 0.82);
+  }
+  .collage-to-bottom:hover {
+    background: rgba(52, 58, 53, 0.9);
+    color: #fffdf8;
+  }
+
   .queue-panel {
     background: rgba(255, 255, 255, 0.04);
     border-color: rgba(255, 255, 255, 0.1);

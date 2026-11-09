@@ -59,7 +59,6 @@ import { requireLogin } from '../lib/guard.js'
 import { setupAvatarMenu } from '../lib/avatar-menu.js'
 import { HISTORY_LIMIT, assetFilename, assetHistory, primaryEntry, primaryFilename, primaryImageOf } from '../lib/format.js'
 import { markAiBusyStill, startAiBusy } from '../lib/ai-busy.js'
-import { mountGenerationAnimation, pickGenerationVariant } from '../lib/generation-anim.js'
 import { activateOverlay } from '../lib/overlay.js'
 import { ratioOptions } from '../lib/ratio.js'
 import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
@@ -325,9 +324,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       freeProgressBar: document.querySelector('#free-progress-bar'),
       freeElapsed: document.querySelector('#free-elapsed'),
       freePreview: document.querySelector('#free-preview'),
-      freeImage: document.querySelector('#free-image'),
-      freeDownload: document.querySelector('#free-download'),
-      freeMaximize: document.querySelector('#free-maximize'),
+      freeCollage: document.querySelector('#free-collage'),
+      freeCollageGrid: document.querySelector('#free-collage-grid'),
+      freeToBottom: document.querySelector('#free-to-bottom'),
       freePromptMaximize: document.querySelector('#free-prompt-maximize'),
       freePromptOptimize: document.querySelector('#free-prompt-optimize'),
       freePromptRevise: document.querySelector('#free-prompt-revise'),
@@ -374,8 +373,11 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     let freeElapsedTimer = 0
     let freeStartedAt = 0
     let freeProgressValue = 0
-    /* 画布上的生成动画（每次生成随机挑一套，结束后销毁） */
-    let freeGenAnim = null
+    /* 自由创作的拼图结果墙：最新在前，拖动只改当前顺序 */
+    let freeCollageItems = []
+    let freeCollageLoaded = false
+    /* 从拼图拖到输入框时携带的图片来源 */
+    const FREE_COLLAGE_DRAG_TYPE = 'application/x-huajing-free-image'
 
     function restoreState() {
       try {
@@ -4316,7 +4318,6 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         if (response.status === 404) {
           // 任务过期或服务重启：清掉标记，避免一直转圈
           clearPendingJob()
-          stopFreeCanvasAnimation()
           finishResume()
           dom.freeStatus.textContent = '上次的生成任务已失效（可能服务重启过），请重新生成'
           return
@@ -4338,14 +4339,17 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           stopFreeProgress()
           dom.freeProgressLabel.textContent = '图像已生成'
           setFreeProgress(100)
-          finishFreeCanvasAnimation()
           state.freeImageUrl = data.result.imageUrl
           state.freeImageExtension = getImageExtension(data.result.imageUrl)
           persistSoon()
-          dom.freeImage.src = `${data.result.imageUrl}?t=${Date.now()}`
-          dom.freePreview.classList.add('has-image')
-          dom.freeDownload.disabled = false
-          dom.freeMaximize.disabled = false
+          addFreeCollageItem({
+            url: data.result.imageUrl,
+            name: data.result.name || freeCollageShortTitle(state.freePrompt || ''),
+            width: data.result.width,
+            height: data.result.height,
+            ratio: data.result.ratio || '',
+            createdAt: Date.now(),
+          })
           dom.freeStatus.textContent = `已接回刷新前的生成结果 · ${data.result.width} × ${data.result.height}`
           finishResume()
           showToast('刷新前的生成已完成，结果已恢复')
@@ -4355,7 +4359,6 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         // 失败
         clearPendingJob()
         stopFreeProgress()
-        stopFreeCanvasAnimation()
         dom.freeProgressLabel.textContent = '生成中断'
         dom.freeStatus.textContent = data.error?.message || '生成失败，请重新尝试'
         finishResume()
@@ -4365,7 +4368,6 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           return
         }
         clearPendingJob()
-        stopFreeCanvasAnimation()
         finishResume()
         dom.freeStatus.textContent = '无法查询生成状态，请重新生成'
       }
@@ -4376,6 +4378,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       state.freeBusy = false
       dom.freePrompt.disabled = false
       setFreeSubmitBusy(false)
+      renderFreeCollage()
     }
 
     /* ===== 自由创作的参考图：可多张，粘贴 / 拖入追加，不占按钮位 ===== */
@@ -4735,22 +4738,24 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         stopFreeProgress()
         dom.freeProgressLabel.textContent = '图像已生成'
         setFreeProgress(100)
-        finishFreeCanvasAnimation()
         await sleep(320)
         state.freeImageUrl = result.imageUrl
         state.freeImageExtension = getImageExtension(result.imageUrl)
         persistSoon()
-        dom.freeImage.src = `${result.imageUrl}?t=${Date.now()}`
-        dom.freePreview.classList.add('has-image')
-        dom.freeDownload.disabled = false
-        dom.freeMaximize.disabled = false
+        addFreeCollageItem({
+          url: result.imageUrl,
+          name: result.name || freeCollageShortTitle(typedPrompt),
+          width: result.width,
+          height: result.height,
+          ratio: result.ratio || dom.freeRatio.value,
+          createdAt: Date.now(),
+        })
         dom.freeStatus.textContent = `生成完成 · ${result.width} × ${result.height}`
         // 自由创作的图同样进服务端记录，面板下次打开要重新拉
         historyPanel.invalidate()
       } catch (error) {
         clearPendingJob()
         stopFreeProgress()
-        stopFreeCanvasAnimation()
         dom.freeProgressLabel.textContent = '生成中断'
         dom.freeStatus.textContent = error.message || '生成失败，请稍后重试'
       } finally {
@@ -4758,7 +4763,301 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         dom.freePrompt.disabled = false
         setFreeSubmitBusy(false)
         renderFreeReferences()
+        renderFreeCollage()
       }
+    }
+
+    /* ===== 拼图结果墙 ===== */
+
+    /** 提示词兜底短名：取第一个短句，去标点，硬性 7 个字 */
+    function freeCollageShortTitle(text) {
+      const first = String(text || '')
+        .split(/[，,。；;\n]/)
+        .map(part => part.trim())
+        .find(Boolean) || ''
+      const clean = first.replace(/[《》「」『』【】（）()"'“”‘’<>，。！？、；：,.!?;:\s]/g, '')
+      return [...clean].slice(0, 7).join('') || '未命名'
+    }
+
+    /** 优先用服务端生成的短名；老记录（自由创作-时间戳）退回提示词短句 */
+    function freeCollageTitle(entry) {
+      const name = String(entry?.name || '').trim()
+      const looksAuto = /^自由创作[-_\s]?\d/.test(name)
+      const chosen = name && !looksAuto ? name : freeCollageShortTitle(entry?.prompt || '')
+      // 不论新旧记录，卡片名一律不超过 7 个字
+      return [...chosen].slice(0, 7).join('') || '未命名'
+    }
+
+    function freeCollageItemFromEntry(entry) {
+      const width = Number(entry.width) || 0
+      const height = Number(entry.height) || 0
+      return {
+        url: entry.imageUrl,
+        name: freeCollageTitle(entry),
+        width,
+        height,
+        ratio: typeof entry.ratio === 'string' ? entry.ratio : '',
+        createdAt: Number(entry.createdAt) || 0,
+      }
+    }
+
+    function freeCollageRatioCss(item) {
+      const width = Number(item.width) || 0
+      const height = Number(item.height) || 0
+      return width > 0 && height > 0 ? `${width} / ${height}` : '1'
+    }
+
+    function freeCollageRatioLabel(item) {
+      const label = String(item.ratio || '').trim()
+      if (/^\d+\s*:\s*\d+$/.test(label)) return label.replace(/\s*:\s*/, ':')
+      const width = Number(item.width) || 0
+      const height = Number(item.height) || 0
+      if (!width || !height) return ''
+      const gcd = (a, b) => (b ? gcd(b, a % b) : a)
+      const divisor = gcd(width, height)
+      const w = width / divisor
+      const h = height / divisor
+      return w <= 64 && h <= 64 ? `${w}:${h}` : ''
+    }
+
+    function freeCollageTime(value) {
+      const stamp = Number(value) || 0
+      if (!stamp) return ''
+      const date = new Date(stamp)
+      if (!Number.isFinite(date.getTime())) return ''
+      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+    }
+
+    function freeTileHtml(item) {
+      const label = freeCollageRatioLabel(item)
+      const dimensions = item.width && item.height ? `${item.width} × ${item.height}` : ''
+      const time = freeCollageTime(item.createdAt)
+      const metaRight = [dimensions, time].filter(Boolean).join(' · ')
+      return `<article class="free-tile" draggable="true" data-free-url="${escapeAttr(item.url)}" style="--ratio:${freeCollageRatioCss(item)}">
+        <div class="free-tile-thumb">
+          <img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.name)}" loading="lazy" draggable="false">
+          ${label ? `<span class="free-tile-ratio">${escapeHtml(label)}</span>` : ''}
+          <div class="free-tile-tools">
+            <button type="button" data-free-action="maximize" title="查看大图" aria-label="查看大图">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3.5h-5v5"></path><path d="M15.5 3.5h5v5"></path><path d="M20.5 15.5v5h-5"></path><path d="M3.5 15.5v5h5"></path></svg>
+            </button>
+            <button type="button" data-free-action="download" title="下载" aria-label="下载">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path><path d="M5 20h14"></path></svg>
+            </button>
+            <span class="free-tile-grip" data-free-action="drag" title="拖动排序，或拖到输入框作参考图" aria-hidden="true">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"></path></svg>
+            </span>
+          </div>
+        </div>
+        <div class="free-tile-meta"><strong title="${escapeAttr(item.name)}">${escapeHtml(item.name)}</strong><span>${escapeHtml(metaRight)}</span></div>
+      </article>`
+    }
+
+    function freeGeneratingTileHtml() {
+      const value = dom.freeRatio?.value || ''
+      const match = /^(\d+):(\d+)$/.exec(value)
+      const ratio = match ? `${match[1]} / ${match[2]}` : '1'
+      const label = match ? value : '自动'
+      return `<article class="free-tile is-generating" style="--ratio:${ratio}">
+        <div class="free-tile-thumb">
+          <div class="free-tile-state"><span class="free-tile-spinner"></span><span>正在绘制 · ${escapeHtml(label)}</span></div>
+          <span class="free-tile-ratio">${escapeHtml(label)}</span>
+        </div>
+        <div class="free-tile-meta"><strong>正在绘制</strong><span>完成后自动入列</span></div>
+      </article>`
+    }
+
+    function isFreeCollageAtBottom() {
+      const host = dom.freeCollage
+      if (!host || host.hidden) return true
+      return host.scrollTop + host.clientHeight >= host.scrollHeight - 8
+    }
+
+    /** 只有还能继续往下滚、且不在底部时，才浮出「回到底部」 */
+    function syncFreeToBottom() {
+      const host = dom.freeCollage
+      const button = dom.freeToBottom
+      if (!host || !button) return
+      const overflow = host.scrollHeight - host.clientHeight
+      const atBottom = host.scrollTop + host.clientHeight >= host.scrollHeight - 8
+      button.classList.toggle('visible', !host.hidden && overflow > 24 && !atBottom)
+    }
+
+    function renderFreeCollage() {
+      const host = dom.freeCollage
+      const grid = dom.freeCollageGrid
+      if (!host || !grid) return
+      const show = freeCollageItems.length > 0 || state.freeBusy
+      const wasHidden = host.hidden
+      host.hidden = !show
+      dom.freePreview?.classList.toggle('has-image', show)
+      if (!show) {
+        grid.replaceChildren()
+        syncFreeToBottom()
+        return
+      }
+
+      // 首次显示不吸底；只有本来就在底部时才跟着新卡片一起到底
+      const stick = !wasHidden && isFreeCollageAtBottom()
+      const scrollTop = host.scrollTop
+      grid.innerHTML =
+        freeCollageItems.map(freeTileHtml).join('') +
+        (state.freeBusy ? freeGeneratingTileHtml() : '')
+      host.scrollTop = stick ? host.scrollHeight : scrollTop
+      syncFreeToBottom()
+    }
+
+    function addFreeCollageItem(item, { prepend = true } = {}) {
+      if (!item?.url) return
+      const index = freeCollageItems.findIndex(existing => existing.url === item.url)
+      if (index >= 0) {
+        freeCollageItems[index] = { ...freeCollageItems[index], ...item }
+      } else if (prepend) {
+        freeCollageItems.unshift(item)
+      } else {
+        freeCollageItems.push(item)
+      }
+      renderFreeCollage()
+    }
+
+    /** 拼图顺序以 DOM 为准，拖动松手后写回状态 */
+    function commitFreeCollageOrder() {
+      const host = dom.freeCollage
+      if (!host) return
+      const ordered = [...host.querySelectorAll('.free-tile[data-free-url]')]
+        .map(tile => tile.dataset.freeUrl)
+      const byUrl = new Map(freeCollageItems.map(item => [item.url, item]))
+      const next = ordered.map(url => byUrl.get(url)).filter(Boolean)
+      if (next.length === freeCollageItems.length) freeCollageItems = next
+      syncFreeToBottom()
+    }
+
+    /** 拉取本账号的自由创作记录作为初始卡片；失败时保留当前结果图 */
+    async function loadFreeCollage() {
+      if (freeCollageLoaded) return
+      freeCollageLoaded = true
+      try {
+        const result = await fetchHistory(200)
+        const entries = (Array.isArray(result?.entries) ? result.entries : [])
+          .filter(entry => entry && entry.source === 'free' && entry.imageUrl)
+        for (const entry of entries) {
+          const item = freeCollageItemFromEntry(entry)
+          const index = freeCollageItems.findIndex(existing => existing.url === item.url)
+          if (index >= 0) {
+            freeCollageItems[index] = { ...freeCollageItems[index], ...item }
+          } else {
+            freeCollageItems.push(item)
+          }
+        }
+        renderFreeCollage()
+      } catch {
+        freeCollageLoaded = false
+      }
+    }
+
+    /** 拖进来的生成图没有参考图路径：取回文件再走既有的上传与校验链路 */
+    async function attachFreeReferenceFromUrl(url) {
+      if (!url) return
+      try {
+        const response = await fetch(url, { credentials: 'include' })
+        if (!response.ok) throw new Error('读取这张图失败，请重试')
+        const blob = await response.blob()
+        const extension = getImageExtension(url) || 'png'
+        const type = blob.type || (extension === 'jpg' ? 'image/jpeg' : `image/${extension}`)
+        const file = new File([blob], `参考图-${timestamp()}.${extension}`, { type })
+        await attachFreeReference(file)
+      } catch (error) {
+        showToast(error?.message || '添加参考图失败', true)
+      }
+    }
+
+    function wireFreeCollage() {
+      const host = dom.freeCollage
+      if (!host) return
+      let draggedTile = null
+
+      host.addEventListener('dragstart', event => {
+        const tile = event.target.closest('.free-tile')
+        if (!tile || tile.classList.contains('is-generating')) {
+          event.preventDefault()
+          return
+        }
+        const url = tile.dataset.freeUrl || ''
+        draggedTile = tile
+        tile.classList.add('is-dragging')
+        event.dataTransfer.effectAllowed = 'copyMove'
+        event.dataTransfer.setData('text/plain', 'free-tile')
+        if (url) event.dataTransfer.setData(FREE_COLLAGE_DRAG_TYPE, url)
+      })
+
+      host.addEventListener('dragend', () => {
+        if (draggedTile) draggedTile.classList.remove('is-dragging')
+        host.querySelectorAll('.is-drop-target').forEach(tile => tile.classList.remove('is-drop-target'))
+        if (draggedTile) commitFreeCollageOrder()
+        draggedTile = null
+      })
+
+      host.addEventListener('dragover', event => {
+        if (!draggedTile) return
+        const target = event.target.closest('.free-tile')
+        if (!target || target === draggedTile || target.classList.contains('is-generating')) return
+        event.preventDefault()
+        host.querySelectorAll('.is-drop-target').forEach(tile => tile.classList.remove('is-drop-target'))
+        target.classList.add('is-drop-target')
+        const rect = target.getBoundingClientRect()
+        const after = event.clientY > rect.top + rect.height / 2
+        if (after) target.after(draggedTile)
+        else target.before(draggedTile)
+      })
+
+      host.addEventListener('drop', event => {
+        event.preventDefault()
+        host.querySelectorAll('.is-drop-target').forEach(tile => tile.classList.remove('is-drop-target'))
+        commitFreeCollageOrder()
+      })
+
+      host.addEventListener('click', event => {
+        const tile = event.target.closest('.free-tile')
+        if (!tile || tile.classList.contains('is-generating')) return
+        const url = tile.dataset.freeUrl
+        if (!url) return
+        const item = freeCollageItems.find(entry => entry.url === url)
+        const action = event.target.closest('[data-free-action]')
+        if (action) {
+          event.stopPropagation()
+          const kind = action.dataset.freeAction
+          if (kind === 'maximize') openLightbox(url, item?.name || '自由创作生成图')
+          else if (kind === 'download') {
+            downloadImage(url, `画境-自由创作-${item?.name || timestamp()}.${getImageExtension(url)}`)
+          }
+          return
+        }
+        openLightbox(url, item?.name || '自由创作生成图')
+      })
+
+      // 图片自带真实比例时补上卡片比例（老记录没有 width/height）
+      host.addEventListener('load', event => {
+        const image = event.target
+        if (!(image instanceof HTMLImageElement)) return
+        const tile = image.closest('.free-tile')
+        const item = freeCollageItems.find(entry => entry.url === tile?.dataset.freeUrl)
+        if (!tile || !item || (item.width && item.height)) return
+        if (!image.naturalWidth || !image.naturalHeight) return
+        item.width = image.naturalWidth
+        item.height = image.naturalHeight
+        tile.style.setProperty('--ratio', `${item.width} / ${item.height}`)
+        const badge = tile.querySelector('.free-tile-ratio')
+        const label = freeCollageRatioLabel(item)
+        if (badge && label) badge.textContent = label
+        syncFreeToBottom()
+      }, true)
+
+      host.addEventListener('scroll', syncFreeToBottom, { passive: true })
+      dom.freeToBottom?.addEventListener('click', () => {
+        host.scrollTo({ top: host.scrollHeight, behavior: 'smooth' })
+      })
+      window.addEventListener('resize', syncFreeToBottom)
+      syncFreeToBottom()
     }
 
     function renderFreeResult() {
@@ -4768,33 +5067,19 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         dom.freeCount.textContent = String(state.freePrompt.length)
         resizeFreePrompt()
       }
-      if (state.freeImageUrl) {
-        dom.freeImage.src = state.freeImageUrl
-        dom.freePreview.classList.add('has-image')
-        dom.freeDownload.disabled = false
-        dom.freeMaximize.disabled = false
+      if (state.freeImageUrl && !freeCollageItems.some(item => item.url === state.freeImageUrl)) {
+        // 历史还没拉回来时，先把刷新前的结果图放进结果墙
+        freeCollageItems.unshift({
+          url: state.freeImageUrl,
+          name: freeCollageShortTitle(state.freePrompt || dom.freePrompt?.value || ''),
+          width: 0,
+          height: 0,
+          ratio: '',
+          createdAt: Date.now(),
+        })
       }
+      renderFreeCollage()
       renderFreeReferences()
-    }
-
-    /** 生成 / 接回任务时在右侧画布挂一套随机动画 */
-    function startFreeCanvasAnimation() {
-      stopFreeCanvasAnimation()
-      if (!dom.freePreview) return
-      freeGenAnim = mountGenerationAnimation(dom.freePreview, pickGenerationVariant())
-      freeGenAnim.setProgress(freeProgressValue)
-    }
-
-    function stopFreeCanvasAnimation() {
-      freeGenAnim?.destroy()
-      freeGenAnim = null
-    }
-
-    /** 生成完成：让水/卡片走完最后一格再淡出 */
-    function finishFreeCanvasAnimation() {
-      if (!freeGenAnim) return
-      freeGenAnim.finish()
-      freeGenAnim = null
     }
 
     function startFreeProgress() {
@@ -4802,7 +5087,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       freeProgressValue = 3
       freeStartedAt = Date.now()
       setFreeProgress(freeProgressValue)
-      startFreeCanvasAnimation()
+      renderFreeCollage()
       dom.freeProgress.classList.add('visible')
       dom.freeProgressLabel.textContent = '正在理解画面'
       const stages = [
@@ -4833,7 +5118,6 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
     function setFreeProgress(value) {
       dom.freeProgressBar.style.width = `${Math.round(value)}%`
-      freeGenAnim?.setProgress(value)
     }
 
     /* ===== 启动 ===== */
@@ -5139,13 +5423,6 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           dom.freeForm.requestSubmit()
         }
       })
-      dom.freeDownload.addEventListener('click', () => {
-        if (!state.freeImageUrl) return
-        downloadImage(state.freeImageUrl, `画境-自由创作-${timestamp()}.${state.freeImageExtension}`)
-      })
-      dom.freeMaximize.addEventListener('click', () => {
-        if (state.freeImageUrl) openLightbox(state.freeImageUrl, '自由创作生成图')
-      })
 
       // 提示词悬浮工具：复制 + AI 优化 + 最大化编辑器（与单张工作台同款）
       dom.freePromptCopy.addEventListener('click', async () => {
@@ -5174,6 +5451,11 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       if (freeShell) {
         const hasFiles = event =>
           Boolean(event.dataTransfer && Array.from(event.dataTransfer.types || []).includes('Files'))
+        const hasCollageImage = event =>
+          Boolean(
+            event.dataTransfer &&
+            Array.from(event.dataTransfer.types || []).includes(FREE_COLLAGE_DRAG_TYPE),
+          )
 
         dom.freePrompt.addEventListener('paste', event => {
           const file = imageFileFromEvent(event)
@@ -5184,21 +5466,28 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         })
 
         freeShell.addEventListener('dragover', event => {
-          if (!hasFiles(event)) return
+          if (!hasFiles(event) && !hasCollageImage(event)) return
           event.preventDefault()
           if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
-          freeShell.classList.add('is-dragover')
+          freeShell.classList.add(hasFiles(event) ? 'is-dragover' : 'is-ref-drop')
         })
 
         freeShell.addEventListener('dragleave', event => {
-          if (!freeShell.contains(event.relatedTarget)) freeShell.classList.remove('is-dragover')
+          if (freeShell.contains(event.relatedTarget)) return
+          freeShell.classList.remove('is-dragover', 'is-ref-drop')
         })
 
         freeShell.addEventListener('drop', event => {
+          if (hasCollageImage(event)) {
+            event.preventDefault()
+            freeShell.classList.remove('is-dragover', 'is-ref-drop')
+            void attachFreeReferenceFromUrl(event.dataTransfer.getData(FREE_COLLAGE_DRAG_TYPE))
+            return
+          }
           if (!hasFiles(event)) return
           // 不拦的话浏览器会直接把文件当页面打开
           event.preventDefault()
-          freeShell.classList.remove('is-dragover')
+          freeShell.classList.remove('is-dragover', 'is-ref-drop')
           const file = imageFileFromEvent(event)
           if (file) void attachFreeReference(file)
           else showToast('参考图仅支持 PNG / JPEG / WebP', true)
@@ -5239,6 +5528,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         // 窗口变宽/变窄会改变换行，输入条高度跟着重算
         window.addEventListener('resize', resizeFreePrompt)
       }
+
+      // 拼图结果墙：拖动排序、拖到输入框作参考图、悬停查看/下载
+      wireFreeCollage()
 
       /* 悬浮工具只在输入框右上角热区出现：热区 = 右侧 150px、顶部 56px */
       const promptShell = dom.freePrompt.closest('.prompt-shell')
@@ -5614,6 +5906,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       // 比例下拉先按本地选择渲染；服务端配置到达后再刷一次
       renderRatioSelects()
       renderAll()
+      // 拼图结果墙：先显示本地记住的结果图，再把本账号的自由创作记录并进来
+      void loadFreeCollage()
       // 刷新前若有正在生成的图片，自动接回进度与结果（只接本账号自己的）
       resumePendingJobIfAny()
 

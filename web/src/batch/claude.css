@@ -356,15 +356,276 @@ body[data-mode="create"] .app-main main {
   background: var(--surface-subtle);
 }
 
-#panel-free .free-preview img {
-  position: absolute;
-  inset: 0;
+/* ===== 自由创作的拼图结果墙 ===== */
+
+#panel-free .free-preview.has-image {
+  display: block;
+}
+
+#panel-free .free-collage {
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  object-position: center;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(29, 36, 32, 0.22) transparent;
+}
+
+/* 列容器必须保持 auto 高度：给多列容器定高会把卡片排到可视区右侧，而不是向下滚动 */
+#panel-free .free-collage-grid {
+  padding: 12px;
+  columns: 330px;
+  column-gap: 12px;
+}
+
+#panel-free .free-collage[hidden] {
+  display: none;
+}
+
+/* 每张结果一张卡：比例来自生成图本身，所以图片不会被裁 */
+#panel-free .free-tile {
+  position: relative;
+  margin: 0 0 12px;
+  break-inside: avoid;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow:
+    0 1px 2px rgba(20, 26, 22, 0.05),
+    0 2px 8px rgba(20, 26, 22, 0.05);
+  cursor: grab;
+  transition: transform 160ms cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 160ms ease, opacity 120ms ease;
+  animation: free-tile-in 260ms ease both;
+}
+
+#panel-free .free-tile:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 24px rgba(20, 26, 22, 0.12),
+    0 2px 6px rgba(20, 26, 22, 0.05);
+}
+
+#panel-free .free-tile:active {
+  cursor: grabbing;
+}
+
+#panel-free .free-tile.is-dragging {
+  opacity: 0.35;
+  transform: scale(0.98);
+}
+
+#panel-free .free-tile.is-drop-target {
+  box-shadow: 0 0 0 2px var(--accent), 0 8px 24px rgba(20, 26, 22, 0.12);
+}
+
+#panel-free .free-tile-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--ratio, 1);
+  overflow: hidden;
+  background: var(--paper-deep, #e9e6de);
+}
+
+#panel-free .free-tile-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--pos, 50% 50%);
+  pointer-events: none;
+  user-select: none;
+}
+
+#panel-free .free-tile-ratio {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: rgba(20, 26, 22, 0.55);
+  color: #fffdf8;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(8px);
+}
+
+/* 右上角一组：最大化、下载，最后是拖动/多选。按钮只在悬停时浮现 */
+#panel-free .free-tile-tools {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+#panel-free .free-tile:hover .free-tile-tools,
+#panel-free .free-tile:focus-within .free-tile-tools {
+  opacity: 1;
+  transform: none;
+}
+
+#panel-free .free-tile-tools button,
+#panel-free .free-tile-tools .free-tile-grip {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 8px;
+  background: rgba(20, 26, 22, 0.5);
+  color: #fffdf8;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 120ms ease;
+}
+
+#panel-free .free-tile-tools button:hover,
+#panel-free .free-tile-tools .free-tile-grip:hover {
+  background: rgba(20, 26, 22, 0.72);
+}
+
+#panel-free .free-tile-tools svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#panel-free .free-tile-grip {
+  cursor: grab;
+}
+
+#panel-free .free-tile-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  color: var(--ink-faint);
+  font-size: 10.5px;
+}
+
+#panel-free .free-tile-meta strong {
+  max-width: 72%;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 生成中的占位卡：和结果卡同列，不遮住已有作品 */
+#panel-free .free-tile.is-generating {
+  cursor: default;
+}
+
+#panel-free .free-tile.is-generating:hover {
+  transform: none;
+  box-shadow:
+    0 1px 2px rgba(20, 26, 22, 0.05),
+    0 2px 8px rgba(20, 26, 22, 0.05);
+}
+
+#panel-free .free-tile.is-generating .free-tile-thumb {
+  background: linear-gradient(110deg, #e9e6de 32%, #f3f0e9 45%, #e9e6de 58%);
+  background-size: 220% 100%;
+  animation: free-tile-shimmer 1.6s linear infinite;
+}
+
+#panel-free .free-tile-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+#panel-free .free-tile-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(54, 84, 69, 0.22);
+  border-top-color: var(--moss);
+  border-radius: 50%;
+  animation: claude-spin 0.9s linear infinite;
+}
+
+/* 快速到底：圆形磨砂按钮，浮在输入框正上方的预览区底部中央 */
+#panel-free .collage-to-bottom {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  z-index: 6;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(32, 39, 34, 0.1);
+  border-radius: 50%;
+  background: rgba(252, 251, 247, 0.68);
+  color: var(--ink-soft);
+  box-shadow:
+    0 6px 20px rgba(20, 26, 22, 0.14),
+    0 1px 2px rgba(20, 26, 22, 0.08);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, 6px);
+  transition: opacity 160ms ease, transform 160ms ease, background 120ms ease, visibility 160ms;
+  backdrop-filter: blur(10px) saturate(1.1);
+}
+
+#panel-free .collage-to-bottom.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+#panel-free .collage-to-bottom:hover {
+  color: var(--ink);
+  background: rgba(252, 251, 247, 0.9);
+}
+
+#panel-free .collage-to-bottom svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 左右布局的预览更窄，列宽跟着收，避免一张卡占满整列 */
+#panel-free .free-layout[data-layout="split"] .free-collage-grid {
+  columns: 240px;
+}
+
+@keyframes free-tile-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes free-tile-shimmer {
+  to { background-position: -220% 0; }
+}
+
+@media (hover: none) {
+  #panel-free .free-tile-tools {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 #panel-free .free-form {
@@ -394,6 +655,27 @@ body[data-mode="create"] .app-main main {
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.07),
     inset 0 0 0 1px rgba(32, 39, 34, 0.28);
+}
+
+/* 从拼图拖到输入框：整条输入框亮起，松手即添加为参考图 */
+#panel-free .input-bar.is-ref-drop {
+  box-shadow:
+    0 4px 24px rgba(165, 76, 49, 0.16),
+    inset 0 0 0 2px var(--accent);
+}
+
+#panel-free .input-bar.is-ref-drop::after {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: #fff;
+  content: "松手添加为参考图";
+  font-size: 10.5px;
+  white-space: nowrap;
+  transform: translateX(-50%);
 }
 
 .input-add {
@@ -463,7 +745,8 @@ body[data-mode="create"] .app-main main {
 #panel-free .free-ref-stack {
   top: 8px;
   right: 16px;
-  left: 52px;
+  /* 左右对称，6 张收窄后不会一边留空、一边贴边 */
+  left: 16px;
   z-index: 0;
   gap: 10px;
 }
@@ -632,7 +915,7 @@ body[data-mode="create"] .app-main main {
 
 #panel-free .free-layout[data-layout="split"] .free-ref-stack {
   top: 24px;
-  left: 68px;
+  left: 16px;
 }
 
 
