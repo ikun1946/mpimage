@@ -24,6 +24,10 @@ const DEFAULTS = {
   LAN_NAME: 'huajing',
   // 更新下载连接数：1 强制单流，2/4/6 强制该段数，auto 或其它值按探测速率自适应
   UPDATE_DOWNLOAD_CONNECTIONS: 'auto',
+  // 自动更新：on = 后台检查并下载，系统空闲时静默安装；off = 只保留手动检查
+  AUTO_UPDATE: 'on',
+  // 系统无输入多少分钟后才允许自动安装
+  AUTO_INSTALL_IDLE_MINUTES: '10',
   // 更新下载镜像前缀（默认空 = 直连）：只在用户自己填时才把地址拼到原始下载链接前
   UPDATE_DOWNLOAD_MIRROR: '',
   LOG_LEVEL: 'info',

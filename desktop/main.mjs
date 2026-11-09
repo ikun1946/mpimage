@@ -1,6 +1,6 @@
-import { app, BrowserWindow, Menu, Tray, clipboard, dialog, ipcMain, nativeImage, shell } from 'electron'
-import { execFile } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync } from 'node:fs'
+import { app, BrowserWindow, Menu, Tray, clipboard, dialog, ipcMain, nativeImage, powerMonitor, shell } from 'electron'
+import { execFile, spawn } from 'node:child_process'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { open, readdir, stat } from 'node:fs/promises'
 import os from 'node:os'
 import { basename, join } from 'node:path'
@@ -499,16 +499,175 @@ function openUpdateWindow() {
   updateWindow.on('closed', () => { updateWindow = null })
 }
 
-async function startUpdateDownload() {
+/* ===== 自动更新：后台检查与下载，系统空闲时静默安装 ===== */
+const AUTO_UPDATE = String(config.AUTO_UPDATE || 'on').toLowerCase() !== 'off'
+const AUTO_INSTALL_IDLE_MINUTES = Math.max(1, Number(config.AUTO_INSTALL_IDLE_MINUTES) || 10)
+let autoInstalling = false
+
+/** 静默检查 + 后台下载：不弹更新窗口，托盘和任务栏照常显示进度 */
+async function autoUpdateTick() {
+  if (!app.isPackaged || !AUTO_UPDATE || quitting || autoInstalling) return
+  if (updateCheckBusy || updateBusy) return
+
+  try {
+    const info = await checkForUpdate()
+    if (!info || info.error || info.disabled || !info.hasUpdate || !info.downloadUrl) return
+
+    const expectedSize =
+      Number.isSafeInteger(info.downloadSize) && info.downloadSize > 0 ? info.downloadSize : null
+
+    updateTarget = {
+      url: info.downloadUrl,
+      apiUrl: info.downloadApiUrl || '',
+      name: info.downloadName || '',
+      version: info.latestVersion || '',
+      pageUrl: info.pageUrl || '',
+      expectedSize,
+    }
+
+    paintUpdate({
+      phase: 'available',
+      currentVersion: info.currentVersion || app.getVersion(),
+      latestVersion: info.latestVersion || '',
+      version: info.latestVersion || '',
+      notes: info.releaseNotes || '',
+      pageUrl: info.pageUrl || '',
+      publishedAt: info.publishedAt || '',
+      checkedAt: info.checkedAt || new Date().toISOString(),
+      expectedSize,
+      fileName: updateTarget.name,
+      hasUpdate: true,
+      autoInstall: true,
+      message: `发现新版本 ${info.latestVersion || ''}，正在后台下载…`,
+    })
+
+    const ready = await findReadyInstaller({
+      url: updateTarget.url,
+      name: updateTarget.name,
+      version: updateTarget.version,
+      expectedSize,
+    })
+    if (ready) {
+      paintUpdate({
+        phase: 'done',
+        filePath: ready.file,
+        fileName: basename(ready.file),
+        received: ready.size,
+        total: ready.size,
+        autoInstall: true,
+        message: '更新已下载，空闲时会自动安装',
+      })
+      notifyUpdate('画境更新已就绪', `新版本 ${updateTarget.version} 已下载，电脑空闲时会自动安装并重开。`)
+      return
+    }
+
+    await startUpdateDownload({ auto: true })
+  } catch (error) {
+    log(`自动更新检查失败：${error?.message || error}`)
+  }
+}
+
+/** 服务端还在生图就不装，别把用户正在跑的任务打断 */
+async function anyGenerationRunning() {
+  try {
+    const response = await fetch(`${SERVER_ORIGIN}/api/system/activity`, {
+      signal: AbortSignal.timeout(3000),
+    })
+    if (!response.ok) return true
+    const data = await response.json().catch(() => null)
+    return Number(data?.generating) > 0
+  } catch {
+    return true
+  }
+}
+
+/** 托盘气泡：自动更新全程无窗口，用户至少要知道「已经下好、什么时候装」 */
+function notifyUpdate(title, content) {
+  try {
+    tray?.displayBalloon({ title, content, iconType: 'info' })
+  } catch {}
+}
+
+const AUTO_INSTALL_MARKER = join(DATA, 'updates', 'auto-install-attempt.json')
+const AUTO_INSTALL_RETRY_MS = 12 * 60 * 60 * 1000
+
+/** 同一次安装失败过就别在空闲时反复重试，隔 12 小时再说 */
+function autoInstallCoolingDown(version) {
+  try {
+    const record = JSON.parse(readFileSync(AUTO_INSTALL_MARKER, 'utf8'))
+    if (!record || record.version !== version) return false
+    return Date.now() - Number(record.at || 0) < AUTO_INSTALL_RETRY_MS
+  } catch {
+    return false
+  }
+}
+
+function markAutoInstallAttempt(version) {
+  try {
+    mkdirSync(join(DATA, 'updates'), { recursive: true })
+    writeFileSync(AUTO_INSTALL_MARKER, JSON.stringify({ version, at: Date.now() }), 'utf8')
+  } catch {}
+}
+
+/** 空闲判定：系统级无输入满 N 分钟，且没有在途生图 */
+async function maybeAutoInstall() {
+  if (!app.isPackaged || !AUTO_UPDATE || quitting || autoInstalling) return
+  if (updateState.phase !== 'done' || !updateState.filePath) return
+  // 便携版没有安装目录可写，自动安装会失败，只保留后台下载
+  if (process.env.PORTABLE_EXECUTABLE_DIR) return
+  if (autoInstallCoolingDown(updateState.version)) return
+  if (powerMonitor.getSystemIdleTime() < AUTO_INSTALL_IDLE_MINUTES * 60) return
+  if (await anyGenerationRunning()) return
+
+  autoInstalling = true
+  markAutoInstallAttempt(updateState.version)
+  runAutoInstall(updateState.filePath)
+}
+
+/** 游离助手：等本进程退出 → /S 静默安装 → 重新拉起应用 */
+function runAutoInstall(file) {
+  log(`空闲自动安装更新：${file}`)
+  paintUpdate({
+    phase: 'installing',
+    autoInstall: true,
+    message: '正在后台安装更新，应用会短暂关闭后自动重开…',
+  })
+  try {
+    const helper = join(app.getAppPath(), 'desktop', 'auto-install.mjs')
+    const child = spawn(process.execPath, [helper, file, process.execPath, String(process.pid)], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    })
+    child.unref()
+  } catch (error) {
+    log(`启动自动安装助手失败：${error.message}`)
+    autoInstalling = false
+    return
+  }
+  setTimeout(() => { void quitApp() }, 700)
+}
+
+function scheduleAutoUpdate() {
+  if (!app.isPackaged || !AUTO_UPDATE) return
+  setTimeout(() => { void autoUpdateTick() }, 45_000)
+  setInterval(() => { void autoUpdateTick() }, 6 * 60 * 60 * 1000)
+  setInterval(() => { void maybeAutoInstall() }, 60_000)
+  // 已经下载好的旧安装包：启动一分钟后开始按空闲条件安装
+  setTimeout(() => { void maybeAutoInstall() }, 60_000)
+}
+
+async function startUpdateDownload({ auto = false } = {}) {
   if (!updateTarget.url) {
     paintUpdate({ phase: 'error', message: '没有可下载的安装包，请先检查更新' })
-    openUpdateWindow()
+    if (!auto) openUpdateWindow()
     return
   }
   if (updateBusy) return
   updateBusy = true
   updateController = new AbortController()
-  openUpdateWindow()
+  if (!auto) openUpdateWindow()
   paintUpdate({
     phase: 'resolve',
     version: updateTarget.version,
@@ -519,9 +678,10 @@ async function startUpdateDownload() {
     etaSeconds: null,
     connections: 1,
     mirror: Boolean(config.UPDATE_DOWNLOAD_MIRROR),
-    message: '',
+    message: auto ? '正在后台下载更新…' : '',
     filePath: '',
     canRetryDownload: true,
+    autoInstall: auto,
   })
 
   try {
@@ -543,7 +703,7 @@ async function startUpdateDownload() {
       total: result.size,
       connections: result.connections,
       etaSeconds: 0,
-      message: '下载完成，可以安装',
+      message: updateState.autoInstall ? '更新已下载，空闲时会自动安装' : '下载完成，可以安装',
     })
   } catch (error) {
     if (error?.name === 'AbortError') {
@@ -553,7 +713,7 @@ async function startUpdateDownload() {
       log(`下载安装包失败：${error?.message || error}`)
       paintUpdate({ phase: 'error', message: error?.message || '下载失败' })
     }
-    openUpdateWindow()
+    if (!auto) openUpdateWindow()
   } finally {
     updateController = null
     updateBusy = false
@@ -1312,6 +1472,8 @@ async function bootstrap() {
     // 换 Wi-Fi、插拔网线后 IP 会变，固定名称的应答跟着换绑定
     ensureMdns()
   }, 5000)
+
+  scheduleAutoUpdate()
 
   // 冒烟自检用：设置 HUAJING_DESKTOP_SMOKE=<毫秒> 时，启动完成后自动走一遍退出流程
   const smokeMs = Number(process.env.HUAJING_DESKTOP_SMOKE || 0)

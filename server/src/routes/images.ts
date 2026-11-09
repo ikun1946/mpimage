@@ -15,6 +15,7 @@ import type { QuotaStore } from '../services/quota-store.js'
 import type { SettingsStore } from '../services/settings-store.js'
 import type { UsageStore } from '../services/usage-store.js'
 import { requireAuth } from './auth.js'
+import { isLoopbackAddress } from './update.js'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -111,6 +112,18 @@ export function registerImageRoutes(
       jobs.delete(oldest)
     }
   }
+
+  // 主进程用来判断「现在有没有在生图」：自动更新只在空闲时安装。
+  // 回环请求免登录（桌面控制台与主服务同机），局域网访问仍需登录。
+  app.get('/api/system/activity', async request => {
+    if (!isLoopbackAddress(request.ip)) requireAuth(request)
+    pruneJobs()
+    let generating = 0
+    for (const job of jobs.values()) {
+      if (job.status === 'running') generating += 1
+    }
+    return { generating, active: generating > 0, checkedAt: Date.now() }
+  })
 
   // 查询任务状态（只能查自己的任务）
   app.get('/api/images/jobs/:id', async request => {

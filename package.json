@@ -1,6 +1,6 @@
 {
   "name": "mpimage",
-  "version": "1.0.42",
+  "version": "1.0.43",
   "private": true,
   "type": "module",
   "description": "画境生图：前后端分离的单张工作台与资产批量工作台",
