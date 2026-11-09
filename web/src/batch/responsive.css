@@ -357,11 +357,11 @@
   }
 
   .modal-sheet {
-    max-height: 94vh;
+    max-height: calc(var(--ui-vh, 100vh) - 20px);
   }
 
   .modal-body {
-    max-height: calc(94vh - 88px);
+    max-height: none;
   }
 
   .field-list,
@@ -381,6 +381,21 @@
 
   .drawer {
     width: 100vw;
+  }
+}
+
+/* 窄屏：页头动作只留图标，避免两个中文按钮把面包屑挤成竖排 */
+@media (max-width: 680px) {
+  .topbar {
+    gap: 8px;
+  }
+
+  .topbar .button span {
+    display: none;
+  }
+
+  .topbar .button {
+    padding: 0 10px;
   }
 }
 

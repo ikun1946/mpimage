@@ -16,6 +16,8 @@ body {
 }
 
 body {
+  /* 整页按窗口宽度等比缩放，避免大屏上内容被拉空、比例失衡 */
+  zoom: var(--ui-zoom, 1);
   color: var(--ink);
   background: var(--paper);
   font-family: var(--font-body);

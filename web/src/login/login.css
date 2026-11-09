@@ -5,9 +5,11 @@
 
 /* ---------- 页面底 ---------- */
 body {
+  min-height: var(--ui-vh, 100vh);
   padding: var(--space-6);
   display: grid;
   place-items: center;
+  align-content: center;
   background:
     radial-gradient(120% 60% at 50% -10%, rgba(255, 253, 248, 0.9), transparent 60%),
     var(--paper);

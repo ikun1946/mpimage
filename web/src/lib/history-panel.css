@@ -34,8 +34,9 @@
   z-index: 90;
   display: none;
   flex-direction: column;
-  width: min(560px, calc(100vw - 48px));
-  max-height: min(640px, calc(100vh - 110px));
+  /* 大屏跟着页面一起放大，但不超过 680，避免变成长条 */
+  width: min(clamp(560px, 32vw, 680px), calc(100vw - 48px));
+  max-height: min(720px, calc(var(--ui-vh, 100vh) - 110px));
   border-radius: 16px;
   border: 1px solid rgba(255, 253, 248, 0.14);
   background: rgba(24, 30, 26, 0.98);
@@ -283,7 +284,8 @@
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.78);
-  padding: 32px;
+  padding: clamp(16px, 3vw, 40px);
+  overflow: auto;
 }
 
 .history-lightbox.visible {
@@ -294,6 +296,7 @@
   margin: 0;
   max-width: min(1100px, 100%);
   max-height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -303,7 +306,8 @@
 
 .history-lightbox-stage img {
   max-width: 100%;
-  max-height: calc(100vh - 120px);
+  /* 图注 + 提示词块大约占 260px，给它们留够位置，关闭按钮才不会跑出视口 */
+  max-height: calc(var(--ui-vh, 100vh) - 260px);
   border-radius: 12px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
 }
@@ -315,9 +319,10 @@
 }
 
 .history-lightbox-close {
-  position: absolute;
-  top: -14px;
-  right: -14px;
+  position: fixed;
+  top: clamp(12px, 2vw, 24px);
+  right: clamp(12px, 2vw, 24px);
+  z-index: 2;
   width: 32px;
   min-width: 0;
   height: 32px;
@@ -335,9 +340,18 @@
 }
 
 @media (max-width: 720px) {
+  /* 手机：改成贴底的抽屉，别把 68px 的顶栏和键盘一起挤 */
   .history-panel {
-    right: 12px;
-    top: 68px;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: calc(var(--ui-vh, 100vh) * 0.86);
+    border-radius: 18px 18px 0 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
   }
 
   .history-item {

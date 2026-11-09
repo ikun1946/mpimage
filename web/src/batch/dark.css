@@ -317,7 +317,7 @@ html[data-theme="dark"] {
     background: rgba(255, 255, 255, 0.24);
   }
 
-  #panel-free .free-form .input-main .prompt-float-button {
+  #panel-free .free-form .input-toolbar .prompt-float-button {
     color: rgba(240, 242, 238, 0.88);
     border-color: rgba(255, 255, 255, 0.14);
     background:
@@ -328,7 +328,7 @@ html[data-theme="dark"] {
       inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
-  #panel-free .free-form .input-main .prompt-float-button:hover {
+  #panel-free .free-form .input-toolbar .prompt-float-button:hover {
     border-color: rgba(255, 255, 255, 0.24);
     background:
       linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08)),

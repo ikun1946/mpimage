@@ -64,8 +64,10 @@
 }
 
 .modal-sheet {
+  display: flex;
+  flex-direction: column;
   width: min(980px, 100%);
-  max-height: min(86vh, 900px);
+  max-height: calc(var(--ui-vh, 100vh) - 48px);
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -105,8 +107,9 @@
 
 .modal-body {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: minmax(270px, 0.82fr) minmax(0, 1.18fr);
-  max-height: calc(86vh - 90px);
+  min-height: 0;
   overflow: auto;
 }
 
@@ -694,7 +697,7 @@
   height: auto;
   max-width: 100%;
   /* 视口单位直接约束，保证整图完整可见 */
-  max-height: calc(100vh - 2 * clamp(20px, 4vw, 56px));
+  max-height: calc(var(--ui-vh, 100vh) - 2 * clamp(20px, 4vw, 56px));
   object-fit: contain;
   border-radius: 12px;
   box-shadow: 0 32px 100px rgba(0, 0, 0, 0.56);

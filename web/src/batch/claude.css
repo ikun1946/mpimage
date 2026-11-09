@@ -16,7 +16,7 @@
   grid-template-rows: minmax(0, 1fr);
   width: 100%;
   max-width: none;
-  height: 100vh;
+  height: var(--ui-vh, 100vh);
   margin: 0;
   overflow: hidden;
   border: 0;
@@ -288,18 +288,29 @@
 
 .crumb {
   display: flex;
+  flex-wrap: nowrap;
   min-width: 0;
   align-items: center;
   gap: 7px;
+  overflow: hidden;
   color: var(--ink-faint);
   font-size: 12.5px;
 }
 
+.crumb .crumb-app,
 .crumb .crumb-sep {
+  flex: 0 0 auto;
+  white-space: nowrap;
   opacity: 0.55;
 }
 
+.crumb .crumb-app {
+  opacity: 1;
+}
+
 .crumb strong {
+  min-width: 0;
+  white-space: nowrap;
   overflow: hidden;
   color: var(--ink);
   font-weight: 600;
@@ -348,7 +359,7 @@ body[data-mode="create"] .app-main main {
 
 #panel-free {
   /* 底部留白收窄到 8px，输入条整体往下靠，同时不把自由创作页撑出滚动条 */
-  height: calc(100vh - 48px - 22px);
+  height: calc(var(--ui-vh, 100vh) - 48px - 22px);
   margin-top: 0;
 }
 
@@ -701,9 +712,10 @@ body[data-mode="create"] .app-main main {
 /* 输入条外壳：Claude 的 pill 形态 */
 #panel-free .input-bar {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 7px 7px 7px 6px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 7px 8px;
   border-radius: 20px;
   background: var(--surface-raised);
   box-shadow:
@@ -770,11 +782,17 @@ body[data-mode="create"] .app-main main {
 
 .input-main {
   position: relative;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
+  flex: 0 0 auto;
   min-width: 0;
+}
+
+/* 输入框底部操作行：左边「+」，右边提示词工具与发送。
+   按钮不再占据正文两侧，正文可以从输入框最左边写到最右边 */
+.input-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 2px;
 }
 
 #panel-free .free-form .input-main .textarea {
@@ -856,11 +874,11 @@ body[data-mode="create"] .app-main main {
 
 /* 提示词工具条：输入框底部右侧一行，常驻但低调，聚焦/悬停时提亮。
    放在正文下方而不是压在文字上，长提示词也不会被按钮挡住 */
-#panel-free .free-form .input-main .prompt-float-tools {
+#panel-free .free-form .input-toolbar .prompt-float-tools {
   position: static;
-  align-self: flex-end;
+  margin-left: auto;
   gap: 4px;
-  padding: 0 2px 1px 0;
+  padding: 0 2px 0 0;
   opacity: 0.72;
   transform: none;
   pointer-events: auto;
@@ -872,9 +890,19 @@ body[data-mode="create"] .app-main main {
   opacity: 1;
 }
 
-#panel-free .free-form .input-main .prompt-float-button {
-  width: 24px;
-  height: 22px;
+#panel-free .free-form .input-toolbar .prompt-float-button {
+  width: 26px;
+  height: 24px;
+}
+
+#panel-free .free-form .input-toolbar .input-add {
+  width: 30px;
+  height: 30px;
+}
+
+#panel-free .free-form .input-toolbar .input-send {
+  width: 32px;
+  height: 32px;
 }
 
 .input-send {
@@ -1055,9 +1083,9 @@ body[data-mode="create"] .app-main main {
 
 /* 左右布局的输入框保持正常高度：过长会把预览挤没，滚动条和发送键也会离正文很远 */
 #panel-free .free-layout[data-layout="split"] .free-form .input-main .textarea {
-  min-height: 240px;
+  min-height: 34px;
   max-height: 360px;
-  padding: 14px 10px 2px;
+  padding: 12px 10px 2px;
   font-size: 14px;
   line-height: 1.8;
 }
@@ -1345,14 +1373,48 @@ body[data-mode="create"] .app-main main {
   }
 
   .side-rail {
+    position: relative;
     gap: 8px;
+    overflow: visible;
     border-right: 0;
     border-bottom: 1px solid var(--line-soft);
   }
 
-  .rail-brand,
-  .rail-foot {
+  .rail-brand {
     display: none;
+  }
+
+  /* 手机上侧栏变成顶部条：账号入口缩成右上角头像，菜单向下展开 */
+  .rail-foot {
+    display: block;
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    z-index: 20;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .rail-foot .user-avatar {
+    width: auto;
+    padding: 3px;
+  }
+
+  .rail-foot .user-avatar::after {
+    display: none;
+  }
+
+  .rail-foot .avatar-menu {
+    top: calc(100% + 8px);
+    right: 0;
+    bottom: auto;
+    left: auto;
+    transform-origin: top right;
+  }
+
+  .mode-switch {
+    margin-right: 46px;
   }
 
   .rail-nav-group {
@@ -1361,16 +1423,25 @@ body[data-mode="create"] .app-main main {
 
   .tabs.rail-nav {
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .tabs.rail-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .rail-nav .tab {
+    flex: 0 0 auto;
     width: auto;
+    white-space: nowrap;
   }
 
   #panel-free {
     height: auto;
-    min-height: calc(100vh - 48px - 200px);
+    min-height: calc(var(--ui-vh, 100vh) - 48px - 200px);
   }
 
   #panel-free .free-layout {
