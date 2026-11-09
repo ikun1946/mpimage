@@ -275,6 +275,14 @@ export function registerImageRoutes(
       promptLength: prompt.length,
       promptPreview: prompt.slice(0, 160),
     })
+    // 生图超时按提示词长度放宽：120 秒起步，约每 8 个字加 1 秒，最多到 IMAGE_TIMEOUT_MS。
+    // 长提示词本身出图更慢，别让本服务先于上游掐断请求。
+    const promptChars = [...prompt].length
+    const promptTimeoutMs = Math.min(
+      config.requestTimeoutMs,
+      120_000 + Math.min(180_000, promptChars * 120),
+    )
+
     try {
     const generated = await deps.gate.run(async () => {
       const references = await loadReferenceImages(referencePaths)
@@ -283,7 +291,7 @@ export function registerImageRoutes(
         baseUrl: await deps.settings.getBaseUrl(),
         // 客户端选了就用客户端的，否则每次重读服务端配置（后台改完立即生效）
         model: requestedModel || deps.settings.getClientImageModel(catalogIds),
-        timeoutMs: config.requestTimeoutMs,
+        timeoutMs: promptTimeoutMs,
       }
       const upstream = references.length
         ? await requestImageEdit(

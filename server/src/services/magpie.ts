@@ -297,6 +297,14 @@ function extractErrorMessage(payload: unknown): string | undefined {
  * 这里翻译成用户能看懂的中文，同时保留原始 request id 方便排查。
  */
 function translateUpstreamError(message: string): string {
+  // 连接级错误先翻译成人话：Codex 生图在 60 秒左右被上游掐断是很常见的情况
+  if (/\bEOF\b|connection reset|broken pipe/i.test(message)) {
+    return '上游连接在约 60 秒时被中断，通常是出图超时。请精简提示词后重试，或改用 Nano Banana / Gemini 模型'
+  }
+  if (/dial tcp|i\/o timeout|connectex|Failed to connect/i.test(message)) {
+    return '连接上游超时，请检查网络或代理后重试'
+  }
+
   if (!/rejected by the safety system/i.test(message)) return message
 
   const categories = [...message.matchAll(/safety_violations=\[([^\]]*)\]/g)]

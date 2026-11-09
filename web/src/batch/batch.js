@@ -4471,6 +4471,10 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     function friendlyGenerationError(message) {
       const raw = String(message || '').trim()
       if (!raw) return '生成失败，请稍后重试'
+      if (/\bEOF\b|connection reset|broken pipe/i.test(raw)) {
+        return '上游连接在约 60 秒时被中断，请精简提示词后重试，或换用 Nano Banana / Gemini 模型'
+      }
+      if (/dial tcp|i\/o timeout|connectex/i.test(raw)) return '连接上游超时，请检查网络后重试'
       if (/timeout|超时|ETIMEDOUT|aborted/i.test(raw)) return '生成超时，请稍后重试'
       if (/fetch failed|ECONN|ENOTFOUND|Failed to connect|network/i.test(raw)) {
         return '连接上游失败，请检查网络后重试'
