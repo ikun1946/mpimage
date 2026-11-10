@@ -844,7 +844,9 @@ body[data-mode="create"] .app-main main {
   right: 16px;
   /* 左右对称，6 张收窄后不会一边留空、一边贴边 */
   left: 16px;
-  z-index: 0;
+  /* 生成动画在预览里是 z-index:4；参考图浮起后必须盖过它，
+     但不能盖过输入条（下面是 7），下半截仍要藏在输入条后面 */
+  z-index: 6;
   gap: 10px;
 }
 
@@ -863,7 +865,7 @@ body[data-mode="create"] .app-main main {
 
 #panel-free .input-bar {
   position: relative;
-  z-index: 1;
+  z-index: 7;
 }
 
 /* 参考图卡片的白色画框放在白底上会看不见，补一圈细边和落地阴影 */
