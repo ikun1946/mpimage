@@ -12,6 +12,9 @@
   position: absolute;
   inset: 0;
   z-index: 4;
+  /* 让各套动画能用 cqw/cqh 按画布真实大小取景：
+     宽画布上圆形、方块不会被拉成椭圆和长条 */
+  container-type: size;
   overflow: hidden;
   border-radius: inherit;
   background: var(--surface-subtle);
@@ -35,6 +38,7 @@
   position: absolute;
   top: 12px;
   right: 14px;
+  --pct-avoid: 0px;
   z-index: 5;
   padding: 3px 9px;
   border: 1px solid rgba(167, 130, 67, 0.3);
@@ -42,8 +46,15 @@
   background: rgba(252, 251, 247, 0.9);
   color: var(--gold);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: clamp(11px, 2.4cqmin, 16px);
+  padding: clamp(3px, 0.7cqmin, 6px) clamp(9px, 1.8cqmin, 16px);
   font-variant-numeric: tabular-nums;
+}
+
+/* v2 右上角有取景角标：百分比胶囊往里让一格，别把角标盖住 */
+.gen-anim.v2 .gen-pct {
+  top: var(--edge);
+  right: calc(var(--edge) + var(--arm) + clamp(8px, 1.6cqmin, 14px));
 }
 
 .gen-anim .gen-chip {
@@ -53,21 +64,21 @@
   z-index: 5;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 12px;
+  gap: clamp(7px, 1.5cqmin, 12px);
+  padding: clamp(5px, 1.1cqmin, 9px) clamp(12px, 2.4cqmin, 20px);
   transform: translateX(-50%);
   border: 1px solid var(--line-soft);
   border-radius: 999px;
   /* 压在实时画布上时不要用 backdrop-filter：每帧回读画布做模糊会把帧率拖垮 */
   background: rgba(252, 251, 247, 0.92);
   color: var(--ink-soft);
-  font-size: 11.5px;
+  font-size: clamp(11.5px, 2.4cqmin, 16px);
   white-space: nowrap;
 }
 
 .gen-anim .gen-chip .dot {
-  width: 6px;
-  height: 6px;
+  width: clamp(6px, 1.3cqmin, 9px);
+  height: clamp(6px, 1.3cqmin, 9px);
   border-radius: 50%;
   background: var(--gold);
   box-shadow: 0 0 0 0 rgba(167, 130, 67, 0.4);
@@ -79,14 +90,15 @@
 .gen-anim.v1 .gen-ink {
   position: absolute;
   inset: -12%;
-  filter: blur(20px);
+  filter: blur(clamp(12px, 3.6cqmin, 28px));
   opacity: calc(0.18 + var(--p, 0) * 0.52);
-  transform: scale(calc(0.98 + var(--p, 0) * 0.06));
+  /* 用独立的 scale，避免被 gen-drift 关键帧里的 transform 覆盖 */
+  scale: calc(0.98 + var(--p, 0) * 0.06);
   background:
-    radial-gradient(38% 32% at 34% 38%, rgba(102, 131, 110, 0.55), transparent 70%),
-    radial-gradient(34% 30% at 68% 30%, rgba(167, 130, 67, 0.5), transparent 70%),
-    radial-gradient(46% 40% at 55% 72%, rgba(165, 76, 49, 0.28), transparent 72%),
-    radial-gradient(40% 36% at 42% 60%, rgba(54, 84, 69, 0.36), transparent 74%);
+    radial-gradient(circle min(32cqh, 30cqw) at 34% 38%, rgba(102, 131, 110, 0.55), transparent 70%),
+    radial-gradient(circle min(30cqh, 28cqw) at 68% 30%, rgba(167, 130, 67, 0.5), transparent 70%),
+    radial-gradient(circle min(40cqh, 36cqw) at 55% 72%, rgba(165, 76, 49, 0.28), transparent 72%),
+    radial-gradient(circle min(36cqh, 32cqw) at 42% 60%, rgba(54, 84, 69, 0.36), transparent 74%);
   animation: gen-drift 9s ease-in-out infinite alternate;
 }
 
@@ -108,13 +120,14 @@
   display: grid;
   place-content: center;
   justify-items: center;
-  gap: 10px;
+  gap: clamp(8px, 2cqmin, 15px);
   z-index: 4;
 }
 
 .gen-anim.v1 .gen-ring {
-  width: 48px;
-  height: 48px;
+  --ring-w: clamp(4px, 0.9cqmin, 7px);
+  width: clamp(48px, 11cqmin, 78px);
+  height: clamp(48px, 11cqmin, 78px);
   border-radius: 50%;
   background: conic-gradient(
     from var(--g-angle),
@@ -124,20 +137,20 @@
     var(--gold-soft) 332deg,
     rgba(167, 130, 67, 0.1) 360deg
   );
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring-w)), #000 calc(100% - var(--ring-w) + 0.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring-w)), #000 calc(100% - var(--ring-w) + 0.5px));
   animation: gen-g-spin 2s linear infinite;
 }
 
 .gen-anim.v1 .gen-core strong {
   color: var(--ink);
-  font-size: 13px;
+  font-size: clamp(13px, 2.8cqmin, 19px);
   letter-spacing: 0.04em;
 }
 
 .gen-anim.v1 .gen-stage {
   color: var(--ink-faint);
-  font-size: 11.5px;
+  font-size: clamp(11.5px, 2.4cqmin, 16px);
 }
 
 /* ---------- 方案二 · 扫描取景 ---------- */
@@ -149,7 +162,8 @@
   background-image:
     linear-gradient(rgba(32, 39, 34, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(32, 39, 34, 0.05) 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-size:
+    clamp(24px, 6cqmin, 56px) clamp(24px, 6cqmin, 56px);
 }
 
 .gen-anim.v2 .gen-draft {
@@ -184,10 +198,23 @@
   border-width: 0;
 }
 
-.gen-anim.v2 .gen-corners span:nth-child(1) { top: 12px; left: 12px; border-top-width: 1.5px; border-left-width: 1.5px; }
-.gen-anim.v2 .gen-corners span:nth-child(2) { top: 12px; right: 12px; border-top-width: 1.5px; border-right-width: 1.5px; }
-.gen-anim.v2 .gen-corners span:nth-child(3) { bottom: 12px; left: 12px; border-bottom-width: 1.5px; border-left-width: 1.5px; }
-.gen-anim.v2 .gen-corners span:nth-child(4) { bottom: 12px; right: 12px; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+.gen-anim.v2 {
+  --edge: clamp(12px, 2.4cqmin, 26px);
+  --arm: clamp(18px, 4.6cqmin, 44px);
+  --bw: clamp(1.5px, 0.3cqmin, 2.5px);
+}
+
+.gen-anim.v2 .gen-corners span {
+  width: var(--arm);
+  height: var(--arm);
+  border-width: 0;
+  border-color: rgba(167, 130, 67, 0.65);
+}
+
+.gen-anim.v2 .gen-corners span:nth-child(1) { top: var(--edge); left: var(--edge); border-top-width: var(--bw); border-left-width: var(--bw); }
+.gen-anim.v2 .gen-corners span:nth-child(2) { top: var(--edge); right: var(--edge); border-top-width: var(--bw); border-right-width: var(--bw); }
+.gen-anim.v2 .gen-corners span:nth-child(3) { bottom: var(--edge); left: var(--edge); border-bottom-width: var(--bw); border-left-width: var(--bw); }
+.gen-anim.v2 .gen-corners span:nth-child(4) { bottom: var(--edge); right: var(--edge); border-bottom-width: var(--bw); border-right-width: var(--bw); }
 
 /* ---------- 方案三 · 叠卡循环 ---------- */
 
@@ -203,7 +230,8 @@
   left: 50%;
   top: 50%;
   /* 固定卡片比例：宽画布上不再被拉成细长条；尺寸跟随画布但不无限放大 */
-  width: min(46%, 540px);
+  /* 宽、高、上限三重约束：窄高预览里不会缩成小岛，宽画布上也不会顶到画布外 */
+  width: min(68cqw, 540px, 112cqh);
   height: auto;
   aspect-ratio: 16 / 10;
   margin: 0;
@@ -212,7 +240,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: clamp(9px, 1.7cqmin, 16px);
   background: linear-gradient(150deg, #fdfcf8 0%, #f3eee2 100%);
   box-shadow: 0 12px 26px rgba(40, 43, 36, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.8);
   color: var(--ink-faint);
@@ -248,7 +276,8 @@
 
 .gen-anim.v3 .gen-layer.lift {
   z-index: 5;
-  transform: translate(-50%, calc(-50% - 105%)) rotate(-4deg) scale(1.05);
+  /* 抬升量按画布高度算，宽画布和窄画布都是「整卡可见地抽起」 */
+  transform: translate(-50%, -50%) translateY(-20cqh) rotate(-4deg) scale(1.05);
   border-color: rgba(167, 130, 67, 0.5);
   box-shadow: 0 26px 46px rgba(40, 43, 36, 0.22);
   transition-duration: 400ms;
@@ -287,11 +316,16 @@
 
 .gen-anim.v4 .gen-tiles {
   position: absolute;
-  inset: 14px;
+  top: 50%;
+  left: 50%;
+  /* 正方形画布：14×14 的格子保持方形，四周留出边距 */
+  width: min(calc(100cqw - 56px), calc(100cqh - 56px));
+  height: min(calc(100cqw - 56px), calc(100cqh - 56px));
   display: grid;
   grid-template-columns: repeat(14, 1fr);
   grid-template-rows: repeat(14, 1fr);
   gap: 2px;
+  transform: translate(-50%, -50%);
   z-index: 3;
 }
 
@@ -324,23 +358,30 @@
 .gen-anim.v5 .gen-orbit::before {
   content: "";
   position: absolute;
-  inset: 24%;
+  top: 50%;
+  left: 50%;
+  /* 用画布短边定圆：宽画布上轨道仍是正圆 */
+  width: min(52cqw, 52cqh);
+  height: min(52cqw, 52cqh);
+  transform: translate(-50%, -50%);
   border: 1px dashed rgba(167, 130, 67, 0.14);
   border-radius: 50%;
 }
 
 .gen-anim.v5 .gen-orbit.b::before {
-  inset: 11%;
+  width: min(78cqw, 78cqh);
+  height: min(78cqw, 78cqh);
   border-color: rgba(102, 131, 110, 0.14);
 }
 
 .gen-anim.v5 .gen-orbit i {
+  --dot: clamp(4px, 0.9cqmin, 8px);
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 5px;
-  height: 5px;
-  margin: -2.5px 0 0 -2.5px;
+  width: var(--dot);
+  height: var(--dot);
+  margin: calc(var(--dot) * -0.5) 0 0 calc(var(--dot) * -0.5);
   border-radius: 50%;
   background: var(--gold-soft);
   box-shadow: 0 0 10px rgba(167, 130, 67, 0.65);
@@ -364,16 +405,18 @@
 }
 
 .gen-anim.v5 .gen-halo span {
-  width: 96px;
-  height: 96px;
+  /* 两个光晕要同心叠在画布中心；grid 自动排版会把它们排成上下两行 */
+  grid-area: 1 / 1;
+  width: 17cqmin;
+  height: 17cqmin;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(167, 130, 67, 0.34), rgba(167, 130, 67, 0) 70%);
   animation: gen-breathe 3.2s ease-in-out infinite;
 }
 
 .gen-anim.v5 .gen-halo span:nth-child(2) {
-  width: 150px;
-  height: 150px;
+  width: 27cqmin;
+  height: 27cqmin;
   animation-delay: 0.7s;
   opacity: 0.6;
 }
@@ -392,14 +435,14 @@
   position: relative;
   color: var(--gold);
   font-family: var(--mono);
-  font-size: 28px;
+  font-size: clamp(22px, 5cqmin, 38px);
   font-variant-numeric: tabular-nums;
 }
 
 .gen-anim.v5 .gen-seed-label {
   position: relative;
   color: var(--ink-faint);
-  font-size: 11px;
+  font-size: clamp(10px, 1.9cqmin, 14px);
   letter-spacing: 0.08em;
 }
 
@@ -425,9 +468,10 @@
 
 .gen-anim.v6 .gen-ruler {
   position: absolute;
-  left: 15px;
-  top: 16%;
-  bottom: 14%;
+  left: clamp(10px, 2cqw, 26px);
+  /* 水位是按整个画布高度算的，标尺也必须铺满整高，25/50/75 才与水面一致 */
+  top: 0;
+  bottom: 0;
   z-index: 4;
   width: 1px;
   background: linear-gradient(180deg, transparent, rgba(54, 84, 69, 0.26), transparent);

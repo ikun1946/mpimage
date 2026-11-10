@@ -182,11 +182,14 @@ function buildTiles(root) {
 function buildOrbits(root) {
   const inner = root.querySelector('.gen-orbit.a')
   const outer = root.querySelector('.gen-orbit.b')
+  // 轨道半径按画布短边缩放：参考尺寸 560px，避免宽画布上粒子缩在中间
+  const box = root.getBoundingClientRect()
+  const scale = Math.min(1.6, Math.max(0.6, Math.min(box.width || 560, box.height || 560) / 560))
   if (inner) {
     for (let i = 0; i < 16; i += 1) {
       const dot = document.createElement('i')
       dot.style.setProperty('--a', String(i * 22.5 + (i % 3) * 5))
-      dot.style.setProperty('--r', `${74 + (i % 4) * 13}px`)
+      dot.style.setProperty('--r', `${Math.round((100 + (i % 4) * 13) * scale)}px`)
       dot.style.setProperty('--d', `${(i * 0.13).toFixed(2)}s`)
       inner.appendChild(dot)
     }
@@ -195,7 +198,7 @@ function buildOrbits(root) {
     for (let i = 0; i < 11; i += 1) {
       const dot = document.createElement('i')
       dot.style.setProperty('--a', String(i * 32.7))
-      dot.style.setProperty('--r', `${118 + (i % 3) * 11}px`)
+      dot.style.setProperty('--r', `${Math.round((168 + (i % 3) * 16) * scale)}px`)
       dot.style.setProperty('--d', `${(0.4 + i * 0.17).toFixed(2)}s`)
       outer.appendChild(dot)
     }
@@ -249,16 +252,19 @@ float waveAt(float x, float t){
 
 void main(){
   vec2 uv = gl_FragCoord.xy / u_res;
+  /* 归一化坐标在宽画布上会把噪声和波形横着拉长：按短边把 x 还原成等比 */
+  float asp = u_res.x / max(u_res.y, 1.0);
+  vec2 shape = vec2(uv.x * asp, uv.y);
   float t = u_time;
 
   float amp = mix(0.042, 0.085, clamp(u_vel, 0.0, 1.0));
-  float edge = u_prog + waveAt(uv.x, t) * amp + 0.004 * sin(t * 0.9) * (0.4 + 0.6 * u_vel);
+  float edge = u_prog + waveAt(shape.x, t) * amp + 0.004 * sin(t * 0.9) * (0.4 + 0.6 * u_vel);
   if(u_prog <= 0.001) edge = -0.05;
   edge = clamp(edge, -0.05, 1.03);
   float d = edge - uv.y;
   float dxp = max(d, 0.0) * u_res.y;
 
-  float sheen = 0.5 + 0.5 * sin((uv.x * 0.9 + uv.y) * 24.0);
+  float sheen = 0.5 + 0.5 * sin((shape.x * 0.9 + uv.y) * 24.0);
   vec3 bg = mix(vec3(0.972, 0.963, 0.941), vec3(0.910, 0.902, 0.874), sheen * 0.30);
   bg += (hash(uv * u_res * 0.5) - 0.5) * 0.014;
   vec3 col = bg;
@@ -266,8 +272,8 @@ void main(){
   if(d > 0.0){
     float lens = smoothstep(0.06, 0.0, d);
     vec2 warp = vec2(
-      noise(uv * vec2(8.0, 22.0) + vec2(0.0, -t * 1.2)),
-      noise(uv * vec2(8.0, 22.0) + vec2(5.2, -t * 1.2) + 7.3)) - 0.5;
+      noise(shape * vec2(8.0, 22.0) + vec2(0.0, -t * 1.2)),
+      noise(shape * vec2(8.0, 22.0) + vec2(5.2, -t * 1.2) + 7.3)) - 0.5;
 
     vec3 topC = vec3(0.64, 0.80, 0.74);
     vec3 botC = vec3(0.16, 0.32, 0.29);
@@ -276,8 +282,8 @@ void main(){
     water += vec3(0.02, 0.05, 0.04) * (warp.x + warp.y) * lens;
     water += vec3(0.60, 0.76, 0.68) * exp(-d * 26.0) * 0.22;
 
-    float ca  = fbm3(uv * vec2(10.0, 26.0) + vec2(t * 0.25, -t * 0.70));
-    float ca2 = fbm3(uv * vec2(17.0, 44.0) + vec2(-t * 0.40, t * 1.00) + 3.7);
+    float ca  = fbm3(shape * vec2(10.0, 26.0) + vec2(t * 0.25, -t * 0.70));
+    float ca2 = fbm3(shape * vec2(17.0, 44.0) + vec2(-t * 0.40, t * 1.00) + 3.7);
     float fil = pow(smoothstep(0.56, 0.88, ca), 2.0)
               + 0.60 * pow(smoothstep(0.60, 0.90, ca2), 2.4);
     water += vec3(0.88, 0.80, 0.58) * fil * 0.34 * (0.25 + 0.65 * exp(-d * 1.8));
@@ -359,7 +365,7 @@ function createWaterTank(glCanvas, fxCanvas) {
     W = Math.max(1, glCanvas.clientWidth)
     H = Math.max(1, glCanvas.clientHeight)
     let scale = Math.min(1.5, window.devicePixelRatio || 1)
-    const budget = 300000
+    const budget = 1200000
     if (W * H * scale * scale > budget) scale = Math.sqrt(budget / (W * H))
     dpr = Math.max(0.75, scale)
     for (const canvas of [glCanvas, fxCanvas]) {
@@ -399,16 +405,18 @@ function createWaterTank(glCanvas, fxCanvas) {
     if (prog <= 0.002) return
     const surfaceY = H * (1 - prog)
     const sheet = bubbleSprite()
+    // 气泡的半径、速度、摆幅按画布高度缩放，和已经等比的水面保持一致
+    const k = Math.min(1.8, Math.max(0.6, H / 560))
 
     if (Math.random() < 0.09 && bubbles.length < 30) {
       bubbles.push({
         x: Math.random() * W,
-        y: H - 4,
-        r: 1.4 + Math.random() * 3.2,
-        vy: 16 + Math.random() * 24,
+        y: H - 4 * k,
+        r: (1.4 + Math.random() * 3.2) * k,
+        vy: (16 + Math.random() * 24) * k,
         phase: Math.random() * 6.28,
         wspd: 2 + Math.random() * 4,
-        wamp: 4 + Math.random() * 8,
+        wamp: (4 + Math.random() * 8) * k,
       })
     }
 

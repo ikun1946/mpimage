@@ -50,6 +50,8 @@
   --moss-tint: rgba(54, 84, 69, 0.12);
   --on-moss: #fffdf8;
   --gold: #a78243;
+  /* 金色高光：生成动画的进度环、粒子等会用到，之前漏定义导致整条渐变失效 */
+  --gold-soft: #c9a76a;
   --danger: #a74331;
   --danger-tint: rgba(167, 67, 49, 0.1);
   --success: #3f6b4b;
@@ -106,6 +108,7 @@
   /* ---------- 字体 ---------- */
   --font-body: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
   --font-display: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif;
+  --mono: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
   /* ---------- 旧名别名（兼容尚未迁移的页面样式） ---------- */
   --radius-shell: var(--radius-xl);
@@ -148,6 +151,7 @@
     --moss-tint: rgba(138, 170, 143, 0.14);
     --on-moss: #12180f;
     --gold: #c9a468;
+    --gold-soft: #d9bb82;
     --danger: #cf8574;
     --danger-tint: rgba(207, 133, 116, 0.16);
     --success: #9ec3a6;
