@@ -126,37 +126,38 @@
 :root[data-theme="dark"] {
     color-scheme: dark;
 
-    --paper: #151915;
-    --paper-deep: #101310;
-    --surface: rgba(28, 33, 29, 0.97);
-    --surface-solid: #1c211d;
-    --surface-raised: #242a25;
-    --surface-subtle: #202520;
+    /* 暗色不用纯黑：整体抬到暖炭灰，正文对比够了，白底图片也不会刺眼 */
+    --paper: #151515;
+    --paper-deep: #0f0f0f;
+    --surface: rgba(26, 26, 25, 0.98);
+    --surface-solid: #1a1a19;
+    --surface-raised: #20201f;
+    --surface-subtle: #181817;
 
     --ink: #e8e6df;
-    --ink-soft: #adb5ab;
-    --ink-faint: #939c91;
+    --ink-soft: #b3b0a8;
+    --ink-faint: #8f8c84;
 
-    --line: rgba(232, 230, 223, 0.14);
-    --line-soft: rgba(232, 230, 223, 0.08);
-    --line-strong: rgba(232, 230, 223, 0.26);
+    --line: hsla(0, 0%, 100%, 0.09);
+    --line-soft: hsla(0, 0%, 100%, 0.06);
+    --line-strong: hsla(0, 0%, 100%, 0.18);
 
-    --accent: #ce7654;
-    --accent-dark: #dc8865;
-    --accent-tint: rgba(206, 118, 84, 0.16);
+    --accent: #d97757;
+    --accent-dark: #cc5a36;
+    --accent-tint: rgba(217, 119, 87, 0.16);
     --on-accent: #fffaf5;
-    --moss: #8aaa8f;
-    --moss-light: #a0bca4;
-    --moss-dark: #6f8f74;
-    --moss-tint: rgba(138, 170, 143, 0.14);
-    --on-moss: #12180f;
+    --moss: #9ab29c;
+    --moss-light: #b0c7b2;
+    --moss-dark: #7d987f;
+    --moss-tint: rgba(154, 178, 156, 0.15);
+    --on-moss: #14200f;
     --gold: #c9a468;
     --gold-soft: #d9bb82;
-    --danger: #cf8574;
-    --danger-tint: rgba(207, 133, 116, 0.16);
-    --success: #9ec3a6;
-    --success-tint: rgba(158, 195, 166, 0.16);
+    --danger: #e0998a;
+    --danger-tint: rgba(224, 153, 138, 0.16);
+    --success: #a5c7ad;
+    --success-tint: rgba(165, 199, 173, 0.16);
 
-    --shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
-    --shadow-soft: 0 6px 20px rgba(0, 0, 0, 0.2);
+    --shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    --shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.4);
   }

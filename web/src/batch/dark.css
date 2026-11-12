@@ -1,33 +1,12 @@
 /* 暗色主题：两层暗色覆盖按级联合并为唯一实现，只保留仍有实际效果的规则 */
 html[data-theme="dark"] {
-  
-    color-scheme: dark;
-    --paper: #151915;
-    --paper-deep: #101310;
-    --surface: rgba(28, 33, 29, 0.97);
-    --surface-solid: #1c211d;
-    --surface-raised: #242a25;
-    --surface-subtle: #202520;
-    --ink: #e8e6df;
-    --ink-soft: #adb5ab;
-    --ink-faint: #939c91;
-    --line: rgba(232, 230, 223, 0.14);
-    --line-soft: rgba(232, 230, 223, 0.08);
-    --accent: #ce7654;
-    --accent-dark: #dc8865;
-    --moss: #8aaa8f;
-    --moss-light: #a0bca4;
-    --gold: #c9a468;
-    --danger: #cf8574;
-    --on-accent: #fffaf5;
-    --shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
-  
+  /* 令牌统一在 tokens.css 里定义，这里只做组件级暗色覆盖 */
+  color-scheme: dark;
 
   body {
-    background:
-      radial-gradient(circle at 12% -8%, rgba(206, 118, 84, 0.065), transparent 30rem),
-      linear-gradient(180deg, #191e19 0, var(--paper) 32rem, var(--paper-deep) 100%);
-    font-weight: 300;
+    /* Claude 夜色：整块中性深灰，不加绿色或暖色渐变 */
+    background: var(--paper);
+    font-weight: 400;
   }
 
   /* 顶栏与外壳：仅靠令牌即可，无需额外覆盖 */
@@ -44,16 +23,16 @@ html[data-theme="dark"] {
   }
 
   .avatar-menu {
-    background: #242a25;
-    border-color: rgba(255, 255, 255, 0.12);
+    background: var(--surface-raised);
+    border-color: var(--line);
     box-shadow: 0 18px 48px rgba(28, 34, 29, 0.16);
   }
 
   .logout-button:hover { background: rgba(207, 133, 116, 0.16); }
 
   .workspace-link {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.17);
     color: var(--ink-soft);
   }
 
@@ -61,28 +40,28 @@ html[data-theme="dark"] {
 
   .button.primary {
     color: #fffaf5;
-    background: #b96041;
+    background: var(--accent);
   }
 
   .button.primary:hover:not(:disabled) {
-    background: #ca7050;
+    background: var(--accent-dark);
   }
 
   .button.secondary {
     background: var(--surface-raised);
-    border-color: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.19);
     color: var(--ink);
   }
 
   .button.secondary:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.11);
-    border-color: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.13);
+    border-color: rgba(255, 255, 255, 0.27);
   }
 
   .mini-button,
   .icon-button {
     background: var(--surface-raised);
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.17);
     color: var(--ink-soft);
     font-weight: 500;
   }
@@ -96,8 +75,8 @@ html[data-theme="dark"] {
   }
 
   .tab.active .tab-count {
-    color: var(--moss);
-    background: rgba(138, 170, 143, 0.12);
+    color: var(--ink-soft);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   /* 导航：浅色层的下划线样式在暗色下同样成立，无需覆盖 */
@@ -117,7 +96,7 @@ html[data-theme="dark"] {
   .dropzone:hover,
   .dropzone.dragging,
   .dropzone:focus-visible {
-    background: rgba(138, 170, 143, 0.09);
+    background: rgba(255, 255, 255, 0.06);
   }
 
   .drop-icon {
@@ -127,15 +106,15 @@ html[data-theme="dark"] {
   }
 
   .badge {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
     color: var(--ink-soft);
   }
 
   .textarea,
   .select {
     background: var(--surface-raised);
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.17);
     color: var(--ink);
   }
 
@@ -143,8 +122,8 @@ html[data-theme="dark"] {
   input[type="text"],
   input[type="number"],
   input[type="password"] {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.17);
     color: var(--ink);
   }
 
@@ -167,43 +146,43 @@ html[data-theme="dark"] {
 
   .field-chip,
   .status-pill {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.17);
   }
 
   .row-select {
     background: var(--surface-raised);
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.17);
   }
 
   .table-shell {
     border-color: var(--line-soft);
   }
 
-  thead th { background: #202520; }
+  thead th { background: var(--surface-raised); color: var(--ink-soft); }
 
   tbody tr:hover {
-    background: rgba(255, 255, 255, 0.035);
+    background: rgba(255, 255, 255, 0.05);
   }
 
-  .asset-group-row td { background: rgba(255, 255, 255, 0.05); }
-  .asset-group-row:hover td { background: rgba(255, 255, 255, 0.075); }
-  .asset-child-row:not(.selected-row) td { background: rgba(255, 255, 255, 0.015); }
+  .asset-group-row td { background: rgba(255, 255, 255, 0.065); }
+  .asset-group-row:hover td { background: rgba(255, 255, 255, 0.09); }
+  .asset-child-row:not(.selected-row) td { background: rgba(255, 255, 255, 0.028); }
 
   .group-toggle {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
   }
 
   .state-chip {
-    background: rgba(201, 164, 104, 0.14);
-    border-color: rgba(201, 164, 104, 0.34);
+    background: rgba(211, 180, 126, 0.18);
+    border-color: rgba(211, 180, 126, 0.44);
   }
 
   .ref-empty,
   .ref-thumb {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.18);
   }
 
   .ref-empty:hover {
@@ -212,13 +191,13 @@ html[data-theme="dark"] {
   }
 
   .history-tile {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.14);
   }
 
   .history-tile.primary {
-    background: rgba(127, 161, 132, 0.12);
-    border-color: rgba(127, 161, 132, 0.38);
+    background: rgba(217, 119, 87, 0.14);
+    border-color: rgba(217, 119, 87, 0.42);
   }
 
   .history-preview { background: rgba(255, 255, 255, 0.06); }
@@ -260,50 +239,50 @@ html[data-theme="dark"] {
   }
 
   .queue-panel {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.14);
   }
 
   .progress-track,
   .cell-progress-track { background: rgba(255, 255, 255, 0.1); }
 
-  .preview-placeholder-mark { background: rgba(138, 170, 143, 0.1); }
+  .preview-placeholder-mark { background: rgba(255, 255, 255, 0.06); }
 
   .style-list-item { background: var(--surface-raised); }
 
-  .style-list-item:hover { background: rgba(255, 255, 255, 0.05); }
+  .style-list-item:hover { background: rgba(255, 255, 255, 0.07); }
 
   .modal-result {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.14);
   }
 
-  .drawer { border-color: rgba(255, 255, 255, 0.1); }
+  .drawer { border-color: rgba(255, 255, 255, 0.14); }
 
   .drawer-close:hover { background: rgba(255, 255, 255, 0.1); }
 
   .toast {
-    background: rgba(28, 33, 29, 0.97);
+    background: rgba(44, 48, 41, 0.98);
     color: var(--ink);
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.16);
   }
 
   /* 图片上的玻璃按钮与大图关闭钮：暗色下减淡为半透明深底 */
   .glass-button {
-    background: rgba(28, 33, 29, 0.72);
-    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(30, 34, 29, 0.82);
+    border-color: rgba(255, 255, 255, 0.22);
     color: var(--ink);
   }
 
-  .glass-button:hover:not(:disabled) { background: rgba(28, 33, 29, 0.88); }
+  .glass-button:hover:not(:disabled) { background: rgba(30, 34, 29, 0.94); }
 
   .lightbox-close {
-    background: rgba(28, 33, 29, 0.9);
-    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(30, 34, 29, 0.92);
+    border-color: rgba(255, 255, 255, 0.22);
     color: var(--ink);
   }
 
-  .lightbox-close:hover { background: rgba(40, 47, 42, 0.95); }
+  .lightbox-close:hover { background: rgba(48, 54, 46, 0.96); }
 
   /* 暗色下的字重：标题与强调回补，正文保持细一档（.button/.tab 由浅色层的 600 接管） */
   h1, h2, h3, .brand-mark, .stat-value, .type-card strong { font-weight: 500; }
@@ -334,4 +313,82 @@ html[data-theme="dark"] {
       linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08)),
       rgba(255, 255, 255, 0.05);
   }
+
+  /* 暗底上小字更难读：密度高的说明文字统一升到 12px，并提亮到次级文字色 */
+  .asset-kind,
+  .stat-label,
+  .cell-progress-text,
+  .composer-meta,
+  .free-status {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .asset-kind {
+    line-height: 1.55;
+  }
+
+  /* 表格正文行高略松一点，长描述不挤在一起 */
+  .table td {
+    line-height: 1.5;
+  }
+
+  /* 组件里写死的浅色底在暗色下会变成亮块，这里统一压回深色 */
+  .result-thumb {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+
+  .table-footer {
+    background: rgba(255, 255, 255, 0.045);
+  }
+
+  .field-list {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .modal-result-thumb,
+  .history-preview {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  #panel-free .collage-to-bottom {
+    background: rgba(36, 40, 34, 0.84);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: var(--ink-soft);
+  }
+
+  #panel-free .collage-to-bottom:hover {
+    background: rgba(50, 56, 47, 0.94);
+    color: var(--ink);
+  }
+
+  .gen-anim .gen-pct {
+    background: rgba(38, 42, 36, 0.9);
+    border-color: rgba(211, 180, 126, 0.4);
+    color: var(--gold);
+  }
+
+  .gen-anim .gen-chip {
+    background: rgba(38, 42, 36, 0.92);
+    border-color: rgba(255, 255, 255, 0.14);
+    color: var(--ink-soft);
+  }
+
+  /* 单图切换箭头在暗色下用烟灰玻璃 + 浅色箭头，和 Claude 夜色一致 */
+  #panel-free .free-single-flip {
+    color: #f1f3ec;
+    border-color: rgba(255, 255, 255, 0.22);
+    background:
+      linear-gradient(160deg, rgba(54, 58, 52, 0.74) 0%, rgba(28, 31, 27, 0.62) 52%, rgba(44, 48, 42, 0.68) 100%);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.28),
+      0 16px 34px rgba(0, 0, 0, 0.44),
+      0 2px 6px rgba(0, 0, 0, 0.26),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  }
 }
+
+

@@ -19,25 +19,33 @@ import { isLoopbackAddress } from './update.js'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+/** 一张生成好的图片（自由创作一次可生成 1-4 张） */
+interface GeneratedImageInfo {
+  id: string
+  imageUrl: string
+  /** 服务端按提示词生成的短名（拼图卡片左下角） */
+  name: string
+  model: string
+  mimeType: string
+  bytes: number
+  width: number
+  height: number
+  ratio: string
+  tokens: { input: number; output: number | null; total: number | null; source: string }
+}
+
 /** 生图任务状态：刷新页面后可用 jobId 重新接回结果 */
 interface GenerationJob {
   userId: string
   status: 'running' | 'done' | 'error'
   startedAt: number
   finishedAt?: number
-  result?: {
-    id: string
-    imageUrl: string
-    /** 服务端按提示词生成的短名（拼图卡片左下角） */
-    name: string
-    model: string
-    mimeType: string
-    bytes: number
-    width: number
-    height: number
-    ratio: string
-    tokens: { input: number; output: number | null; total: number | null; source: string }
-  }
+  /** 多张生成时的进度，客户端据此显示「第 2/4 张」 */
+  progress?: { done: number; total: number }
+  /** 第一张，兼容只认 result 的旧客户端 */
+  result?: GeneratedImageInfo
+  /** 本次任务生成的全部图片（1-4 张） */
+  results?: GeneratedImageInfo[]
   error?: { message: string; code: string }
 }
 
@@ -60,6 +68,18 @@ interface GenerateBody {
   model?: unknown
   /** 起标题用的原始画面描述（不含风格前缀）；不传则退回 prompt */
   titlePrompt?: unknown
+  /** 一次生成的张数，1-4，默认 1 */
+  count?: unknown
+}
+
+/** 自由创作一次最多生成的张数 */
+const MAX_IMAGES_PER_REQUEST = 4
+
+/** 张数只认 1-4 的整数，其余一律按 1 张处理 */
+function normalizeImageCount(raw: unknown): number {
+  const value = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isFinite(value)) return 1
+  return Math.min(MAX_IMAGES_PER_REQUEST, Math.max(1, Math.trunc(value)))
 }
 
 export function registerImageRoutes(
@@ -88,13 +108,13 @@ export function registerImageRoutes(
    */
   const inflight = new Map<string, number>()
 
-  /** 在途名额 +1 / -1，返还在 finally 里做，失败也不会漏掉。 */
-  function holdSlot(userId: string): void {
-    inflight.set(userId, (inflight.get(userId) ?? 0) + 1)
+  /** 在途名额 +N / -N（一次生成多张就占多张），返还在 finally 里做，失败也不会漏掉。 */
+  function holdSlot(userId: string, count = 1): void {
+    inflight.set(userId, (inflight.get(userId) ?? 0) + count)
   }
 
-  function releaseSlot(userId: string): void {
-    const left = (inflight.get(userId) ?? 1) - 1
+  function releaseSlot(userId: string, count = 1): void {
+    const left = (inflight.get(userId) ?? count) - count
     if (left > 0) inflight.set(userId, left)
     else inflight.delete(userId)
   }
@@ -141,7 +161,9 @@ export function registerImageRoutes(
       status: job.status,
       startedAt: new Date(job.startedAt).toISOString(),
       elapsedMs: (job.finishedAt ?? Date.now()) - job.startedAt,
+      progress: job.progress ?? null,
       result: job.result ?? null,
+      results: job.results ?? (job.result ? [job.result] : []),
       error: job.error ?? null,
     }
   })
@@ -218,7 +240,14 @@ export function registerImageRoutes(
         : randomUUID()
 
     pruneJobs()
-    const job: GenerationJob = { userId: auth.userId, status: 'running', startedAt: Date.now() }
+    // 一次生成几张：1-4，默认 1。在途名额与额度都按张数计。
+    const imageCount = normalizeImageCount(body.count)
+    const job: GenerationJob = {
+      userId: auth.userId,
+      status: 'running',
+      startedAt: Date.now(),
+      progress: { done: 0, total: imageCount },
+    }
     jobs.set(jobId, job)
 
     // 每日额度：0 表示不限额
@@ -227,26 +256,30 @@ export function registerImageRoutes(
       const usedToday = await deps.usage.countToday(auth.userId)
       const pending = inflight.get(auth.userId) ?? 0
       const used = usedToday + pending
-      if (used >= quota.dailyLimit) {
+      if (used + imageCount > quota.dailyLimit) {
+        const remaining = Math.max(0, quota.dailyLimit - used)
         auditLog(request.log, 'warn', 'image.generate.rejected', auth, '生图被每日额度拦截', {
           source: typeof body.source === 'string' ? body.source : 'studio',
           ratio: ratio.id,
           usedToday,
           pending,
           dailyLimit: quota.dailyLimit,
+          requested: imageCount,
           promptLength: prompt.length,
           promptPreview: prompt.slice(0, 160),
         })
         throw new ApiError(
           'QUOTA_EXCEEDED',
-          `今日生图额度已用完（${used}/${quota.dailyLimit} 张${pending ? `，其中 ${pending} 张正在生成` : ''}），明天再来或联系管理员调整额度`,
+          remaining > 0
+            ? `今日额度只剩 ${remaining} 张，无法一次生成 ${imageCount} 张，请减少张数或明天再来`
+            : `今日生图额度已用完（${used}/${quota.dailyLimit} 张${pending ? `，其中 ${pending} 张正在生成` : ''}），明天再来或联系管理员调整额度`,
           429,
         )
       }
     }
 
-    // 预约一个在途名额：并行请求按「已用 + 在途」判断，不会同时超发
-    holdSlot(auth.userId)
+    // 预约在途名额（按张数）：并行请求按「已用 + 在途」判断，不会同时超发
+    holdSlot(auth.userId, imageCount)
 
     const category = typeof body.category === 'string' ? body.category : '未分类'
     const assetName = typeof body.name === 'string' ? body.name : ''
@@ -297,119 +330,177 @@ export function registerImageRoutes(
     )
 
     try {
-    const generated = await deps.gate.run(async () => {
-      const references = await loadReferenceImages(referencePaths)
-      // 每次生图都重读上游地址：后台改完立即生效，无需重启服务
-      const upstreamOptions = {
-        baseUrl: await deps.settings.getBaseUrl(),
-        // 客户端选了就用客户端的，否则每次重读服务端配置（后台改完立即生效）
-        model: requestedModel || deps.settings.getClientImageModel(catalogIds),
-        timeoutMs: promptTimeoutMs,
-      }
-      const upstream = references.length
-        ? await requestImageEdit(
-          upstreamOptions,
-          { prompt, ratioHint: ratio.promptHint, images: references },
-        )
-        : await requestImage(
-          upstreamOptions,
-          { prompt, ratioHint: ratio.promptHint },
-        )
+    // 参考图与上游配置对本次任务的所有图片都一致，只读一次
+    const references = await loadReferenceImages(referencePaths)
+    // 每次生图都重读上游地址：后台改完立即生效，无需重启服务
+    const upstreamOptions = {
+      baseUrl: await deps.settings.getBaseUrl(),
+      // 客户端选了就用客户端的，否则每次重读服务端配置（后台改完立即生效）
+      model: requestedModel || deps.settings.getClientImageModel(catalogIds),
+      timeoutMs: promptTimeoutMs,
+    }
 
-      let type
-      try {
-        type = detectImageType(upstream.buffer)
-      } catch {
-        throw new ApiError('IMAGE_UNSUPPORTED', 'Magpie 返回了不支持的图片格式', 502)
-      }
+    /**
+     * 一次生成 1-4 张。每张单独进生图闸门（并发由服务端配置决定，串行时就是逐张出图），
+     * 每完成一张更新任务进度；个别失败不拖累其他张，全部失败才算这次任务失败。
+     */
+    const settled = await Promise.allSettled(
+      Array.from({ length: imageCount }, async () => {
+        try {
+          const upstream = await deps.gate.run(async () =>
+            references.length
+              ? await requestImageEdit(
+                upstreamOptions,
+                { prompt, ratioHint: ratio.promptHint, images: references },
+              )
+              : await requestImage(
+                upstreamOptions,
+                { prompt, ratioHint: ratio.promptHint },
+              ),
+          )
 
-      const size = readImageSize(upstream.buffer)
-      // 上游按画幅输出的原生尺寸已足够准确，直接交付原图，不做缩放
-      const stored = await deps.storage.save(upstream.buffer, type.extension, {
-        category: typeof body.category === 'string' ? body.category : undefined,
-        name: typeof body.name === 'string' ? body.name : undefined,
-        width: size?.width,
-        height: size?.height,
+          let type
+          try {
+            type = detectImageType(upstream.buffer)
+          } catch {
+            throw new ApiError('IMAGE_UNSUPPORTED', 'Magpie 返回了不支持的图片格式', 502)
+          }
+
+          const size = readImageSize(upstream.buffer)
+          // 上游按画幅输出的原生尺寸已足够准确，直接交付原图，不做缩放
+          const stored = await deps.storage.save(upstream.buffer, type.extension, {
+            category: typeof body.category === 'string' ? body.category : undefined,
+            name: typeof body.name === 'string' ? body.name : undefined,
+            width: size?.width,
+            height: size?.height,
+          })
+
+          return {
+            stored,
+            model: upstream.model,
+            mimeType: type.mimeType,
+            size,
+            tokens: upstream.tokens,
+          }
+        } finally {
+          // 成功或失败都算「这一张结束了」，进度才不会卡在同一格
+          const done = Math.min(imageCount, (job.progress?.done ?? 0) + 1)
+          job.progress = { done, total: imageCount }
+        }
+      }),
+    )
+
+    const generatedList = settled.flatMap(item =>
+      item.status === 'fulfilled' ? [item.value] : [],
+    )
+    if (!generatedList.length) {
+      const failure = settled.find(item => item.status === 'rejected')
+      throw failure && failure.status === 'rejected'
+        ? failure.reason
+        : new Error('生成失败')
+    }
+    const failedCount = imageCount - generatedList.length
+    if (failedCount > 0) {
+      auditLog(request.log, 'warn', 'image.generate.partial', auth, '部分图片生成失败', {
+        jobId,
+        source,
+        category,
+        ratio: ratio.id,
+        requested: imageCount,
+        succeeded: generatedList.length,
+        failed: failedCount,
       })
+    }
 
-      return { stored, model: upstream.model, mimeType: type.mimeType, size, tokens: upstream.tokens }
-    })
-
-    const width = generated.size?.width ?? ratio.nativeWidth
-    const height = generated.size?.height ?? ratio.nativeHeight
     // 标题已在生图期间并行生成；模型失败时 generateImageTitle 自己会兜底
     const displayName = (await titleTask) || assetName
 
-    // 记录本次生图归属与详情，供生成记录与管理端统计
-    await deps.usage.record({
-      userId: auth.userId,
-      username: auth.username,
-      displayName: auth.displayName,
-      source,
-      category,
-      name: displayName,
-      ratio: ratio.id,
-      model: generated.model,
-      width,
-      height,
-      bytes: generated.stored.bytes,
-      prompt,
-      durationMs: Date.now() - startedAt,
-      relativePath: generated.stored.relativePath,
-      tokensInput: generated.tokens.inputTokens,
-      tokensOutput: generated.tokens.outputTokens,
-      tokensSource: generated.tokens.source,
-    })
+    const payloads: GeneratedImageInfo[] = []
+    for (const generated of generatedList) {
+      const width = generated.size?.width ?? ratio.nativeWidth
+      const height = generated.size?.height ?? ratio.nativeHeight
 
-    // 审计：谁、什么时候、生成了什么、花了多少
-    auditLog(request.log, 'info', 'image.generate', auth, '生图成功', {
-      jobId,
-      source,
-      category,
-      name: displayName,
-      ratio: ratio.id,
-      model: generated.model,
-      references: referencePaths.length,
-      promptLength: prompt.length,
-      promptPreview: prompt.slice(0, 160),
-      durationMs: Date.now() - startedAt,
-      imageId: generated.stored.id,
-      relativePath: generated.stored.relativePath,
-      bytes: generated.stored.bytes,
-      width,
-      height,
-      tokens: {
-        input: generated.tokens.inputTokens,
-        output: generated.tokens.outputTokens,
-        total: generated.tokens.totalTokens,
-        source: generated.tokens.source,
-      },
-    })
+      // 记录每一张的生图归属与详情，供生成记录与管理端统计
+      await deps.usage.record({
+        userId: auth.userId,
+        username: auth.username,
+        displayName: auth.displayName,
+        source,
+        category,
+        name: displayName,
+        ratio: ratio.id,
+        model: generated.model,
+        width,
+        height,
+        bytes: generated.stored.bytes,
+        prompt,
+        durationMs: Date.now() - startedAt,
+        relativePath: generated.stored.relativePath,
+        tokensInput: generated.tokens.inputTokens,
+        tokensOutput: generated.tokens.outputTokens,
+        tokensSource: generated.tokens.source,
+      })
 
-    const payload = {
-      id: generated.stored.id,
-      imageUrl: buildFileUrl(request, generated.stored.relativePath),
-      name: displayName,
-      model: generated.model,
-      mimeType: generated.mimeType,
-      bytes: generated.stored.bytes,
-      width,
-      height,
-      ratio: ratio.id,
-      tokens: {
-        input: generated.tokens.inputTokens,
-        output: generated.tokens.outputTokens,
-        total: generated.tokens.totalTokens,
-        source: generated.tokens.source,
-      },
+      // 审计：谁、什么时候、生成了什么、花了多少
+      auditLog(request.log, 'info', 'image.generate', auth, '生图成功', {
+        jobId,
+        source,
+        category,
+        name: displayName,
+        ratio: ratio.id,
+        model: generated.model,
+        references: referencePaths.length,
+        promptLength: prompt.length,
+        promptPreview: prompt.slice(0, 160),
+        durationMs: Date.now() - startedAt,
+        imageId: generated.stored.id,
+        relativePath: generated.stored.relativePath,
+        bytes: generated.stored.bytes,
+        width,
+        height,
+        batchSize: imageCount,
+        tokens: {
+          input: generated.tokens.inputTokens,
+          output: generated.tokens.outputTokens,
+          total: generated.tokens.totalTokens,
+          source: generated.tokens.source,
+        },
+      })
+
+      payloads.push({
+        id: generated.stored.id,
+        imageUrl: buildFileUrl(request, generated.stored.relativePath),
+        name: displayName,
+        model: generated.model,
+        mimeType: generated.mimeType,
+        bytes: generated.stored.bytes,
+        width,
+        height,
+        ratio: ratio.id,
+        tokens: {
+          input: generated.tokens.inputTokens,
+          output: generated.tokens.outputTokens,
+          total: generated.tokens.totalTokens,
+          source: generated.tokens.source,
+        },
+      })
     }
 
-    // 记入任务表：页面若已刷新，凭 jobId 回来就能取到这份结果
+    // 记入任务表：页面若已刷新，凭 jobId 回来就能取到这几张结果
     job.status = 'done'
     job.finishedAt = Date.now()
-    job.result = { ...payload, tokens: { ...payload.tokens, source: payload.tokens.source } }
+    job.results = payloads
+    // 旧客户端只认 result，用第一张兜底
+    job.result = payloads[0]
 
-    return reply.send({ ...payload, jobId })
+    // 顶层仍然展开第一张（imageUrl/width/height），老客户端不改也能用
+    return reply.send({
+      ...payloads[0],
+      images: payloads,
+      failed: failedCount,
+      requested: imageCount,
+      jobId,
+    })
     } catch (error) {
       auditFailure(request.log, 'image.generate', auth, startedAt, error, '生图失败', {
         jobId,
@@ -430,8 +521,8 @@ export function registerImageRoutes(
       }
       throw error
     } finally {
-      // 成功/失败都归还在途名额，额度判断才能保持准确
-      releaseSlot(auth.userId)
+      // 成功/失败都归还在途名额（按张数），额度判断才能保持准确
+      releaseSlot(auth.userId, imageCount)
     }
   })
 }

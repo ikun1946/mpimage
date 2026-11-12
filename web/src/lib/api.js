@@ -34,10 +34,10 @@ export async function request(path, options = {}) {
   return payload
 }
 
-export function generateImage({ prompt, titlePrompt, ratio, model, category, name, source, jobId, referencePath, referencePaths }) {
+export function generateImage({ prompt, titlePrompt, ratio, model, category, name, source, jobId, referencePath, referencePaths, count }) {
   return request('/api/images', {
     method: 'POST',
-    body: JSON.stringify({ prompt, titlePrompt, ratio, model, category, name, source, jobId, referencePath, referencePaths }),
+    body: JSON.stringify({ prompt, titlePrompt, ratio, model, category, name, source, jobId, referencePath, referencePaths, count }),
   })
 }
 

@@ -176,6 +176,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       // 自由创作的自定义风格：和「风格设定」里的风格库互相独立，只存在本机
       freeStyles: [],
       freeStyleId: '',
+      // 一次生成几张（1-4），默认 1 张
+      freeImageCount: 1,
       freePrompt: '',
       // 自由创作的参考图（可多张）：只存相对路径与可预览地址，快照里不塞 base64
       freeReferences: [],
@@ -310,10 +312,15 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       avatarSettings: document.querySelector('#avatar-settings'),
       freeSingle: document.querySelector('#free-single'),
       freeSingleLoading: document.querySelector('#free-single-loading'),
-      freeImage: document.querySelector('#free-image'),
+      freeSingleDeck: document.querySelector('#free-single-deck'),
+      freeSingleRatio: document.querySelector('#free-single-ratio'),
+      freeSingleDots: document.querySelector('#free-single-dots'),
+      freeSingleCount: document.querySelector('#free-single-count'),
+      freeSingleFoot: document.querySelector('#free-single-foot'),
       freeDownload: document.querySelector('#free-download'),
       freeMaximize: document.querySelector('#free-maximize'),
       freeModel: document.querySelector('#free-model'),
+      freeImageCount: document.querySelector('#free-image-count'),
       freeStyle: document.querySelector('#free-style'),
       freeStyleEdit: document.querySelector('#free-style-edit'),
       freeStyleModal: document.querySelector('#free-style-modal'),
@@ -436,6 +443,11 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         state.freeStyles = normalizeFreeStyles(saved.freeStyles)
         if (typeof saved.freeStyleId === 'string') {
           state.freeStyleId = saved.freeStyleId
+        }
+        // 一次生成张数：只认 1-4，老快照没有这一项就回到 1 张
+        const savedImageCount = Number(saved.freeImageCount)
+        if (Number.isFinite(savedImageCount) && savedImageCount >= 1) {
+          state.freeImageCount = Math.min(4, Math.floor(savedImageCount))
         }
         if (state.freeStyleId && !state.freeStyles.some(style => style.id === state.freeStyleId)) {
           state.freeStyleId = ''
@@ -691,6 +703,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           freeModel: state.freeModel,
           freeStyles: state.freeStyles,
           freeStyleId: state.freeStyleId,
+          freeImageCount: state.freeImageCount,
           freePrompt: state.freePrompt,
           freeReferences: state.freeReferences.map(ref => ({ path: ref.path, url: ref.url, name: ref.name })),
           freeImageUrl: state.freeImageUrl,
@@ -1514,6 +1527,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       refreshSelectionLabels()
       renderFreeResult()
       renderFreeStyleSelect()
+      renderFreeImageCount()
       renderFaceResult()
     }
 
@@ -2572,6 +2586,14 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       dom.freeStyle.value = valid ? state.freeStyleId : ''
       dom.freeStyleEdit.hidden = !valid
       refreshMenuSelect(dom.freeStyle)
+    }
+
+    /** 张数下拉以 state 为准回填：快照是异步恢复的，页面初次渲染时可能还没读到 */
+    function renderFreeImageCount() {
+      if (!dom.freeImageCount) return
+      const value = String(state.freeImageCount || 1)
+      if (dom.freeImageCount.value !== value) dom.freeImageCount.value = value
+      refreshMenuSelect(dom.freeImageCount)
     }
 
     function selectedFreeStyle() {
@@ -4416,7 +4438,12 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         if (!response.ok) throw new Error(data.error || '查询生成状态失败')
 
         if (data.status === 'running') {
-          dom.freeStatus.textContent = '后台仍在生成，完成后会自动显示'
+          const done = Number(data.progress?.done) || 0
+          const total = Number(data.progress?.total) || 1
+          dom.freeStatus.textContent =
+            total > 1 && done > 0
+              ? `后台仍在生成（${done}/${total} 张），完成后会自动显示`
+              : '后台仍在生成，完成后会自动显示'
           // 进度条随已用时长缓慢推进，最多 94%
           const elapsedSec = Math.max(0, (data.elapsedMs || 0) / 1000)
           const guess = Math.min(94, 20 + elapsedSec * 1.2)
@@ -4425,26 +4452,34 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           return
         }
 
-        if (data.status === 'done' && data.result) {
+        const resumedImages =
+          Array.isArray(data.results) && data.results.length
+            ? data.results
+            : data.result
+              ? [data.result]
+              : []
+        if (data.status === 'done' && resumedImages.length) {
           clearPendingJob()
           stopFreeProgress()
           dom.freeProgressLabel.textContent = '图像已生成'
           setFreeProgress(100)
           finishFreeCanvasAnimation()
-          state.freeImageUrl = data.result.imageUrl
-          state.freeImageExtension = getImageExtension(data.result.imageUrl)
-          persistSoon()
-          addFreeCollageItem({
-            url: data.result.imageUrl,
-            name: data.result.name || freeCollageShortTitle(state.freePrompt || ''),
-            width: data.result.width,
-            height: data.result.height,
-            ratio: data.result.ratio || '',
-            createdAt: Date.now(),
-          })
-          dom.freeStatus.textContent = `已接回刷新前的生成结果 · ${data.result.width} × ${data.result.height}`
+          const applied = applyFreeGenerationImages(
+            resumedImages,
+            state.freePrompt || '',
+            resumedImages[0].ratio || '',
+          )
+          const first = resumedImages[0]
+          dom.freeStatus.textContent =
+            applied > 1
+              ? `已接回刷新前的生成结果 · ${applied} 张 · ${first.width} × ${first.height}`
+              : `已接回刷新前的生成结果 · ${first.width} × ${first.height}`
           finishResume()
-          showToast('刷新前的生成已完成，结果已恢复')
+          showToast(
+            applied > 1
+              ? `刷新前的 ${applied} 张图片已完成，结果已恢复`
+              : '刷新前的生成已完成，结果已恢复',
+          )
           return
         }
 
@@ -4801,6 +4836,66 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       })
     }
 
+    /**
+     * 把一次任务生成的所有图片接到结果墙：第一张作为单图视图，其余都进拼图墙。
+     * 老服务端只返回单张，调用方会自己包成数组，这里不区分。
+     */
+    function applyFreeGenerationImages(images, promptText, ratioValue) {
+      const list = (Array.isArray(images) ? images : []).filter(item => item?.imageUrl)
+      if (!list.length) return 0
+      state.freeImageUrl = list[0].imageUrl
+      state.freeImageExtension = getImageExtension(list[0].imageUrl)
+      // 新的一批结果从第一张开始看
+      freeSingleIndex = 0
+      persistSoon()
+      list.forEach((item, index) => {
+        addFreeCollageItem({
+          url: item.imageUrl,
+          name: item.name || freeCollageShortTitle(promptText),
+          width: item.width,
+          height: item.height,
+          ratio: item.ratio || ratioValue,
+          // 同一批稍微错开时间，结果墙的「最新在前」顺序才稳定
+          createdAt: Date.now() + index,
+        })
+      })
+      // 自由创作的图同样进服务端记录，面板下次打开要重新拉
+      historyPanel.invalidate()
+      return list.length
+    }
+
+    /** 一次生成多张时，趁请求在跑轮询任务表，把「第 n/N 张」显示在输入条上 */
+    function watchFreeJobProgress(jobId, total) {
+      if (!(total > 1)) return () => {}
+      let stopped = false
+      let timer = 0
+      const tick = async () => {
+        if (stopped || pageUnloading) return
+        try {
+          const response = await fetch(`/api/images/jobs/${encodeURIComponent(jobId)}`, {
+            credentials: 'include',
+          })
+          const data = await response.json().catch(() => ({}))
+          if (stopped || pageUnloading) return
+          const done = Number(data?.progress?.done) || 0
+          const all = Number(data?.progress?.total) || total
+          if (data?.status === 'running' && done > 0) {
+            // 进度条文案由动画自己按阶段更新，这里只补充「第几张」，
+            // 改标签会和动画抢文字，所以只更新状态行。
+            dom.freeStatus.textContent = `Magpie 正在绘制 ${done}/${all} 张`
+          }
+        } catch {
+          // 轮询只是锦上添花，失败就安静等主请求返回
+        }
+        timer = window.setTimeout(tick, 2600)
+      }
+      timer = window.setTimeout(tick, 2600)
+      return () => {
+        stopped = true
+        window.clearTimeout(timer)
+      }
+    }
+
     async function generateFreeImage(event) {
       event.preventDefault()
       const references = state.freeReferences
@@ -4825,15 +4920,22 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       }
       if (state.freeBusy) return
 
+      // 一次生成几张：以控件为准，读不到就按 1 张
+      const imageCount = (() => {
+        const value = Number(dom.freeImageCount?.value ?? state.freeImageCount)
+        return Number.isFinite(value) ? Math.min(4, Math.max(1, Math.floor(value))) : 1
+      })()
+
       state.freeBusy = true
       dom.freePrompt.disabled = true
       setFreeSubmitBusy(true)
-      dom.freeStatus.textContent = 'Magpie 正在绘制'
+      dom.freeStatus.textContent = imageCount > 1 ? `Magpie 正在绘制 ${imageCount} 张` : 'Magpie 正在绘制'
       renderFreeReferences()
       startFreeProgress()
 
       const jobId = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now())
       rememberPendingJob(jobId)
+      const stopWatchingProgress = watchFreeJobProgress(jobId, imageCount)
 
       try {
         const result = await generateImage({
@@ -4846,9 +4948,16 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           name: `自由创作-${timestamp()}`,
           source: 'free',
           jobId,
+          count: imageCount,
           referencePaths: references.length ? references.map(ref => ref.path) : undefined,
         })
-        if (!result?.imageUrl) throw new Error('接口没有返回图片地址')
+        const images =
+          Array.isArray(result?.images) && result.images.length
+            ? result.images
+            : result?.imageUrl
+              ? [result]
+              : []
+        if (!images.length) throw new Error('接口没有返回图片地址')
         clearPendingJob()
 
         stopFreeProgress()
@@ -4856,20 +4965,14 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         setFreeProgress(100)
         finishFreeCanvasAnimation()
         await sleep(320)
-        state.freeImageUrl = result.imageUrl
-        state.freeImageExtension = getImageExtension(result.imageUrl)
-        persistSoon()
-        addFreeCollageItem({
-          url: result.imageUrl,
-          name: result.name || freeCollageShortTitle(typedPrompt),
-          width: result.width,
-          height: result.height,
-          ratio: result.ratio || dom.freeRatio.value,
-          createdAt: Date.now(),
-        })
-        dom.freeStatus.textContent = `生成完成 · ${result.width} × ${result.height}`
-        // 自由创作的图同样进服务端记录，面板下次打开要重新拉
-        historyPanel.invalidate()
+        const applied = applyFreeGenerationImages(images, typedPrompt, dom.freeRatio.value)
+        const first = images[0]
+        const failed = Math.max(0, imageCount - applied)
+        dom.freeStatus.textContent = failed
+          ? `生成完成 ${applied}/${imageCount} 张 · ${first.width} × ${first.height}`
+          : applied > 1
+            ? `生成完成 · ${applied} 张 · ${first.width} × ${first.height}`
+            : `生成完成 · ${first.width} × ${first.height}`
       } catch (error) {
         // 刷新/跳转会把在途请求中断，但服务端任务仍在跑：保留标记，下次载入接回。
         // 只有服务端明确失败的响应才清掉，避免「一刷新就丢任务」。
@@ -4889,6 +4992,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           dom.freeStatus.textContent = friendlyGenerationError(error.message)
         }
       } finally {
+        stopWatchingProgress()
         state.freeBusy = false
         dom.freePrompt.disabled = false
         setFreeSubmitBusy(false)
@@ -5017,23 +5121,281 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     }
 
     /** 单图视图：只展示最近一张，生成中且还没有图时给一个加载态 */
+    /* ===== 单图视图：一摞卡片，左右切换 ===== */
+
+    let freeSingleIndex = 0
+    let freeSingleAnimating = false
+
+    function freeSingleItem(index = freeSingleIndex) {
+      const items = freeCollageItems
+      if (!items.length) return null
+      if (index < 0 || index >= items.length) index = 0
+      freeSingleIndex = index
+      return items[index]
+    }
+
+    /** 当前图的比例；历史记录还没带尺寸时先按 16:9，图片加载后会自动纠正 */
+    function freeSingleRatio(item) {
+      const width = Number(item?.width) || 0
+      const height = Number(item?.height) || 0
+      return width > 0 && height > 0 ? width / height : 16 / 9
+    }
+
+    /** 卡片按当前图比例撑满可用区域：宽图不超宽、竖图不超高，图片本身不裁 */
+    function sizeFreeSingleDeck(item = freeSingleItem()) {
+      const deck = dom.freeSingleDeck
+      const host = dom.freeSingle
+      if (!deck || !host || host.hidden) return
+      const style = getComputedStyle(host)
+      const padX = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0)
+      const padY = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0)
+      // 左右各留出箭头半个身位（27px）加一点余量，堆叠右上角也要留 24px
+      const availWidth = Math.max(160, host.clientWidth - padX - 76)
+      const availHeight = Math.max(120, host.clientHeight - padY - 20)
+      const ratio = freeSingleRatio(item)
+      let width = Math.min(availWidth, 900)
+      let height = width / ratio
+      if (height > availHeight) {
+        height = availHeight
+        width = height * ratio
+      }
+      deck.style.width = `${Math.round(width)}px`
+      deck.style.height = `${Math.round(height)}px`
+    }
+
+    function createFreeSingleCard(item) {
+      const card = document.createElement('div')
+      card.className = 'free-single-card'
+      card.dataset.url = item.url
+      const image = document.createElement('img')
+      image.src = item.url
+      image.alt = item.name || '自由创作生成的图片'
+      image.draggable = false
+      image.decoding = 'async'
+      image.addEventListener('load', () => {
+        if ((!item.width || !item.height) && image.naturalWidth && image.naturalHeight) {
+          item.width = image.naturalWidth
+          item.height = image.naturalHeight
+        }
+        if (freeCollageItems[freeSingleIndex]?.url === item.url) {
+          sizeFreeSingleDeck(item)
+          updateFreeSingleMeta()
+        }
+      })
+      card.appendChild(image)
+      return card
+    }
+
+    /** 单图角标用真实像素比例：卡片盒子也是按它算的，避免和请求比例对不上 */
+    function freeSingleRatioLabel(item) {
+      const width = Number(item?.width) || 0
+      const height = Number(item?.height) || 0
+      if (width > 0 && height > 0) {
+        const gcd = (a, b) => (b ? gcd(b, a % b) : a)
+        const divisor = gcd(width, height)
+        const w = width / divisor
+        const h = height / divisor
+        if (w <= 64 && h <= 64) return `${w}:${h}`
+      }
+      return freeCollageRatioLabel(item)
+    }
+
+    function updateFreeSingleMeta(index = freeSingleIndex) {
+      const items = freeCollageItems
+      const total = items.length
+      const item = items[index] || null
+      if (dom.freeSingleRatio) {
+        // 还没结果时 item 为空，不能直接取比例
+        const label = item ? freeSingleRatioLabel(item) : ''
+        dom.freeSingleRatio.textContent = label
+        dom.freeSingleRatio.hidden = !label
+      }
+      if (dom.freeSingleCount) {
+        dom.freeSingleCount.textContent = total ? `${index + 1} / ${total}` : ''
+      }
+      if (dom.freeSingleDots) {
+        dom.freeSingleDots.innerHTML =
+          total > 1 && total <= 10
+            ? items.map((_, i) => `<i${i === index ? ' class="on"' : ''}></i>`).join('')
+            : ''
+      }
+      if (dom.freeSingleFoot) dom.freeSingleFoot.hidden = total < 2
+      dom.freeSingle?.classList.toggle('is-single', total < 2)
+    }
+
     function renderFreeSingle() {
-      const item = freeCollageItems[0] || null
-      const url = item?.url || ''
-      const image = dom.freeImage
-      if (!image) return
-      if (url) {
-        if (image.getAttribute('src') !== url) image.src = url
-        image.hidden = false
-      } else {
-        image.hidden = true
-        image.removeAttribute('src')
+      // 切换动画进行中不改 DOM，避免把正在掉落/上升的卡片重新排层级
+      if (freeSingleAnimating) return
+      const deck = dom.freeSingleDeck
+      if (!deck) return
+      const items = freeCollageItems
+      if (freeSingleIndex >= items.length) freeSingleIndex = 0
+
+      const visible = []
+      for (let offset = 0; offset < Math.min(4, items.length); offset += 1) {
+        visible.push(items[(freeSingleIndex + offset) % items.length])
       }
+      const wanted = new Set(visible.map(item => item.url))
+      deck.querySelectorAll('.free-single-card').forEach(card => {
+        if (!wanted.has(card.dataset.url)) card.remove()
+      })
+      const existing = [...deck.querySelectorAll('.free-single-card')]
+      visible.forEach((item, level) => {
+        let card = existing.find(el => el.dataset.url === item.url)
+        if (!card) card = createFreeSingleCard(item)
+        card.className = `free-single-card${level === 0 ? ' is-front' : ` level-${level}`}`
+        card.style.zIndex = String(4 - level)
+        card.style.transform = ''
+        card.style.opacity = ''
+        deck.appendChild(card)
+      })
+
+      sizeFreeSingleDeck(items[freeSingleIndex] || null)
+      updateFreeSingleMeta()
       if (dom.freeSingleLoading) {
-        dom.freeSingleLoading.hidden = Boolean(url) || !state.freeBusy
+        dom.freeSingleLoading.hidden = items.length > 0 || !state.freeBusy
       }
-      if (dom.freeDownload) dom.freeDownload.disabled = !url
-      if (dom.freeMaximize) dom.freeMaximize.disabled = !url
+      if (dom.freeDownload) dom.freeDownload.disabled = !items.length
+      if (dom.freeMaximize) dom.freeMaximize.disabled = !items.length
+    }
+
+    /**
+     * 切图动画：
+     * 右键 → 当前图左侧先向下倾斜，然后整张向下掉落；
+     * 左键镜像：右侧先向下倾斜，再同样向下掉落。
+     * 新的一张从堆叠位置升到最前面补位。
+     */
+    function goFreeSingle(step) {
+      const items = freeCollageItems
+      if (freeSingleAnimating || state.freeBusy || items.length < 2) return
+      const deck = dom.freeSingleDeck
+      if (!deck) return
+      const currentItem = items[freeSingleIndex]
+      const currentCard = deck.querySelector('.free-single-card.is-front')
+      const nextIndex = (freeSingleIndex + step + items.length) % items.length
+      const nextItem = items[nextIndex]
+      if (!currentCard || !nextItem) return
+
+      let incoming = deck.querySelector(
+        `.free-single-card[data-url="${CSS.escape(nextItem.url)}"]`,
+      )
+      if (!incoming) {
+        incoming = createFreeSingleCard(nextItem)
+        incoming.className = 'free-single-card level-3'
+        deck.appendChild(incoming)
+      }
+
+      freeSingleAnimating = true
+      // 卡片盒子跟着新图比例走，新图落位时不会被裁；编号等新图落位后再切
+
+      sizeFreeSingleDeck(nextItem)
+      incoming.classList.add('is-front')
+      currentCard.classList.remove('is-front')
+      incoming.style.zIndex = '29'
+      currentCard.style.zIndex = '30'
+
+      const startTransform = getComputedStyle(incoming).transform
+      // 左键反过来：右侧向下倾斜
+      const tilt = step > 0 ? -2.4 : 2.4
+
+      // 第一段只让当前图自己倾斜、下坠；后一张先不动，
+      // 等它落下去之后再从堆叠里推上来，顺序才看得清。
+      const fall = currentCard.animate(
+        [
+          { transform: 'translate(0, 0) rotate(0deg)', opacity: 1, offset: 0 },
+          { transform: `translate(0, 7px) rotate(${tilt * 1.35}deg)`, opacity: 1, offset: 0.16 },
+          { transform: `translate(0, 24px) rotate(${tilt * 1.45}deg)`, opacity: 1, offset: 0.3 },
+          { transform: `translate(0, 120px) rotate(${tilt * 1.5}deg)`, opacity: 1, offset: 0.5 },
+          { transform: `translate(0, 340px) rotate(${tilt * 1.55}deg)`, opacity: 1, offset: 0.72 },
+          { transform: `translate(0, 118%) rotate(${tilt * 1.6}deg)`, opacity: 1, offset: 0.88 },
+          { transform: `translate(0, 132%) rotate(${tilt * 1.65}deg)`, opacity: 0, offset: 1 },
+        ],
+        { duration: 600, easing: 'cubic-bezier(.45, 0, .55, 1)', fill: 'forwards' },
+      )
+
+      // 后面几张一起往前补一层：下一张升到最前，其余整摞跟着推上来。
+      // 返回停在最前面之后才开始动，避免和正在掉落的这张抢视线。
+      const LEVEL_TRANSFORMS = [
+        'translate(0px, 0px) rotate(0deg)',
+        'translate(8px, -7px) rotate(-0.5deg)',
+        'translate(16px, -14px) rotate(-0.9deg)',
+        'translate(24px, -21px) rotate(-1.3deg)',
+      ]
+      const LEVEL_OPACITIES = [1, 0.9, 0.72, 0.5]
+      const levelOf = card => {
+        const found = [...card.classList].find(name => /^level-\d$/.test(name))
+        return found ? Number(found.slice(6)) : 0
+      }
+
+      const shiftAnimations = []
+      const others = [...deck.querySelectorAll('.free-single-card')].filter(
+        card => card !== currentCard,
+      )
+      for (const card of others) {
+        const fromLevel = levelOf(card)
+        const toLevel = card === incoming ? 0 : Math.max(0, fromLevel - 1)
+        if (fromLevel === toLevel) continue
+        shiftAnimations.push(
+          card.animate(
+            [
+              {
+                transform: getComputedStyle(card).transform,
+                // 下一张直接以全不透明补位：它盖在后面的卡片上方，
+                // 如果边升边增加透明度，会把后面那张透出来，像双重曝光。
+                opacity: card === incoming ? 1 : getComputedStyle(card).opacity,
+                offset: 0,
+              },
+              {
+                transform: LEVEL_TRANSFORMS[toLevel],
+                opacity: card === incoming ? 1 : LEVEL_OPACITIES[toLevel],
+                offset: 1,
+              },
+            ],
+            {
+              duration: 440,
+              delay: 460,
+              easing: 'cubic-bezier(.22, 1, .36, 1)',
+              fill: 'forwards',
+            },
+          ),
+        )
+      }
+
+      // 左键时新的一张不在牌堆里（是「更新的一张」），单独把它从堆叠位置提上来
+      const rise =
+        step < 0
+          ? incoming.animate(
+              [
+                {
+                  transform: startTransform === 'none' ? 'translate(0, 0)' : startTransform,
+                  opacity: 1,
+                  offset: 0,
+                },
+                { transform: 'translate(0, -3px) rotate(0deg)', opacity: 1, offset: 0.78 },
+                { transform: 'translate(0, 0) rotate(0deg)', opacity: 1, offset: 1 },
+              ],
+              {
+                duration: 440,
+                delay: 460,
+                easing: 'cubic-bezier(.22, 1, .36, 1)',
+                fill: 'forwards',
+              },
+            )
+          : null
+
+      const animations = [fall, ...shiftAnimations, ...(rise ? [rise] : [])]
+      Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
+        animations.forEach(animation => animation.cancel())
+        freeSingleIndex = nextIndex
+        freeSingleAnimating = false
+        renderFreeSingle()
+      })
+    }
+
+    /** 下载 / 查看大图都跟随单图视图当前正在看的那一张 */
+    function currentFreeSingleItem() {
+      if (!freeCollageItems.length) return null
+      return freeCollageItems[freeSingleIndex] || freeCollageItems[0]
     }
 
     /* ===== 生成中的随机画布动画（拼图视图） ===== */
@@ -5424,13 +5786,43 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         setSettingsOpen(false)
       })
 
-      // 单图视图的两个按钮：作用于最近一张结果
+      // 单图视图的两个按钮：作用于当前正在看的那一张
       dom.freeDownload?.addEventListener('click', () => {
-        if (!state.freeImageUrl) return
-        downloadImage(state.freeImageUrl, `画境-自由创作-${timestamp()}.${state.freeImageExtension}`)
+        const item = currentFreeSingleItem()
+        if (!item) return
+        downloadImage(item.url, `画境-自由创作-${timestamp()}.${getImageExtension(item.url)}`)
       })
       dom.freeMaximize?.addEventListener('click', () => {
-        if (state.freeImageUrl) openLightbox(state.freeImageUrl, '自由创作生成图')
+        const item = currentFreeSingleItem()
+        if (!item) return
+        openLightbox(item.url, item.name || '自由创作生成图')
+      })
+
+      // 单图视图：左右热区点击 + 键盘方向键切换
+      dom.freeSingle?.querySelectorAll('[data-single-step]').forEach(button => {
+        button.addEventListener('click', () => {
+          goFreeSingle(Number(button.dataset.singleStep) || 1)
+        })
+      })
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+        if (state.activeTab !== 'free' || state.freeResultView !== 'single') return
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+        const target = event.target
+        if (
+          target &&
+          (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+        ) {
+          return
+        }
+        // 侧栏页签自己用左右键切换，别被单图切图抢走
+        if (target?.closest?.('.rail-nav')) return
+        if (document.querySelector('.modal.visible, .overlay.visible')) return
+        event.preventDefault()
+        goFreeSingle(event.key === 'ArrowRight' ? 1 : -1)
+      })
+      window.addEventListener('resize', () => {
+        if (state.freeResultView === 'single') sizeFreeSingleDeck()
       })
 
       // 页签组：方向键 / Home / End 只在当前模式可见的页签之间切换，
@@ -5755,7 +6147,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         })
 
         // 参数下拉包成 Claude 风格圆角菜单，原生 select 仍是状态源
-        ;[dom.freeModel, dom.freeRatio, dom.freeStyle].forEach(enhanceMenuSelect)
+        if (dom.freeImageCount) dom.freeImageCount.value = String(state.freeImageCount)
+        ;[dom.freeModel, dom.freeRatio, dom.freeStyle, dom.freeImageCount].forEach(enhanceMenuSelect)
 
         // 窗口变宽/变窄会改变换行，输入条高度跟着重算
         window.addEventListener('pagehide', () => {
@@ -5978,6 +6371,16 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
       if (event.target === dom.freeModel) {
         state.freeModel = dom.freeModel.value
+        persistSoon()
+        return
+      }
+
+      // 一次生成 1-4 张：记住选择，刷新后保持
+      if (event.target === dom.freeImageCount) {
+        const count = Number(dom.freeImageCount.value)
+        state.freeImageCount = Number.isFinite(count)
+          ? Math.min(4, Math.max(1, Math.floor(count)))
+          : 1
         persistSoon()
         return
       }

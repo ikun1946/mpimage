@@ -414,26 +414,227 @@ body[data-mode="create"] .app-main main {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 14px;
+  padding: 22px 26px 42px;
+  overflow: hidden;
 }
 
 #panel-free .free-single[hidden] {
   display: none;
 }
 
-#panel-free .free-single img {
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
-  border-radius: 10px;
-  object-fit: contain;
-  box-shadow: 0 10px 30px rgba(20, 26, 22, 0.12);
-  animation: free-tile-in 260ms ease both;
+/* 单图视图：几张结果叠成一摞，最上面一张是当前图 */
+#panel-free .free-single-deck {
+  position: relative;
+  flex: none;
+  width: min(100%, 900px);
+  height: 100%;
 }
 
-#panel-free .free-single img[hidden] {
+#panel-free .free-single-card {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--surface-raised);
+  box-shadow:
+    0 0 0 1px var(--line-soft),
+    0 22px 48px rgba(20, 26, 22, 0.16),
+    0 3px 10px rgba(20, 26, 22, 0.06);
+  will-change: transform, opacity;
+}
+
+#panel-free .free-single-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+#panel-free .free-single-card.is-front img {
+  object-fit: contain;
+}
+
+#panel-free .free-single-card.level-1 {
+  transform: translate(8px, -7px) rotate(-0.5deg);
+  opacity: 0.9;
+}
+
+#panel-free .free-single-card.level-2 {
+  transform: translate(16px, -14px) rotate(-0.9deg);
+  opacity: 0.72;
+}
+
+#panel-free .free-single-card.level-3 {
+  transform: translate(24px, -21px) rotate(-1.3deg);
+  opacity: 0.5;
+}
+
+/* 图片左右两侧的切换热区：贴着图片边缘，一半在里一半在外 */
+#panel-free .free-single-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 7;
+  width: 96px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#panel-free .free-single-zone.left {
+  left: -48px;
+}
+
+#panel-free .free-single-zone.right {
+  right: -48px;
+}
+
+#panel-free .free-single-zone:focus-visible {
+  outline: none;
+}
+
+/* 只有一张时没有可切换的对象，箭头和热区都收起来 */
+#panel-free .free-single.is-single .free-single-zone,
+#panel-free .free-single.is-single .free-single-flip {
   display: none;
+}
+
+/* 圆形半透明玻璃箭头，圆心正好落在图片边缘 */
+#panel-free .free-single-flip {
+  position: absolute;
+  top: 50%;
+  z-index: 6;
+  display: grid;
+  width: 54px;
+  height: 54px;
+  margin-top: -27px;
+  padding: 0;
+  place-items: center;
+  color: #2b322c;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background:
+    linear-gradient(158deg, rgba(255, 255, 255, 0.86) 0%, rgba(240, 239, 233, 0.56) 48%, rgba(255, 255, 255, 0.66) 100%);
+  box-shadow:
+    0 0 0 1px rgba(32, 39, 34, 0.08),
+    0 16px 34px rgba(30, 34, 28, 0.22),
+    0 2px 6px rgba(30, 34, 28, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(18px) saturate(1.4) brightness(0.97);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4) brightness(0.97);
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+  transition:
+    opacity 240ms ease,
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#panel-free .free-single-flip.left {
+  left: -27px;
+  transform: translateX(-8px) scale(0.94);
+}
+
+#panel-free .free-single-flip.right {
+  right: -27px;
+  transform: translateX(8px) scale(0.94);
+}
+
+#panel-free .free-single:has(.free-single-zone.left:hover) .free-single-flip.left,
+#panel-free .free-single:has(.free-single-zone.left:focus-visible) .free-single-flip.left,
+#panel-free .free-single.show-left .free-single-flip.left,
+#panel-free .free-single:has(.free-single-zone.right:hover) .free-single-flip.right,
+#panel-free .free-single:has(.free-single-zone.right:focus-visible) .free-single-flip.right,
+#panel-free .free-single.show-right .free-single-flip.right {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+#panel-free .free-single-flip svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+/* 触屏没有 hover，箭头常驻 */
+@media (hover: none) {
+  #panel-free .free-single-flip {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+#panel-free .free-single-chip {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 5;
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  padding: 0 10px;
+  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  background: rgba(28, 30, 26, 0.36);
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+
+#panel-free .free-single-foot {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  height: 30px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  color: var(--ink-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(14px);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+
+#panel-free .free-single-foot[hidden] {
+  display: none;
+}
+
+#panel-free .free-single-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#panel-free .free-single-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--line);
+  transition: width 220ms ease, background 220ms ease;
+}
+
+#panel-free .free-single-dots i.on {
+  width: 14px;
+  border-radius: 999px;
+  background: var(--gold);
 }
 
 #panel-free .free-single-loading {

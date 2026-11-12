@@ -577,6 +577,15 @@
                     </svg>
                   </button>
                 </div>
+                <span class="meta-dot" aria-hidden="true">·</span>
+                <div class="meta-field">
+                  <select class="select" id="free-image-count" data-menu-compact aria-label="生成张数">
+                    <option value="1">1 张</option>
+                    <option value="2">2 张</option>
+                    <option value="3">3 张</option>
+                    <option value="4">4 张</option>
+                  </select>
+                </div>
               </div>
               <div class="meta-info">
                 <span class="meta-count"><span id="free-count">0</span> 字</span>
@@ -611,7 +620,26 @@
               <div class="free-collage-grid" id="free-collage-grid"></div>
             </div>
             <div class="free-single" id="free-single" hidden>
-              <img id="free-image" alt="自由创作生成的图片" />
+              <div class="free-single-deck" id="free-single-deck">
+                <!-- 卡片由 renderFreeSingle 按结果墙顺序生成 -->
+                <button class="free-single-flip left" type="button" tabindex="-1" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M14.5 5.5 8 12l6.5 6.5"></path>
+                  </svg>
+                </button>
+                <button class="free-single-flip right" type="button" tabindex="-1" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M9.5 5.5 16 12l-6.5 6.5"></path>
+                  </svg>
+                </button>
+                <button class="free-single-zone left" type="button" data-single-step="-1" aria-label="上一张"></button>
+                <button class="free-single-zone right" type="button" data-single-step="1" aria-label="下一张"></button>
+              </div>
+              <span class="free-single-chip" id="free-single-ratio">16:9</span>
+              <div class="free-single-foot" id="free-single-foot">
+                <span class="free-single-dots" id="free-single-dots"></span>
+                <span class="free-single-count" id="free-single-count">1 / 1</span>
+              </div>
               <div class="free-single-loading" id="free-single-loading" hidden>
                 <span class="free-tile-spinner" aria-hidden="true"></span>
                 <span>正在绘制</span>
