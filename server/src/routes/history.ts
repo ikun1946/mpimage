@@ -45,6 +45,7 @@ export function registerHistoryRoutes(
         tokensOutput: entry.tokensOutput ?? null,
         tokensSource: entry.tokensSource || '',
         createdAt: entry.createdAt,
+        batchId: entry.batchId || '',
         imageUrl: buildFileUrl(request, entry.relativePath),
       })),
     }

@@ -24,6 +24,8 @@ export interface UsageEntry {
   durationMs: number
   /** 图片在存储目录内的相对路径，如 角色/苏晚棠-1086x1448.png */
   relativePath: string
+  /** 同一次生图任务的批次号；老记录没有这个字段 */
+  batchId?: string
   /** 提示词消耗 token（上游返回真实值或本地估算） */
   tokensInput: number
   /** 生成消耗 token；上游未提供时为 null */

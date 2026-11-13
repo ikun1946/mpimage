@@ -436,6 +436,8 @@ export function registerImageRoutes(
         prompt,
         durationMs: Date.now() - startedAt,
         relativePath: generated.stored.relativePath,
+        // 同一任务里的几张图共用一个批次号，单图视图按它成摞
+        batchId: jobId,
         tokensInput: generated.tokens.inputTokens,
         tokensOutput: generated.tokens.outputTokens,
         tokensSource: generated.tokens.source,

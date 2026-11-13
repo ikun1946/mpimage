@@ -4468,6 +4468,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
             resumedImages,
             state.freePrompt || '',
             resumedImages[0].ratio || '',
+            data.jobId || '',
           )
           const first = resumedImages[0]
           dom.freeStatus.textContent =
@@ -4840,12 +4841,13 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
      * 把一次任务生成的所有图片接到结果墙：第一张作为单图视图，其余都进拼图墙。
      * 老服务端只返回单张，调用方会自己包成数组，这里不区分。
      */
-    function applyFreeGenerationImages(images, promptText, ratioValue) {
+    function applyFreeGenerationImages(images, promptText, ratioValue, batchId = '') {
       const list = (Array.isArray(images) ? images : []).filter(item => item?.imageUrl)
       if (!list.length) return 0
       state.freeImageUrl = list[0].imageUrl
       state.freeImageExtension = getImageExtension(list[0].imageUrl)
-      // 新的一批结果从第一张开始看
+      // 新的一批结果从第一张开始看，单图视图也只围着这一批转
+      freeSingleBatchKey = batchId ? `batch:${batchId}` : ''
       freeSingleIndex = 0
       persistSoon()
       list.forEach((item, index) => {
@@ -4855,6 +4857,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           width: item.width,
           height: item.height,
           ratio: item.ratio || ratioValue,
+          batchId,
           // 同一批稍微错开时间，结果墙的「最新在前」顺序才稳定
           createdAt: Date.now() + index,
         })
@@ -4965,7 +4968,12 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         setFreeProgress(100)
         finishFreeCanvasAnimation()
         await sleep(320)
-        const applied = applyFreeGenerationImages(images, typedPrompt, dom.freeRatio.value)
+        const applied = applyFreeGenerationImages(
+          images,
+          typedPrompt,
+          dom.freeRatio.value,
+          result.jobId || jobId,
+        )
         const first = images[0]
         const failed = Math.max(0, imageCount - applied)
         dom.freeStatus.textContent = failed
@@ -5032,6 +5040,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         height,
         ratio: typeof entry.ratio === 'string' ? entry.ratio : '',
         createdAt: Number(entry.createdAt) || 0,
+        batchId: typeof entry.batchId === 'string' ? entry.batchId : '',
       }
     }
 
@@ -5124,10 +5133,33 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     /* ===== 单图视图：一摞卡片，左右切换 ===== */
 
     let freeSingleIndex = 0
+    let freeSingleBatchKey = ''
     let freeSingleAnimating = false
 
+    /**
+     * 单图视图只围着「同一批」的图转：优先用服务端批次号；
+     * 老记录没有批次号时，用「同名 + 最近 10 分钟」近似归批。
+     */
+    function freeSingleBatchKeyOf(item) {
+      if (!item) return ''
+      if (item.batchId) return `batch:${item.batchId}`
+      const bucket = Math.floor((Number(item.createdAt) || 0) / (10 * 60 * 1000))
+      return `legacy:${item.name || ''}:${bucket}`
+    }
+
+    function freeSingleItems() {
+      const all = freeCollageItems
+      if (!all.length) return []
+      let anchor = all.find(item => freeSingleBatchKeyOf(item) === freeSingleBatchKey)
+      if (!anchor) {
+        anchor = all[0]
+        freeSingleBatchKey = freeSingleBatchKeyOf(anchor)
+      }
+      return all.filter(item => freeSingleBatchKeyOf(item) === freeSingleBatchKey)
+    }
+
     function freeSingleItem(index = freeSingleIndex) {
-      const items = freeCollageItems
+      const items = freeSingleItems()
       if (!items.length) return null
       if (index < 0 || index >= items.length) index = 0
       freeSingleIndex = index
@@ -5177,7 +5209,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           item.width = image.naturalWidth
           item.height = image.naturalHeight
         }
-        if (freeCollageItems[freeSingleIndex]?.url === item.url) {
+        if (freeSingleItems()[freeSingleIndex]?.url === item.url) {
           sizeFreeSingleDeck(item)
           updateFreeSingleMeta()
         }
@@ -5201,7 +5233,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     }
 
     function updateFreeSingleMeta(index = freeSingleIndex) {
-      const items = freeCollageItems
+      const items = freeSingleItems()
       const total = items.length
       const item = items[index] || null
       if (dom.freeSingleRatio) {
@@ -5228,7 +5260,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       if (freeSingleAnimating) return
       const deck = dom.freeSingleDeck
       if (!deck) return
-      const items = freeCollageItems
+      const items = freeSingleItems()
       if (freeSingleIndex >= items.length) freeSingleIndex = 0
 
       const visible = []
@@ -5266,7 +5298,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
      * 新的一张从堆叠位置升到最前面补位。
      */
     function goFreeSingle(step) {
-      const items = freeCollageItems
+      const items = freeSingleItems()
       if (freeSingleAnimating || state.freeBusy || items.length < 2) return
       const deck = dom.freeSingleDeck
       if (!deck) return
@@ -5394,8 +5426,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
     /** 下载 / 查看大图都跟随单图视图当前正在看的那一张 */
     function currentFreeSingleItem() {
-      if (!freeCollageItems.length) return null
-      return freeCollageItems[freeSingleIndex] || freeCollageItems[0]
+      const items = freeSingleItems()
+      if (!items.length) return null
+      return items[freeSingleIndex] || items[0]
     }
 
     /* ===== 生成中的随机画布动画（拼图视图） ===== */
