@@ -63,12 +63,12 @@ async function authNeedsSetup() {
 /* ===== 主窗口：桌面控制台（本地页面）。客户端只在浏览器里用 ===== */
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 680,
-    minWidth: 760,
-    minHeight: 560,
+    width: 1180,
+    height: 820,
+    minWidth: 860,
+    minHeight: 600,
     title: '画境 · 服务控制台',
-    backgroundColor: '#f4f0e6',
+    backgroundColor: '#f7f7f7',
     icon: iconPath(),
     show: false,
     webPreferences: {

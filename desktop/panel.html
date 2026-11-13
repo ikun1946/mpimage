@@ -978,6 +978,134 @@
   }
 
   /* GPT 账号池：导入、状态与模型可用性 */
+  .gpt-import-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .gpt-import-menu-wrap {
+    position: relative;
+  }
+
+  .gpt-import-toggle .caret {
+    margin-left: 4px;
+    font-size: 10px;
+    opacity: 0.8;
+  }
+
+  .gpt-import-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    min-width: 232px;
+    padding: 5px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: 0 14px 34px rgba(24, 30, 25, 0.16);
+  }
+
+  .gpt-import-menu button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ink);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .gpt-import-menu button:hover:not(:disabled) {
+    background: var(--surface-sunken);
+  }
+
+  .gpt-import-menu button:disabled {
+    color: var(--ink-faint);
+    cursor: not-allowed;
+  }
+
+  .gpt-import-menu button small {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--ink-faint);
+  }
+
+  .gpt-mode-panel {
+    margin-top: 10px;
+  }
+
+  .gpt-mode-note {
+    margin: 0 0 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+  }
+
+  .gpt-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 8px;
+  }
+
+  .gpt-form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .gpt-form-grid input,
+  .gpt-form-grid select {
+    height: 32px;
+    font-size: 12px;
+  }
+
+  .gpt-remote-list {
+    display: grid;
+    gap: 4px;
+    max-height: 220px;
+    margin-top: 8px;
+    overflow-y: auto;
+  }
+
+  .gpt-remote-list:empty::before {
+    content: '连接后会在这里列出服务器上的账号文件。';
+    color: var(--ink-faint);
+    font-size: 12px;
+  }
+
+  .gpt-remote-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    font-size: 12px;
+  }
+
+  .gpt-remote-row code {
+    font-family: Consolas, "SFMono-Regular", monospace;
+    font-size: 11px;
+    color: var(--ink);
+  }
+
+  .gpt-remote-row span {
+    color: var(--ink-faint);
+  }
+
+  html[data-theme="dark"] .gpt-import-menu {
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  }
   .gpt-import textarea {
     width: 100%;
     min-height: 78px;
@@ -1034,11 +1162,16 @@
   }
 
   .gpt-account-row {
-    padding: 8px 10px;
-    border: 1px solid var(--line-soft);
-    border-radius: 10px;
-    background: var(--surface);
+    padding: 12px 4px;
+    border: 0;
+    border-bottom: 1px solid var(--line-soft);
+    border-radius: 0;
+    background: transparent;
   }
+
+  .gpt-account-row:last-child { border-bottom: 0; }
+
+  .gpt-account-row:hover { background: var(--surface-subtle); }
 
   .gpt-account-main {
     display: flex;
@@ -1800,10 +1933,449 @@
       margin-right: 0;
     }
   }
+
+  /* ===== 参考控制台皮肤：中性灰、衬线标题、侧栏工作台 =====
+     这一层放在最后，负责覆盖上面旧的控制台样式；所有颜色走令牌，
+     亮/暗两套只换变量，组件规则共用。 */
+  :root {
+    --paper: hsl(0 0% 97%);
+    --paper-deep: hsl(0 0% 92%);
+    --surface: hsl(0 0% 100%);
+    --surface-raised: hsl(0 0% 100%);
+    --surface-subtle: hsl(0 0% 96%);
+    --ink: hsl(0 0% 10%);
+    --ink-soft: hsl(0 0% 40%);
+    --ink-faint: hsl(0 0% 52%);
+    --line: hsl(0 0% 86%);
+    --line-soft: hsl(0 0% 91%);
+    --line-strong: hsl(0 0% 70%);
+    --accent: hsl(0 0% 10%);
+    --accent-dark: hsl(0 0% 20%);
+    --accent-tint: hsla(0, 0%, 10%, 0.06);
+    --on-accent: #ffffff;
+    --moss: hsl(0 0% 10%);
+    --moss-light: hsl(0 0% 34%);
+    --moss-dark: hsl(0 0% 4%);
+    --moss-tint: hsla(0, 0%, 10%, 0.06);
+    --on-moss: #ffffff;
+    --gold: hsl(32 95% 38%);
+    --gold-tint: hsla(32, 95%, 44%, 0.12);
+    --danger: hsl(0 72% 45%);
+    --danger-tint: hsla(0, 72%, 51%, 0.1);
+    --success: hsl(160 84% 28%);
+    --success-tint: hsla(160, 84%, 39%, 0.12);
+    --radius-sm: 8px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+    --shadow-soft: 0 3px 12px rgba(15, 23, 42, 0.05);
+    --font-body: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    --font-display: "Noto Serif SC", "Songti SC", "SimSun", Georgia, serif;
+    --font-mono: "Cascadia Mono", "Consolas", "Sarasa Mono SC", monospace;
+    --side-w: 240px;
+    --topbar-h: 68px;
+    --page-glow: rgba(0, 0, 0, 0.04);
+    --page-glow-2: rgba(0, 0, 0, 0.05);
+    --focus-ring: hsla(0, 0%, 10%, 0.09);
+  }
+
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: hsl(0 0% 6%);
+    --paper-deep: hsl(0 0% 4%);
+    --surface: hsl(0 0% 10%);
+    --surface-raised: hsl(0 0% 14%);
+    --surface-subtle: hsl(0 0% 12%);
+    --ink: hsl(0 0% 96%);
+    --ink-soft: hsl(0 0% 72%);
+    --ink-faint: hsl(0 0% 60%);
+    --line: hsl(0 0% 27%);
+    --line-soft: hsl(0 0% 19%);
+    --line-strong: hsl(0 0% 40%);
+    --accent: hsl(0 0% 96%);
+    --accent-dark: hsl(0 0% 88%);
+    --accent-tint: hsla(0, 0%, 96%, 0.1);
+    --on-accent: hsl(0 0% 8%);
+    --moss: hsl(0 0% 96%);
+    --moss-light: hsl(0 0% 82%);
+    --moss-dark: hsl(0 0% 86%);
+    --moss-tint: hsla(0, 0%, 96%, 0.1);
+    --on-moss: hsl(0 0% 8%);
+    --gold: hsl(38 82% 64%);
+    --gold-tint: hsla(38, 82%, 64%, 0.14);
+    --danger: hsl(0 72% 70%);
+    --danger-tint: hsla(0, 72%, 70%, 0.14);
+    --success: hsl(160 60% 62%);
+    --success-tint: hsla(160, 60%, 62%, 0.14);
+    --shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+    --shadow-soft: 0 3px 12px rgba(0, 0, 0, 0.28);
+    --page-glow: rgba(255, 255, 255, 0.06);
+    --page-glow-2: rgba(255, 255, 255, 0.05);
+    --focus-ring: hsla(0, 0%, 96%, 0.14);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: hsl(0 0% 6%);
+      --paper-deep: hsl(0 0% 4%);
+      --surface: hsl(0 0% 10%);
+      --surface-raised: hsl(0 0% 14%);
+      --surface-subtle: hsl(0 0% 12%);
+      --ink: hsl(0 0% 96%);
+      --ink-soft: hsl(0 0% 72%);
+      --ink-faint: hsl(0 0% 60%);
+      --line: hsl(0 0% 27%);
+      --line-soft: hsl(0 0% 19%);
+      --line-strong: hsl(0 0% 40%);
+      --accent: hsl(0 0% 96%);
+      --accent-dark: hsl(0 0% 88%);
+      --accent-tint: hsla(0, 0%, 96%, 0.1);
+      --on-accent: hsl(0 0% 8%);
+      --moss: hsl(0 0% 96%);
+      --moss-light: hsl(0 0% 82%);
+      --moss-dark: hsl(0 0% 86%);
+      --moss-tint: hsla(0, 0%, 96%, 0.1);
+      --on-moss: hsl(0 0% 8%);
+      --gold: hsl(38 82% 64%);
+      --gold-tint: hsla(38, 82%, 64%, 0.14);
+      --danger: hsl(0 72% 70%);
+      --danger-tint: hsla(0, 72%, 70%, 0.14);
+      --success: hsl(160 60% 62%);
+      --success-tint: hsla(160, 60%, 62%, 0.14);
+      --shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+      --shadow-soft: 0 3px 12px rgba(0, 0, 0, 0.28);
+      --page-glow: rgba(255, 255, 255, 0.06);
+      --page-glow-2: rgba(255, 255, 255, 0.05);
+      --focus-ring: hsla(0, 0%, 96%, 0.14);
+    }
+  }
+
+  body {
+    background-color: var(--paper);
+    background-image:
+      radial-gradient(900px circle at 10% -20%, var(--page-glow), transparent 45%),
+      radial-gradient(700px circle at 90% 0%, var(--page-glow-2), transparent 40%),
+      linear-gradient(180deg, var(--paper) 0%, var(--paper) 100%);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, .topbar-title, .card-head h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  /* ---------- 外壳 ---------- */
+  .app-shell { display: flex; min-height: 100vh; }
+
+  .side {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    flex: 0 0 var(--side-w);
+    width: var(--side-w);
+    height: 100vh;
+    padding: 18px 12px 14px;
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .side-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 42px;
+    padding: 0 10px;
+  }
+
+  .side-mark {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--ink);
+    color: var(--surface);
+    font-family: var(--font-display);
+    font-size: 12px;
+    line-height: 1;
+    padding-bottom: 1px;
+  }
+
+  .side-brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+  .side-brand-text strong { font-family: var(--font-display); font-size: 14px; letter-spacing: 0.02em; color: var(--ink); }
+  .side-brand-text small { margin-top: 2px; font-size: 10.5px; color: var(--ink-faint); }
+
+  .side-nav { display: flex; flex-direction: column; gap: 2px; }
+
+  .side-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--ink-soft);
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .side-link svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .side-link:hover { background: var(--surface-subtle); color: var(--ink); }
+  .side-link.is-active { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+
+  .side-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    padding: 12px 10px 2px;
+    border-top: 1px solid var(--line-soft);
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+
+  .workspace { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    height: var(--topbar-h);
+    padding: 0 28px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .topbar-title { margin: 0; font-size: 19px; font-weight: 600; line-height: 1.2; color: var(--ink); }
+  .topbar-sub { margin: 3px 0 0; font-size: 11.5px; color: var(--ink-faint); }
+  .topbar-actions { display: flex; align-items: center; gap: 10px; }
+  .topbar-status { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+
+  .workspace-body { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 24px 28px 40px; }
+
+  /* ---------- 页面切换 ---------- */
+  .page[hidden] { display: none !important; }
+  main.grid.pages {
+    display: block;
+    width: 100%;
+    max-width: 1180px;
+    margin: 0;
+    padding: 0;
+    gap: 0;
+    align-items: stretch;
+  }
+
+  /* ---------- 卡片与面板 ---------- */
+  .card {
+    height: auto;
+    max-height: none;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: var(--shadow-soft);
+    overflow: visible;
+  }
+
+  .card-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line-soft);
+    background: transparent;
+  }
+
+  .card-head h2 { font-size: 16px; font-weight: 600; color: var(--ink); }
+  .card-body { height: auto; overflow: visible; padding: 18px 20px 20px; }
+
+  .masthead.page {
+    margin-bottom: 18px;
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .masthead .brand { display: none; }
+  .masthead .brand-mark { background: var(--ink); color: var(--surface); }
+  .masthead .brand-sub { color: var(--ink-faint); }
+  .masthead .brand-sep { background: var(--line); }
+
+  .tools.page {
+    margin: 16px 0 0;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 22px 0 0;
+    padding: 14px 2px 0;
+    border-top: 1px solid var(--line-soft);
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- 控件 ---------- */
+  .button {
+    border-radius: 999px;
+    font-weight: 500;
+    font-size: 12.5px;
+    min-height: 32px;
+    padding: 5px 14px;
+  }
+
+  .button.primary { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+  .button.primary:hover:not(:disabled) { border-color: var(--moss-dark); background: var(--moss-dark); }
+  .button.mini { min-height: 26px; padding: 3px 10px; font-size: 12px; }
+
+  .input,
+  .select,
+  .textarea,
+  select,
+  input[type="text"],
+  input[type="url"],
+  input[type="password"],
+  input[type="number"] {
+    border-color: var(--line);
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+
+  .input:focus,
+  .select:focus,
+  .textarea:focus,
+  select:focus,
+  input:focus,
+  textarea:focus {
+    outline: none;
+    border-color: var(--ink-soft);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+  }
+
+  .table-shell { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  thead th { background: var(--surface-subtle); color: var(--ink-soft); font-weight: 500; }
+  tbody td { border-top: 1px solid var(--line-soft); }
+  tbody tr:hover { background: var(--surface-subtle); }
+
+  .hint { color: var(--ink-faint); }
+  .current { color: var(--ink-soft); }
+
+  html[data-theme="dark"] body {
+    background-image:
+      radial-gradient(900px circle at 10% -20%, var(--page-glow), transparent 45%),
+      radial-gradient(700px circle at 90% 0%, var(--page-glow-2), transparent 40%),
+      linear-gradient(180deg, var(--paper) 0%, var(--paper) 100%);
+  }
+
+  @media (max-width: 980px) {
+    :root { --side-w: 64px; }
+    .side { padding: 14px 8px; }
+    .side-brand { justify-content: center; padding: 0; }
+    .side-brand-text, .side-link span, .side-hint { display: none; }
+    .side-link { justify-content: center; padding: 0; }
+    .side-foot { justify-content: center; padding: 10px 0 2px; }
+    .side-version { font-size: 10px; }
+    .topbar { padding: 0 16px; }
+    .workspace-body { padding: 18px 16px 32px; }
+    .card-head, .card-body { padding-left: 14px; padding-right: 14px; }
+  }
+
 </style>
 </head>
 <body>
-<header class="masthead">
+<div class="app-shell">
+<aside class="side">
+  <div class="side-brand">
+    <span class="side-mark">画</span>
+    <span class="side-brand-text">
+      <strong>画境</strong>
+      <small>服务控制台</small>
+    </span>
+  </div>
+  <nav class="side-nav" aria-label="控制台导航">
+    <button class="side-link is-active" type="button" data-page="service">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="4.5" rx="1.2"/><rect x="2" y="9" width="12" height="4.5" rx="1.2"/><path d="M4.5 4.75h.01M4.5 11.25h.01"/></svg>
+      <span>服务状态</span>
+    </button>
+    <button class="side-link" type="button" data-page="accounts">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="5" r="2.4"/><path d="M2.2 13c.4-2.2 1.9-3.4 3.8-3.4S9.4 10.8 9.8 13"/><path d="M10.7 5.4a2 2 0 0 1 0 3.6M12 13c-.1-1.1-.5-2-1.2-2.6"/></svg>
+      <span>账号管理</span>
+    </button>
+    <button class="side-link" type="button" data-page="upstream">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.2 9.8l3.6-3.6"/><path d="M7 4.4l1.1-1.1a2.5 2.5 0 0 1 3.6 3.6L10.6 8"/><path d="M9 11.6l-1.1 1.1a2.5 2.5 0 0 1-3.6-3.6L5.4 8"/></svg>
+      <span>上游与模型</span>
+    </button>
+    <button class="side-link" type="button" data-page="gpt">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2l1.2 2.6 2.6 1.2-2.6 1.2L8 9.8 6.8 7.2 4.2 6l2.6-1.2z"/><path d="M11.7 9.4l.6 1.3 1.3.6-1.3.6-.6 1.3-.6-1.3-1.3-.6 1.3-.6z"/></svg>
+      <span>GPT 账号池</span>
+    </button>
+    <button class="side-link" type="button" data-page="limits">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5a5.5 5.5 0 1 1 11 0"/><path d="M8 12.5L10.6 7"/><circle cx="8" cy="12.5" r="1.1"/></svg>
+      <span>限流与并发</span>
+    </button>
+    <button class="side-link" type="button" data-page="feedback">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3.2h10a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H7l-3 2.3v-2.3H3a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z"/><path d="M5.2 6h5.6M5.2 8.2h3.6"/></svg>
+      <span>意见反馈</span>
+    </button>
+    <button class="side-link" type="button" data-page="stats">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 13.5h11"/><path d="M4 13.5V9M8 13.5V4.5M12 13.5V7"/></svg>
+      <span>统计与维护</span>
+    </button>
+  </nav>
+  <div class="side-foot">
+    <span class="side-version" id="side-version">画境</span>
+    <span class="side-hint">本机管理</span>
+  </div>
+</aside>
+
+<div class="workspace">
+  <header class="topbar">
+    <div class="topbar-heading">
+      <h1 class="topbar-title" id="panel-page-title">服务状态</h1>
+      <p class="topbar-sub" id="panel-page-sub">启停服务、访问地址与局域网</p>
+    </div>
+    <div class="topbar-actions">
+      <span class="dot" id="status-dot"></span>
+      <strong class="topbar-status" id="status-text">读取状态…</strong>
+      <button class="button mini" type="button" id="panel-theme-toggle">深色</button>
+    </div>
+  </header>
+  <div class="workspace-body">
+<header class="masthead page" data-page-panel="service">
   <div class="masthead-row">
     <div class="brand">
       <span class="brand-mark">画境</span>
@@ -1811,8 +2383,6 @@
       <span class="brand-sub">服务控制台</span>
     </div>
     <div class="service">
-      <span class="dot" id="status-dot"></span>
-      <strong id="status-text">读取状态…</strong>
       <span class="service-meta" id="service-meta">等待服务反馈</span>
     </div>
     <div class="masthead-actions">
@@ -1861,10 +2431,10 @@
 
 <h1 class="sr-only" id="admin-title">后台管理</h1>
 
-<main class="grid">
-  <section class="card span-6" aria-labelledby="accounts-title">
+<main class="grid pages">
+  <section data-page-panel="accounts" class="card page span-6" aria-labelledby="accounts-title">
     <div class="card-head">
-      <h2 id="accounts-title">账号</h2>
+      <h2 id="accounts-title">账号与额度</h2>
       <span class="card-note">改动直接打到本机服务，立即生效</span>
       <div class="head-actions">
         <button class="button mini" type="button" id="btn-users-refresh">刷新账号</button>
@@ -1907,9 +2477,9 @@
     </div>
   </section>
 
-  <section class="card span-6" aria-labelledby="upstream-title">
+  <section data-page-panel="upstream" class="card page span-6" aria-labelledby="upstream-title">
     <div class="card-head">
-      <h2 id="upstream-title">上游</h2>
+      <h2 id="upstream-title">Magpie 与模型</h2>
       <div class="head-actions">
         <button class="button mini" type="button" id="btn-upstream-refresh">刷新</button>
       </div>
@@ -1979,9 +2549,9 @@
     </div>
   </section>
 
-  <section class="card span-6" aria-labelledby="gpt-accounts-title">
+  <section data-page-panel="gpt" class="card page span-6" aria-labelledby="gpt-accounts-title">
     <div class="card-head">
-      <h2 id="gpt-accounts-title">GPT 账号池</h2>
+      <h2 id="gpt-accounts-title">导入与账号列表</h2>
       <div class="head-actions">
         <button class="button mini" type="button" id="btn-gpt-accounts-refresh">刷新</button>
       </div>
@@ -1993,23 +2563,118 @@
         （/backend-api/codex/responses）；Web 账号可以保存，但暂不参与生图。
       </p>
       <div class="gpt-import">
-        <div class="form-row">
-          <label>账号类型
-            <select id="gpt-import-source">
-              <option value="">自动识别（默认 Codex）</option>
-              <option value="codex">Codex</option>
-              <option value="web">Web（仅保存）</option>
-            </select>
-          </label>
-          <button class="button" type="button" id="gpt-import-file">从文件导入</button>
-          <input type="file" id="gpt-import-file-input" accept=".json,.jsonl,.txt" hidden />
-        </div>
-        <textarea id="gpt-import-text" class="textarea" rows="4" spellcheck="false"
-          placeholder="每行一个 access_token，或 email----token；也可以粘贴 auth.json / JSON 数组 / JSONL"></textarea>
-        <div class="form-row">
-          <button class="button primary" type="button" id="gpt-import-submit">导入账号</button>
+        <div class="gpt-import-bar">
+          <div class="gpt-import-menu-wrap">
+            <button class="button primary gpt-import-toggle" type="button" id="gpt-import-toggle"
+              aria-haspopup="menu" aria-expanded="false">导入 / 添加<span class="caret">▾</span></button>
+            <div class="gpt-import-menu" id="gpt-import-menu" role="menu" hidden>
+              <button type="button" role="menuitem" data-gpt-mode="manual">手动添加账号</button>
+              <button type="button" role="menuitem" data-gpt-mode="oauth" disabled title="需要 Web 通道（Sentinel / PoW），当前版本暂未启用">OAuth 登录已有账号<small>需 Web 通道</small></button>
+              <button type="button" role="menuitem" data-gpt-mode="token">导入 Access Token</button>
+              <button type="button" role="menuitem" data-gpt-mode="session">导入 Session JSON</button>
+              <button type="button" role="menuitem" data-gpt-mode="cpa">导入 CPA JSON 文件</button>
+              <button type="button" role="menuitem" data-gpt-mode="remote-cpa">从 CPA 服务器导入</button>
+              <button type="button" role="menuitem" data-gpt-mode="sub2api" disabled title="Sub2API 账号需要 Web 通道，当前版本暂未接入">从 Sub2API 服务器导入<small>暂未接入</small></button>
+            </div>
+          </div>
           <button class="button" type="button" id="gpt-check-all">测试全部</button>
           <span class="current" id="gpt-import-status" role="status" aria-live="polite"></span>
+        </div>
+
+        <div class="gpt-mode-panel" id="gpt-panel-token" data-gpt-panel="token">
+          <div class="form-row">
+            <label>账号类型
+              <select id="gpt-import-source">
+                <option value="">自动识别（默认 Codex）</option>
+                <option value="codex">Codex</option>
+                <option value="web">Web（仅保存）</option>
+              </select>
+            </label>
+            <button class="button mini" type="button" id="gpt-import-file">从文件读取</button>
+            <input type="file" id="gpt-import-file-input" accept=".json,.jsonl,.txt" hidden />
+          </div>
+          <textarea id="gpt-import-text" class="textarea" rows="4" spellcheck="false"
+            placeholder="每行一个 access_token，或 email----token；也可以粘贴 auth.json / JSON 数组 / JSONL"></textarea>
+          <div class="form-row">
+            <button class="button primary" type="button" id="gpt-import-submit">导入账号</button>
+          </div>
+        </div>
+
+        <div class="gpt-mode-panel" id="gpt-panel-session" data-gpt-panel="session" hidden>
+          <p class="gpt-mode-note">
+            粘贴浏览器导出的 Session JSON（顶层含 accessToken / access_token）。
+            这类账号会按 Web 账号保存，当前版本只启用 Codex 通道，暂不参与生图。
+          </p>
+          <textarea id="gpt-session-text" class="textarea" rows="4" spellcheck="false"
+            placeholder='{"accessToken":"eyJ...","email":"you@example.com","type":"free"}'></textarea>
+          <div class="form-row">
+            <button class="button mini" type="button" id="gpt-session-file">选择文件</button>
+            <input type="file" id="gpt-session-input" accept=".json,.txt" hidden />
+            <button class="button primary" type="button" id="gpt-session-submit">导入 Session</button>
+          </div>
+        </div>
+
+        <div class="gpt-mode-panel" id="gpt-panel-cpa" data-gpt-panel="cpa" hidden>
+          <p class="gpt-mode-note">
+            选择 CLIProxyAPI / Codex CLI 导出的 auth JSON 文件，可以多选。文件里的
+            access_token、refresh_token 会被直接读取。
+          </p>
+          <div class="form-row">
+            <button class="button" type="button" id="gpt-cpa-file">选择 CPA JSON 文件</button>
+            <input type="file" id="gpt-cpa-input" accept=".json" multiple hidden />
+            <span class="hint" id="gpt-cpa-file-meta"></span>
+          </div>
+        </div>
+
+        <div class="gpt-mode-panel" id="gpt-panel-remote-cpa" data-gpt-panel="remote-cpa" hidden>
+          <p class="gpt-mode-note">
+            从 CLIProxyAPI 的 management 接口读取 auth 文件（Bearer 密钥）。
+            地址示例：http://127.0.0.1:8317
+          </p>
+          <div class="form-row">
+            <label class="grow">服务器地址
+              <input id="gpt-cpa-base" type="url" placeholder="http://127.0.0.1:8317" spellcheck="false" autocomplete="off" />
+            </label>
+            <label class="grow">管理密钥
+              <input id="gpt-cpa-secret" type="password" placeholder="secret key" autocomplete="off" />
+            </label>
+            <button class="button" type="button" id="gpt-cpa-connect">连接</button>
+          </div>
+          <div class="gpt-remote-list" id="gpt-cpa-list"></div>
+          <div class="form-row">
+            <button class="button primary" type="button" id="gpt-cpa-import">导入选中</button>
+            <span class="hint" id="gpt-cpa-meta"></span>
+          </div>
+        </div>
+
+        <div class="gpt-mode-panel" id="gpt-panel-manual" data-gpt-panel="manual" hidden>
+          <div class="gpt-form-grid">
+            <label>邮箱
+              <input id="gpt-manual-email" type="text" placeholder="you@example.com" autocomplete="off" />
+            </label>
+            <label>账号类型
+              <select id="gpt-manual-source">
+                <option value="codex">Codex</option>
+                <option value="web">Web（仅保存）</option>
+              </select>
+            </label>
+            <label>套餐（可选）
+              <input id="gpt-manual-plan" type="text" placeholder="plus / pro / team" autocomplete="off" />
+            </label>
+            <label>显示名（可选）
+              <input id="gpt-manual-label" type="text" placeholder="备注名" autocomplete="off" />
+            </label>
+          </div>
+          <label class="gpt-manual-token">Access Token
+            <textarea id="gpt-manual-token" class="textarea" rows="3" spellcheck="false"
+              placeholder="粘贴 access_token / accessToken"></textarea>
+          </label>
+          <div class="form-row">
+            <label class="grow">Refresh Token（可选）
+              <input id="gpt-manual-refresh" type="password" placeholder="refresh_token" autocomplete="off" />
+            </label>
+            <button class="button primary" type="button" id="gpt-manual-submit">添加账号</button>
+          </div>
         </div>
       </div>
       <div class="gpt-model-list" id="gpt-model-list"></div>
@@ -2018,9 +2683,9 @@
     </div>
   </section>
 
-  <section class="card span-6" aria-labelledby="limits-title">
+  <section data-page-panel="limits" class="card page span-6" aria-labelledby="limits-title">
     <div class="card-head">
-      <h2 id="limits-title">限流与并发</h2>
+      <h2 id="limits-title">生效中的限制</h2>
       <div class="head-actions">
         <button class="button mini" type="button" id="btn-limits-refresh">刷新</button>
       </div>
@@ -2051,9 +2716,9 @@
     </div>
   </section>
 
-  <section class="card span-6" aria-labelledby="feedback-title">
+  <section data-page-panel="feedback" class="card page span-6" aria-labelledby="feedback-title">
     <div class="card-head">
-      <h2 id="feedback-title">反馈</h2>
+      <h2 id="feedback-title">用户反馈</h2>
       <span class="count" id="feedback-count"></span>
       <div class="segmented" role="group" aria-label="反馈筛选">
         <button class="seg" type="button" data-filter="all" aria-pressed="true">全部</button>
@@ -2085,9 +2750,9 @@
     </div>
   </section>
 
-  <section class="card span-12" aria-labelledby="stats-title">
+  <section data-page-panel="stats" class="card page span-12" aria-labelledby="stats-title">
     <div class="card-head">
-      <h2 id="stats-title">统计</h2>
+      <h2 id="stats-title">生成数据</h2>
       <span class="card-note">本机累计</span>
       <div class="head-actions">
         <button class="button mini" type="button" id="btn-stats-refresh">刷新</button>
@@ -2155,7 +2820,7 @@
     </div>
   </section>
 
-  <div class="tools" role="group" aria-labelledby="maint-title">
+  <div class="tools page" data-page-panel="stats" role="group" aria-labelledby="maint-title">
     <span class="sr-only" id="maint-title">维护</span>
     <button class="button mini" type="button" id="btn-logs">运行日志…</button>
     <button class="button mini" type="button" id="btn-update">检查更新…</button>
@@ -2171,6 +2836,9 @@
   <span>·</span>
   <span>生图客户端在浏览器里用：打开上面的地址即可；服务停着时页面打不开是正常的。</span>
 </footer>
+  </div>
+</div>
+</div>
 
 <dialog id="user-dialog" aria-labelledby="user-dialog-title">
   <form id="user-form" novalidate>
@@ -2272,6 +2940,32 @@
     providerAdd: $('provider-add'),
     gptAccountsNotice: $('gpt-accounts-notice'),
     btnGptAccountsRefresh: $('btn-gpt-accounts-refresh'),
+    panelPageTitle: $('panel-page-title'),
+    panelPageSub: $('panel-page-sub'),
+    panelThemeToggle: $('panel-theme-toggle'),
+    sideVersion: $('side-version'),
+    gptImportToggle: $('gpt-import-toggle'),
+    gptImportMenu: $('gpt-import-menu'),
+    gptSessionText: $('gpt-session-text'),
+    gptSessionFile: $('gpt-session-file'),
+    gptSessionInput: $('gpt-session-input'),
+    gptSessionSubmit: $('gpt-session-submit'),
+    gptCpaFile: $('gpt-cpa-file'),
+    gptCpaInput: $('gpt-cpa-input'),
+    gptCpaFileMeta: $('gpt-cpa-file-meta'),
+    gptCpaBase: $('gpt-cpa-base'),
+    gptCpaSecret: $('gpt-cpa-secret'),
+    gptCpaConnect: $('gpt-cpa-connect'),
+    gptCpaList: $('gpt-cpa-list'),
+    gptCpaImport: $('gpt-cpa-import'),
+    gptCpaMeta: $('gpt-cpa-meta'),
+    gptManualEmail: $('gpt-manual-email'),
+    gptManualSource: $('gpt-manual-source'),
+    gptManualPlan: $('gpt-manual-plan'),
+    gptManualLabel: $('gpt-manual-label'),
+    gptManualToken: $('gpt-manual-token'),
+    gptManualRefresh: $('gpt-manual-refresh'),
+    gptManualSubmit: $('gpt-manual-submit'),
     gptImportSource: $('gpt-import-source'),
     gptImportText: $('gpt-import-text'),
     gptImportFile: $('gpt-import-file'),
@@ -2430,6 +3124,8 @@
   let upstreamAccountImageModels = []
   let gptAccountsState = { enabled: true, accounts: [], models: [] }
   let gptCheckTimer = null
+  let gptImportMode = 'token'
+  let gptCpaFiles = []
 
   // ---------- 小工具 ----------
 
@@ -2569,6 +3265,9 @@
     state.loginUrl = typeof next.loginUrl === 'string' ? next.loginUrl : ''
     state.needsSetup = Boolean(next.needsSetup)
     state.version = typeof next.version === 'string' ? next.version : ''
+    if (dom.sideVersion) {
+      dom.sideVersion.textContent = state.version ? `画境 ${state.version}` : '画境'
+    }
 
     const running = state.running
     dom.dot.className = running ? 'dot on' : 'dot off'
@@ -3283,36 +3982,219 @@
     )
   }
 
-  async function importGptAccounts() {
-    const text = dom.gptImportText?.value || ''
-    if (!text.trim()) {
-      setCurrent(dom.gptImportStatus, '先粘贴账号内容', 'error')
-      return
+  function gptImportResultText(data) {
+    const parts = [
+      `新增 ${Number(data.imported) || 0}`,
+      `更新 ${Number(data.updated) || 0}`,
+    ]
+    if (Number(data.skipped)) parts.push(`跳过 ${data.skipped}`)
+    if (Array.isArray(data.invalid) && data.invalid.length) parts.push(`无效 ${data.invalid.length}`)
+    if (Array.isArray(data.failures) && data.failures.length) parts.push(`失败 ${data.failures.length}`)
+    return parts.join(' · ')
+  }
+
+  async function runGptImport({ text, mode, source, button, clear }) {
+    if (!String(text || '').trim()) {
+      setCurrent(dom.gptImportStatus, '先填写账号内容', 'error')
+      return false
     }
-    const source = dom.gptImportSource?.value || ''
-    await withBusy(dom.gptImportSubmit, async () => {
+    let ok = false
+    await withBusy(button || dom.gptImportSubmit, async () => {
       setCurrent(dom.gptImportStatus, '正在导入…')
       const result = await api('/api/admin/gpt-accounts/import', {
         method: 'POST',
-        body: { text, ...(source ? { source } : {}) },
+        body: {
+          text,
+          ...(mode ? { mode } : {}),
+          ...(source ? { source } : {}),
+        },
       })
       if (!result.ok) {
         setCurrent(dom.gptImportStatus, result.error || '导入失败', 'error')
         return
       }
       const data = result.data || {}
-      const parts = [
-        `新增 ${Number(data.imported) || 0}`,
-        `更新 ${Number(data.updated) || 0}`,
-      ]
-      if (Number(data.skipped)) parts.push(`跳过 ${data.skipped}`)
-      if (Array.isArray(data.invalid) && data.invalid.length) {
-        parts.push(`无效 ${data.invalid.length}`)
+      setCurrent(dom.gptImportStatus, gptImportResultText(data), 'ok')
+      if (clear) clear.value = ''
+      applyGptPayload(data)
+      ok = true
+    })
+    return ok
+  }
+
+  function importGptAccounts() {
+    return runGptImport({
+      text: dom.gptImportText?.value || '',
+      source: dom.gptImportSource?.value || '',
+      button: dom.gptImportSubmit,
+      clear: dom.gptImportText,
+    })
+  }
+
+  function setGptImportMode(mode) {
+    gptImportMode = mode
+    for (const panel of document.querySelectorAll('[data-gpt-panel]')) {
+      panel.hidden = panel.dataset.gptPanel !== mode
+    }
+    if (dom.gptImportMenu) dom.gptImportMenu.hidden = true
+    if (dom.gptImportToggle) dom.gptImportToggle.setAttribute('aria-expanded', 'false')
+    const focusTarget = {
+      token: dom.gptImportText,
+      session: dom.gptSessionText,
+      'remote-cpa': dom.gptCpaBase,
+      manual: dom.gptManualToken,
+    }[mode]
+    focusTarget?.focus()
+  }
+
+  function readTextFile(file, onText) {
+    const reader = new FileReader()
+    reader.onload = () => onText(String(reader.result || ''))
+    reader.onerror = () => setCurrent(dom.gptImportStatus, '文件读取失败', 'error')
+    reader.readAsText(file)
+  }
+
+  async function importGptSession() {
+    await runGptImport({
+      text: dom.gptSessionText?.value || '',
+      mode: 'session',
+      button: dom.gptSessionSubmit,
+      clear: dom.gptSessionText,
+    })
+  }
+
+  function importGptCpaFiles(fileList) {
+    const files = [...(fileList || [])].filter(file => file && file.size <= 2 * 1024 * 1024)
+    if (!files.length) {
+      setCurrent(dom.gptImportStatus, '没有可读取的 JSON 文件（单文件上限 2MB）', 'error')
+      return
+    }
+    const objects = []
+    let pending = files.length
+    let failed = 0
+    const done = () => {
+      pending -= 1
+      if (pending > 0) return
+      if (!objects.length) {
+        setCurrent(dom.gptImportStatus, '选中的文件里没有可识别的账号 JSON', 'error')
+        return
       }
-      setCurrent(dom.gptImportStatus, parts.join(' · '), 'ok')
-      if (dom.gptImportText) dom.gptImportText.value = ''
+      if (dom.gptCpaFileMeta) {
+        dom.gptCpaFileMeta.textContent = `已读取 ${objects.length} 个账号${failed ? `，${failed} 个文件解析失败` : ''}`
+      }
+      void runGptImport({
+        text: JSON.stringify(objects),
+        mode: 'cpa',
+        button: dom.gptCpaFile,
+      })
+    }
+    for (const file of files) {
+      readTextFile(file, text => {
+        try {
+          const parsed = JSON.parse(text)
+          if (Array.isArray(parsed)) objects.push(...parsed)
+          else objects.push(parsed)
+        } catch {
+          failed += 1
+        }
+        done()
+      })
+    }
+  }
+
+  async function connectGptCpa() {
+    const baseUrl = dom.gptCpaBase?.value.trim() || ''
+    const secretKey = dom.gptCpaSecret?.value || ''
+    if (!baseUrl || !secretKey) {
+      setCurrent(dom.gptCpaMeta, '先填写服务器地址与管理密钥', 'error')
+      return
+    }
+    await withBusy(dom.gptCpaConnect, async () => {
+      setCurrent(dom.gptCpaMeta, '正在连接…')
+      const result = await api('/api/admin/gpt-accounts/remote/cpa/list', {
+        method: 'POST',
+        body: { baseUrl, secretKey },
+      })
+      if (!result.ok) {
+        setCurrent(dom.gptCpaMeta, result.error || '连接失败', 'error')
+        return
+      }
+      gptCpaFiles = Array.isArray(result.data?.files) ? result.data.files : []
+      if (!gptCpaFiles.length) {
+        dom.gptCpaList.innerHTML = ''
+        setCurrent(dom.gptCpaMeta, '服务器上没有账号文件', 'warn')
+        return
+      }
+      dom.gptCpaList.innerHTML = gptCpaFiles
+        .map(
+          (file, index) => `<label class="gpt-remote-row">
+            <input type="checkbox" value="${escapeHtml(file.name)}" data-index="${index}">
+            <code>${escapeHtml(file.name)}</code>
+            <span>${escapeHtml(file.email || '')}</span>
+          </label>`,
+        )
+        .join('')
+      setCurrent(dom.gptCpaMeta, `共 ${gptCpaFiles.length} 个文件`)
+    })
+  }
+
+  async function importGptCpa() {
+    const names = [...(dom.gptCpaList?.querySelectorAll('input[type="checkbox"]:checked') || [])].map(
+      input => input.value,
+    )
+    if (!names.length) {
+      setCurrent(dom.gptCpaMeta, '先勾选要导入的文件', 'error')
+      return
+    }
+    const baseUrl = dom.gptCpaBase?.value.trim() || ''
+    const secretKey = dom.gptCpaSecret?.value || ''
+    await withBusy(dom.gptCpaImport, async () => {
+      setCurrent(dom.gptCpaMeta, '正在导入…')
+      const result = await api('/api/admin/gpt-accounts/remote/cpa/import', {
+        method: 'POST',
+        body: { baseUrl, secretKey, names },
+      })
+      if (!result.ok) {
+        setCurrent(dom.gptCpaMeta, result.error || '导入失败', 'error')
+        return
+      }
+      const data = result.data || {}
+      const failures = Array.isArray(data.failures) ? data.failures : []
+      setCurrent(
+        dom.gptCpaMeta,
+        gptImportResultText(data) + (failures.length ? ` · ${failures[0].name}：${failures[0].message}` : ''),
+        failures.length ? 'warn' : 'ok',
+      )
       applyGptPayload(data)
     })
+  }
+
+  async function addGptManual() {
+    const accessToken = dom.gptManualToken?.value.trim() || ''
+    if (!accessToken) {
+      setCurrent(dom.gptImportStatus, '先填写 Access Token', 'error')
+      return
+    }
+    const payload = {
+      access_token: accessToken,
+      type: dom.gptManualSource?.value || 'codex',
+      ...(dom.gptManualEmail?.value.trim() ? { email: dom.gptManualEmail.value.trim() } : {}),
+      ...(dom.gptManualRefresh?.value.trim() ? { refresh_token: dom.gptManualRefresh.value.trim() } : {}),
+      ...(dom.gptManualPlan?.value.trim() ? { plan: dom.gptManualPlan.value.trim() } : {}),
+      ...(dom.gptManualLabel?.value.trim() ? { label: dom.gptManualLabel.value.trim() } : {}),
+    }
+    const ok = await runGptImport({
+      text: JSON.stringify(payload),
+      mode: 'manual',
+      button: dom.gptManualSubmit,
+    })
+    if (ok) {
+      if (dom.gptManualToken) dom.gptManualToken.value = ''
+      if (dom.gptManualRefresh) dom.gptManualRefresh.value = ''
+      if (dom.gptManualEmail) dom.gptManualEmail.value = ''
+      if (dom.gptManualLabel) dom.gptManualLabel.value = ''
+      setGptImportMode('token')
+    }
   }
 
   async function checkGptAccounts(ids) {
@@ -3391,6 +4273,62 @@
       dom.gptImportFileInput.value = ''
     })
   }
+  if (dom.gptImportToggle && dom.gptImportMenu) {
+    dom.gptImportToggle.addEventListener('click', event => {
+      event.stopPropagation()
+      const willOpen = dom.gptImportMenu.hidden
+      dom.gptImportMenu.hidden = !willOpen
+      dom.gptImportToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false')
+    })
+    dom.gptImportMenu.addEventListener('click', event => {
+      const item = event.target.closest('[data-gpt-mode]')
+      if (!item || item.disabled) return
+      setGptImportMode(item.dataset.gptMode)
+    })
+    document.addEventListener('click', event => {
+      if (dom.gptImportMenu.hidden) return
+      if (dom.gptImportMenu.contains(event.target) || dom.gptImportToggle.contains(event.target)) return
+      dom.gptImportMenu.hidden = true
+      dom.gptImportToggle.setAttribute('aria-expanded', 'false')
+    })
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape' || dom.gptImportMenu.hidden) return
+      dom.gptImportMenu.hidden = true
+      dom.gptImportToggle.setAttribute('aria-expanded', 'false')
+    })
+  }
+
+  if (dom.gptSessionSubmit) {
+    dom.gptSessionSubmit.addEventListener('click', () => void importGptSession())
+  }
+  if (dom.gptSessionFile && dom.gptSessionInput) {
+    dom.gptSessionFile.addEventListener('click', () => dom.gptSessionInput.click())
+    dom.gptSessionInput.addEventListener('change', () => {
+      const file = dom.gptSessionInput.files?.[0]
+      if (file) readTextFile(file, text => {
+        if (dom.gptSessionText) dom.gptSessionText.value = text
+      })
+      dom.gptSessionInput.value = ''
+    })
+  }
+
+  if (dom.gptCpaFile && dom.gptCpaInput) {
+    dom.gptCpaFile.addEventListener('click', () => dom.gptCpaInput.click())
+    dom.gptCpaInput.addEventListener('change', () => {
+      importGptCpaFiles(dom.gptCpaInput.files)
+      dom.gptCpaInput.value = ''
+    })
+  }
+  if (dom.gptCpaConnect) {
+    dom.gptCpaConnect.addEventListener('click', () => void connectGptCpa())
+  }
+  if (dom.gptCpaImport) {
+    dom.gptCpaImport.addEventListener('click', () => void importGptCpa())
+  }
+  if (dom.gptManualSubmit) {
+    dom.gptManualSubmit.addEventListener('click', () => void addGptManual())
+  }
+
   if (dom.gptCheckAll) {
     dom.gptCheckAll.addEventListener('click', () => void checkGptAccounts(gptSelectedIds()))
   }
@@ -4776,6 +5714,64 @@
       flash('服务已停止，管理接口暂时不可用', 'warn')
     }
   }
+
+  const PANEL_PAGES = {
+    service: ['服务状态', '启停服务、访问地址与局域网'],
+    accounts: ['账号管理', '注册审核、账号与每日额度'],
+    upstream: ['上游与模型', 'Magpie 地址、生图模型与自定义供应商'],
+    gpt: ['GPT 账号池', '导入账号并用账号自己的额度生图'],
+    limits: ['限流与并发', '请求限流、生图排队与客户端统计'],
+    feedback: ['意见反馈', '用户提交的问题与建议'],
+    stats: ['统计与维护', '生成量、成功率与运行维护'],
+  }
+
+  function showPanelPage(name, persist = true) {
+    const target = PANEL_PAGES[name] ? name : 'service'
+    for (const panel of document.querySelectorAll('[data-page-panel]')) {
+      panel.hidden = panel.dataset.pagePanel !== target
+    }
+    for (const link of document.querySelectorAll('.side-link[data-page]')) {
+      link.classList.toggle('is-active', link.dataset.page === target)
+    }
+    const meta = PANEL_PAGES[target]
+    if (dom.panelPageTitle) dom.panelPageTitle.textContent = meta[0]
+    if (dom.panelPageSub) dom.panelPageSub.textContent = meta[1]
+    if (persist) {
+      try { localStorage.setItem('huajing.panelPage', target) } catch {}
+    }
+  }
+
+  function applyPanelTheme(mode) {
+    const resolved =
+      mode === 'light' || mode === 'dark'
+        ? mode
+        : window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light'
+    document.documentElement.dataset.theme = resolved
+    document.documentElement.style.colorScheme = resolved
+    if (dom.panelThemeToggle) {
+      dom.panelThemeToggle.textContent = resolved === 'dark' ? '浅色' : '深色'
+    }
+    try { localStorage.setItem('huajing.panelTheme', resolved) } catch {}
+  }
+
+  for (const link of document.querySelectorAll('.side-link[data-page]')) {
+    link.addEventListener('click', () => showPanelPage(link.dataset.page))
+  }
+  if (dom.panelThemeToggle) {
+    dom.panelThemeToggle.addEventListener('click', () => {
+      const current = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'
+      applyPanelTheme(current)
+    })
+  }
+
+  let initialPanelPage = 'service'
+  try { initialPanelPage = localStorage.getItem('huajing.panelPage') || 'service' } catch {}
+  showPanelPage(initialPanelPage, false)
+  let initialPanelTheme = 'system'
+  try { initialPanelTheme = localStorage.getItem('huajing.panelTheme') || 'system' } catch {}
+  applyPanelTheme(initialPanelTheme)
 
   function boot() {
     window.addEventListener('error', event => {

@@ -19,6 +19,7 @@ import {
   type GptAccountSource,
 } from '../app/control/accounts/account-types.js'
 import { validateAccount } from '../app/products/openai/chatgpt-auth.js'
+import { fetchCpaEntries, listCpaFiles } from '../app/products/openai/account-sources.js'
 
 const MAX_IMPORT_CHARS = 2 * 1024 * 1024
 const MAX_IDS = 50
@@ -101,7 +102,7 @@ export function registerGptAccountRoutes(
 
   app.post('/api/admin/gpt-accounts/import', async request => {
     requireAdmin(request)
-    const body = (request.body ?? {}) as { text?: unknown; source?: unknown }
+    const body = (request.body ?? {}) as { text?: unknown; source?: unknown; mode?: unknown }
     const text = typeof body.text === 'string' ? body.text : ''
     if (!text.trim()) {
       throw new ApiError('UPSTREAM_INVALID', '请粘贴要导入的账号内容', 400)
@@ -113,10 +114,17 @@ export function registerGptAccountRoutes(
     if (sourceRaw && sourceRaw !== 'codex' && sourceRaw !== 'web') {
       throw new ApiError('UPSTREAM_INVALID', '账号类型只能是 codex 或 web', 400)
     }
-    const source: GptAccountSource | undefined =
-      sourceRaw === 'codex' || sourceRaw === 'web' ? sourceRaw : undefined
+    // session_json 是浏览器会话导出的账号，只适用于 Web 通道；
+    // token / cpa / manual 默认按 Codex 处理，也可以用 source 显式指定。
+    const modeRaw = typeof body.mode === 'string' ? body.mode.trim().toLowerCase() : ''
+    const defaultSource: GptAccountSource =
+      modeRaw === 'session'
+        ? 'web'
+        : sourceRaw === 'codex' || sourceRaw === 'web'
+          ? sourceRaw
+          : 'codex'
 
-    const result = await store.importText(text, { defaultSource: source })
+    const result = await store.importText(text, { defaultSource })
     request.log.info(
       { imported: result.imported, updated: result.updated, skipped: result.skipped },
       'GPT 账号导入完成',
@@ -159,6 +167,40 @@ export function registerGptAccountRoutes(
     const body = (request.body ?? {}) as { ids?: unknown }
     const cleared = await store.clearCooldown(parseIds(body.ids))
     return { cleared, ...listPayload() }
+  })
+
+  app.post('/api/admin/gpt-accounts/remote/cpa/list', async request => {
+    requireAdmin(request)
+    const body = (request.body ?? {}) as { baseUrl?: unknown; secretKey?: unknown }
+    const files = await listCpaFiles(body.baseUrl, body.secretKey)
+    return { files }
+  })
+
+  app.post('/api/admin/gpt-accounts/remote/cpa/import', async request => {
+    requireAdmin(request)
+    const body = (request.body ?? {}) as {
+      baseUrl?: unknown
+      secretKey?: unknown
+      names?: unknown
+    }
+    const fetched = await fetchCpaEntries(body.baseUrl, body.secretKey, body.names)
+    const result = fetched.entries.length
+      ? await store.importParsed(fetched.entries)
+      : { imported: 0, updated: 0, skipped: 0, invalid: [], accounts: store.listPublic() }
+    request.log.info(
+      {
+        imported: result.imported,
+        updated: result.updated,
+        skipped: result.skipped,
+        failed: fetched.failures.length,
+      },
+      'CP 服务器账号导入完成',
+    )
+    return {
+      ...result,
+      failures: fetched.failures,
+      ...listPayload(),
+    }
   })
 
   app.post('/api/admin/gpt-accounts/check', async request => {

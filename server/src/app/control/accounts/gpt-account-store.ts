@@ -273,17 +273,20 @@ export class GptAccountStore {
     return changed
   }
 
-  async importText(
-    text: string,
-    options: ImportParseOptions = {},
+  /** 已经解析好的账号直接入库：文本导入与远程导入共用 */
+  async importParsed(
+    parsedEntries: ParsedAccountEntry[],
+    parsedInvalid: Array<{ line: string; reason: string }> = [],
   ): Promise<ImportResult> {
-    const parsed = parseAccountImport(text, options)
-    let entries = parsed.entries
-    const invalid = [...parsed.invalid]
+    let entries = parsedEntries
+    const invalid = [...parsedInvalid]
     if (entries.length > this.options.maxAccountsPerImport) {
       const dropped = entries.length - this.options.maxAccountsPerImport
       entries = entries.slice(0, this.options.maxAccountsPerImport)
-      invalid.push({ line: '(批量导入)', reason: `一次最多导入 ${this.options.maxAccountsPerImport} 个账号，已忽略 ${dropped} 个` })
+      invalid.push({
+        line: '(批量导入)',
+        reason: `一次最多导入 ${this.options.maxAccountsPerImport} 个账号，已忽略 ${dropped} 个`,
+      })
     }
 
     let imported = 0
@@ -310,6 +313,14 @@ export class GptAccountStore {
       invalid,
       accounts: this.listPublic(),
     }
+  }
+
+  async importText(
+    text: string,
+    options: ImportParseOptions = {},
+  ): Promise<ImportResult> {
+    const parsed = parseAccountImport(text, options)
+    return this.importParsed(parsed.entries, parsed.invalid)
   }
 
   /** 后台可改的字段：显示名、启用状态、并发上限 */
