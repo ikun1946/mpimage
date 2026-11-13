@@ -1,23 +1,17 @@
 /**
  * 生图实时监控：进程内记录、聚合与快照。
  *
- * 只记录真实能测到的阶段（排队、账号领取、令牌刷新、上游、解析、存储、总额度写入），
- * 不伪造 DNS/TCP/TLS、SSE 之外的网络细节。所有耗时都是整数毫秒。
+ * 只记录真实能测到的阶段（排队、上游、解析、存储、总额度写入），
+ * 不伪造 DNS/TCP/TLS 等网络细节。所有耗时都是整数毫秒。
  */
 
-export type MonitorBranch = 'account' | 'custom' | 'magpie'
+export type MonitorBranch = 'custom' | 'magpie'
 export type MonitorStatus = 'running' | 'success' | 'failed'
 
 export type MonitorMetrics = Record<string, number>
 
 export interface MonitorAttempt {
   attempt: number
-  account_id?: string
-  account_label?: string
-  account_email?: string
-  plan?: string
-  acquire_ms?: number
-  refresh_ms?: number
   upstream_ms?: number
   outcome: string
   error?: string
@@ -60,7 +54,6 @@ export interface MonitorRecord {
   metrics: MonitorMetrics
   attempts: MonitorAttempt[]
   images: MonitorImage[]
-  account?: { id: string; label: string; email: string; plan: string }
   error?: string
   /** 内部：最近一次 stage 开始时间，仅用于 stage_elapsed_ms */
   stage_started_at?: number
@@ -84,12 +77,8 @@ const METRIC_LABELS: Record<string, string> = {
   reference_load_ms: '参考图读取',
   config_read_ms: '配置读取',
   queue_wait_ms: '排队等待',
-  account_acquire_ms: '账号领取',
-  token_refresh_ms: '令牌刷新',
   upstream_headers_ms: '上游响应头',
   upstream_ms: '上游请求',
-  sse_first_event_ms: 'SSE 首事件',
-  sse_max_gap_ms: 'SSE 最大空窗',
   download_ms: '图片下载',
   parse_ms: '图片解析',
   store_ms: '图片存储',
@@ -104,13 +93,10 @@ const STAGE_LABELS: Record<string, string> = {
   storing: '图片存储',
   done: '已完成',
   failed: '失败',
-  refreshing: '刷新令牌',
 }
 
 const BOTTLENECK_KEYS = [
   'queue_wait_ms',
-  'account_acquire_ms',
-  'token_refresh_ms',
   'upstream_headers_ms',
   'upstream_ms',
   'parse_ms',
@@ -149,13 +135,6 @@ function p95(values: number[]): number {
 function average(values: number[]): number {
   if (!values.length) return 0
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
-}
-
-function maskEmail(email: string): string {
-  const value = String(email || '').trim()
-  const at = value.indexOf('@')
-  if (at <= 0) return value ? `${value.slice(0, 1)}***` : ''
-  return `${value.slice(0, 1)}***${value.slice(at)}`
 }
 
 export interface StartInput {
@@ -215,22 +194,6 @@ export class RealtimeMonitor {
     Object.assign(record, patch, { updated_at: Date.now() })
   }
 
-  annotateAccount(
-    callId: string,
-    account: { id: string; label: string; email: string; plan: string } | null | undefined,
-  ): void {
-    if (!account) return
-    const record = this.active.get(callId)
-    if (!record) return
-    record.account = {
-      id: account.id,
-      label: account.label || account.email || account.id,
-      email: maskEmail(account.email),
-      plan: account.plan,
-    }
-    record.updated_at = Date.now()
-  }
-
   stage(callId: string, stage: string): void {
     const record = this.active.get(callId)
     if (!record) return
@@ -283,26 +246,6 @@ export class RealtimeMonitor {
     for (const [key, value] of Object.entries(metrics)) {
       this.imageMetric(callId, index, key, value)
     }
-  }
-
-  attempt(callId: string, attempt: MonitorAttempt): void {
-    const record = this.active.get(callId)
-    if (!record) return
-    record.attempts.push(attempt)
-    if (attempt.acquire_ms) {
-      record.metrics.account_acquire_ms = Math.max(
-        record.metrics.account_acquire_ms || 0,
-        ms(attempt.acquire_ms),
-      )
-    }
-    if (attempt.refresh_ms) {
-      record.metrics.token_refresh_ms = Math.max(
-        record.metrics.token_refresh_ms || 0,
-        ms(attempt.refresh_ms),
-      )
-    }
-    record.updated_at = Date.now()
-    this.version += 1
   }
 
   imageFinish(
@@ -391,12 +334,11 @@ export class RealtimeMonitor {
 
     const slowCounts = {
       queue_wait: completed.filter(record => (record.metrics.queue_wait_ms || 0) > 1000).length,
-      account_acquire: completed.filter(record => (record.metrics.account_acquire_ms || 0) > 3000).length,
       upstream_over_60s: completed.filter(record => (record.metrics.upstream_ms || 0) > 60_000).length,
       store: completed.filter(record => (record.metrics.store_ms || 0) > 1000).length,
       total_over_120s: completed.filter(record => (record.duration_ms || 0) > 120_000).length,
       local_reject_or_busy: completed.filter(
-        record => record.status === 'failed' && /BUSY|POOL_EMPTY|RATE_LIMIT|QUOTA/i.test(record.error || ''),
+        record => record.status === 'failed' && /BUSY|RATE_LIMIT|QUOTA/i.test(record.error || ''),
       ).length,
     }
 
@@ -469,7 +411,6 @@ export class RealtimeMonitor {
       metrics: { ...record.metrics },
       attempts: record.attempts.map(attempt => ({ ...attempt })),
       images: record.images.map(image => ({ ...image, metrics: { ...image.metrics } })),
-      account: record.account ? { ...record.account } : null,
       error: record.error || null,
     }
   }

@@ -6,7 +6,6 @@ import { ModelCatalog } from '../app/control/model-catalog.js'
 import { ImageModelCatalog } from '../app/control/image-model-catalog.js'
 import type { ProviderConfig, ProviderModelConfig, SettingsStore } from '../app/control/settings-store.js'
 import { customModelId } from '../app/control/client-models.js'
-import type { GptAccountStore } from '../app/control/accounts/gpt-account-store.js'
 import { requireAdmin } from './auth.js'
 
 /** 缓存按上游地址分键，放在模块级才能跨请求复用 */
@@ -218,7 +217,7 @@ function wantsRefresh(raw: unknown): boolean {
 
 export function registerUpstreamRoutes(
   app: FastifyInstance,
-  deps: { settings: SettingsStore; accounts?: GptAccountStore },
+  deps: { settings: SettingsStore },
 ): void {
   app.get('/api/admin/upstream', async request => {
     requireAdmin(request)
@@ -250,14 +249,6 @@ export function registerUpstreamRoutes(
       providers: deps.settings.getProviders(),
       modelAliases: deps.settings.getModelAliases(),
       modelVisibility: deps.settings.getModelVisibility(),
-      /** 账号池当前可用的生图模型；只读，由导入的账号决定 */
-      accountImageModels: deps.accounts
-        ? deps.accounts.availableModels().map(spec => ({
-            id: spec.id,
-            label: spec.label,
-            accounts: deps.accounts!.countForModel(spec),
-          }))
-        : [],
     }
   })
 
@@ -299,7 +290,7 @@ export function registerUpstreamRoutes(
     const modelVisibility =
       body.modelVisibility === undefined ? undefined : parseModelVisibility(body.modelVisibility)
 
-    // 内置、自定义供应商、账号池三类里至少留一个对客户端可见的模型
+    // 内置与自定义供应商里至少留一个对客户端可见的模型
     const visibilityForCheck = modelVisibility ?? deps.settings.getModelVisibility()
     const visibleBuiltins =
       enabledImageModels !== undefined
@@ -317,11 +308,8 @@ export function registerUpstreamRoutes(
           ).length,
         0,
       )
-    const visibleAccounts = deps.accounts
-      ? deps.accounts.availableModels().filter(model => visibilityForCheck[model.id] !== false).length
-      : 0
-    if (visibleBuiltins + visibleCustom + visibleAccounts === 0) {
-      throw new ApiError('UPSTREAM_INVALID', '客户端至少需要一个可见模型（内置、自定义供应商或账号池）', 400)
+    if (visibleBuiltins + visibleCustom === 0) {
+      throw new ApiError('UPSTREAM_INVALID', '客户端至少需要一个可见模型（内置或自定义供应商）', 400)
     }
 
     // 生图模型可以是内置的，也可以是自定义供应商里的公开 ID
@@ -329,13 +317,9 @@ export function registerUpstreamRoutes(
       const customIds = (providers ?? deps.settings.getProviders()).flatMap(provider =>
         provider.models.map(model => customModelId(provider.id, model.id)),
       )
-      const accountIds = deps.accounts
-        ? deps.accounts.availableModels().map(spec => spec.id)
-        : []
       if (
         !catalogIds.includes(imageModel) &&
         !customIds.includes(imageModel) &&
-        !accountIds.includes(imageModel) &&
         !findImageModel(imageModel)
       ) {
         throw new ApiError('UPSTREAM_INVALID', '未知的生图模型：' + imageModel, 400)
@@ -393,13 +377,6 @@ export function registerUpstreamRoutes(
       providers: deps.settings.getProviders(),
       modelAliases: deps.settings.getModelAliases(),
       modelVisibility: deps.settings.getModelVisibility(),
-      accountImageModels: deps.accounts
-        ? deps.accounts.availableModels().map(spec => ({
-            id: spec.id,
-            label: spec.label,
-            accounts: deps.accounts!.countForModel(spec),
-          }))
-        : [],
     })
   })
 

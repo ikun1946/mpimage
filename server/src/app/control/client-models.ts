@@ -10,7 +10,6 @@
  */
 import type { ProviderConfig, ProviderModelConfig, SettingsStore } from './settings-store.js'
 import { ImageModelCatalog } from './image-model-catalog.js'
-import type { GptAccountStore } from './accounts/gpt-account-store.js'
 
 const imageModelCatalog = new ImageModelCatalog()
 
@@ -48,7 +47,6 @@ export interface ClientModelList {
 
 export async function listClientImageModels(
   settings: SettingsStore,
-  accounts?: GptAccountStore,
 ): Promise<ClientModelList> {
   const catalog = await imageModelCatalog.list(await settings.getBaseUrl())
   const magpieCatalogIds = catalog.map(model => model.id)
@@ -74,18 +72,6 @@ export async function listClientImageModels(
         id: publicId,
         label: aliases[publicId] || model.label || model.id,
         provider: provider.id,
-      })
-    }
-  }
-
-  // 账号池模型：只有存在可用账号时才出现，导入/停用账号后立即生效
-  if (accounts) {
-    for (const spec of accounts.availableModels()) {
-      if (visibility[spec.id] === false) continue
-      models.push({
-        id: spec.id,
-        label: aliases[spec.id] || spec.label,
-        provider: 'gpt-accounts',
       })
     }
   }

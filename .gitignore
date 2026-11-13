@@ -7,7 +7,7 @@ generated/
 
 # 本地数据：账号库含密码哈希，统计与风格库是个人数据
 users.json
-# GPT 账号池：含 access_token / refresh_token，绝不能提交
+# 历史 GPT 账号池数据：仍含 access_token，保留忽略以免误提交
 gpt-accounts.json
 gpt-accounts.json.*
 projects.json

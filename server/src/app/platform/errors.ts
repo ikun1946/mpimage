@@ -18,8 +18,6 @@ export type ApiErrorCode =
   | 'UPSTREAM_TRUNCATED'
   | 'UPSTREAM_INVALID'
   | 'CONTENT_POLICY'
-  | 'ACCOUNT_BUSY'
-  | 'ACCOUNT_POOL_EMPTY'
   | 'VISION_UNSUPPORTED'
   | 'IMAGE_INVALID'
   | 'IMAGE_UNSUPPORTED'
@@ -58,10 +56,6 @@ function defaultStatusFor(code: ApiErrorCode): number {
       return 413
     case 'UPSTREAM_INVALID':
       return 400
-    case 'ACCOUNT_BUSY':
-      return 503
-    case 'ACCOUNT_POOL_EMPTY':
-      return 503
     default:
       return 400
   }

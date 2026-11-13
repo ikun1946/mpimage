@@ -60,8 +60,6 @@ function serverEnv() {
     USER_DATABASE_PATH: join(paths.data, 'users.json'),
     USAGE_DATABASE_PATH: join(paths.data, 'usage.json'),
     PROJECT_DATABASE_PATH: join(paths.data, 'projects.json'),
-    // GPT 账号池含 token，跟其它运行期数据一起放数据目录，绝不写安装目录
-    GPT_ACCOUNTS_FILE: join(paths.data, 'gpt-accounts.json'),
     DATA_DIR: join(paths.data, 'data'),
     LOG_DIR: paths.logDir,
     WEB_DIST_DIR: join(paths.root, 'web', 'dist'),

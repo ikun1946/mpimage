@@ -3,15 +3,14 @@ import { config } from '../app/platform/config.js'
 import { checkHealth } from '../app/products/images/magpie.js'
 import { listClientImageModels } from '../app/control/client-models.js'
 import type { SettingsStore } from '../app/control/settings-store.js'
-import type { GptAccountStore } from '../app/control/accounts/gpt-account-store.js'
 
 export function registerMetaRoutes(
   app: FastifyInstance,
-  deps: { concurrency?: () => number; settings: SettingsStore; accounts?: GptAccountStore },
+  deps: { concurrency?: () => number; settings: SettingsStore },
 ): void {
   app.get('/api/config', async () => {
     // 生图模型 = Magpie 实际返回的清单 + 后台配置的自定义供应商
-    const { models: clientModels } = await listClientImageModels(deps.settings, deps.accounts)
+    const { models: clientModels } = await listClientImageModels(deps.settings)
     const imageModels = clientModels.map(({ id, label }) => ({ id, label }))
     const configuredModel = deps.settings.getImageModel()
     // 默认模型排第一位，客户端下拉打开就能看到它；默认值可能来自自定义供应商

@@ -7,9 +7,6 @@ import { auditFailure, auditLog } from '../app/platform/audit.js'
 import { buildFileUrl } from '../utils/url.js'
 import { requestImage, requestImageEdit } from '../app/products/images/magpie.js'
 import { listClientImageModels, resolveCustomProviderModel } from '../app/control/client-models.js'
-import { requestAccountImage, resolveAccountModel } from '../app/products/openai/account-image.js'
-import type { GptAccountPool } from '../app/control/accounts/account-pool.js'
-import type { GptAccountStore } from '../app/control/accounts/gpt-account-store.js'
 import type { RealtimeMonitor } from '../services/realtime-monitor.js'
 import { detectImageType, readImageSize } from '../app/products/images/imaging.js'
 import { generateImageTitle } from '../app/products/images/image-title.js'
@@ -94,8 +91,6 @@ export function registerImageRoutes(
     usage: UsageStore
     quotas: QuotaStore
     settings: SettingsStore
-    /** GPT 账号池（可选）：导入账号后客户端会出现 g: 前缀的模型 */
-    accounts?: { store: GptAccountStore; pool: GptAccountPool }
     /** 实时监控（可选）：记录每个请求的阶段耗时 */
     monitor?: RealtimeMonitor
   },
@@ -198,7 +193,7 @@ export function registerImageRoutes(
 
     // 客户端只能选服务端开启的模型（含自定义供应商）；不传就跟随服务端当前配置
     const modelResolveStartedAt = Date.now()
-    const clientModels = await listClientImageModels(deps.settings, deps.accounts?.store)
+    const clientModels = await listClientImageModels(deps.settings)
     const knownModelIds = clientModels.models.map(model => model.id)
     const requestedModel = typeof body.model === 'string' ? body.model.trim() : ''
     if (requestedModel && !knownModelIds.includes(requestedModel)) {
@@ -362,12 +357,10 @@ export function registerImageRoutes(
     const references = await loadReferenceImages(referencePaths)
     deps.monitor?.metric(callId, 'reference_load_ms', Date.now() - referenceLoadStartedAt)
     // 每次生图都重读上游地址：后台改完立即生效，无需重启服务
-    // 账号池模型：用导入账号的额度走 Codex 通道
-    const accountTarget = deps.accounts ? resolveAccountModel(selectedModel) : null
     // 自定义供应商：换成它自己的地址、密钥与上游模型名；否则走 Magpie
-    const customModel = accountTarget ? null : resolveCustomProviderModel(deps.settings, selectedModel)
+    const customModel = resolveCustomProviderModel(deps.settings, selectedModel)
     deps.monitor?.annotate(callId, {
-      branch: accountTarget ? 'account' : customModel ? 'custom' : 'magpie',
+      branch: customModel ? 'custom' : 'magpie',
     })
     let upstreamOptions
     if (customModel) {
@@ -398,42 +391,12 @@ export function registerImageRoutes(
       Array.from({ length: imageCount }, async (_value, imageIndex) => {
         const index = imageIndex + 1
         const imageStartedAt = Date.now()
-        let attemptNumber = 0
         try {
           const upstream = await deps.gate.run(async () => {
             deps.monitor?.imageStart(callId, index)
             deps.monitor?.imageMetric(callId, index, 'queue_wait_ms', Date.now() - queuedAt)
             deps.monitor?.stage(callId, 'generating')
 
-            if (accountTarget && deps.accounts) {
-              return requestAccountImage(deps.accounts, selectedModel, {
-                prompt,
-                ratioHint: ratio.promptHint,
-                images: references,
-                timeoutMs: promptTimeoutMs,
-                onAttempt: attempt => {
-                  attemptNumber += 1
-                  deps.monitor?.attempt(callId, {
-                    attempt: attemptNumber,
-                    account_id: attempt.accountId,
-                    account_label: attempt.label,
-                    account_email: attempt.email ? `${attempt.email.slice(0, 1)}***` : '',
-                    plan: attempt.plan,
-                    acquire_ms: attempt.acquireMs,
-                    refresh_ms: attempt.refreshMs,
-                    upstream_ms: attempt.upstreamMs,
-                    outcome: attempt.outcome,
-                    error: attempt.error,
-                  })
-                  deps.monitor?.annotateAccount(callId, {
-                    id: attempt.accountId,
-                    label: attempt.label,
-                    email: attempt.email,
-                    plan: attempt.plan,
-                  })
-                },
-              })
-            }
             return references.length
               ? await requestImageEdit(
                 upstreamOptions,

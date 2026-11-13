@@ -987,260 +987,6 @@
     margin-top: 10px;
   }
 
-  /* GPT 账号池：导入、状态与模型可用性 */
-  .gpt-import-bar {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .gpt-import-menu-wrap {
-    position: relative;
-  }
-
-  .gpt-import-toggle .caret {
-    margin-left: 4px;
-    font-size: 10px;
-    opacity: 0.8;
-  }
-
-  .gpt-import-menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    z-index: 30;
-    min-width: 232px;
-    padding: 5px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--surface);
-    box-shadow: 0 14px 34px rgba(24, 30, 25, 0.16);
-  }
-
-  .gpt-import-menu button {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
-    padding: 8px 10px;
-    border: 0;
-    border-radius: 7px;
-    background: transparent;
-    color: var(--ink);
-    font-size: 13px;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .gpt-import-menu button:hover:not(:disabled) {
-    background: var(--surface-sunken);
-  }
-
-  .gpt-import-menu button:disabled {
-    color: var(--ink-faint);
-    cursor: not-allowed;
-  }
-
-  .gpt-import-menu button small {
-    margin-left: auto;
-    font-size: 10px;
-    color: var(--ink-faint);
-  }
-
-  .gpt-mode-panel {
-    margin-top: 10px;
-  }
-
-  .gpt-mode-note {
-    margin: 0 0 8px;
-    font-size: 12px;
-    line-height: 1.6;
-    color: var(--ink-soft);
-  }
-
-  .gpt-form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 8px;
-  }
-
-  .gpt-form-grid label {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--ink-soft);
-  }
-
-  .gpt-form-grid input,
-  .gpt-form-grid select {
-    height: 32px;
-    font-size: 12px;
-  }
-
-  .gpt-remote-list {
-    display: grid;
-    gap: 4px;
-    max-height: 220px;
-    margin-top: 8px;
-    overflow-y: auto;
-  }
-
-  .gpt-remote-list:empty::before {
-    content: '连接后会在这里列出服务器上的账号文件。';
-    color: var(--ink-faint);
-    font-size: 12px;
-  }
-
-  .gpt-remote-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 8px;
-    border: 1px solid var(--line-soft);
-    border-radius: 8px;
-    font-size: 12px;
-  }
-
-  .gpt-remote-row code {
-    font-family: Consolas, "SFMono-Regular", monospace;
-    font-size: 11px;
-    color: var(--ink);
-  }
-
-  .gpt-remote-row span {
-    color: var(--ink-faint);
-  }
-
-  html[data-theme="dark"] .gpt-import-menu {
-    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
-  }
-  .gpt-import textarea {
-    width: 100%;
-    min-height: 78px;
-    margin-top: 8px;
-    font-family: Consolas, "SFMono-Regular", monospace;
-    font-size: 12px;
-  }
-
-  .gpt-model-list {
-    display: grid;
-    gap: 5px;
-    margin: 10px 0 4px;
-    padding: 9px 12px;
-    border: 1px solid var(--line-soft);
-    border-radius: 10px;
-    background: var(--surface-subtle);
-  }
-
-  .gpt-model-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--ink-soft);
-  }
-
-  .gpt-model-row code {
-    color: var(--ink);
-    font-family: Consolas, "SFMono-Regular", monospace;
-    font-size: 11px;
-  }
-
-  .gpt-model-row .gpt-model-count {
-    margin-left: auto;
-    color: var(--ink-faint);
-  }
-
-  .gpt-model-row.is-empty {
-    opacity: 0.55;
-  }
-
-  .gpt-account-list {
-    display: grid;
-    gap: 8px;
-    max-height: 320px;
-    margin-top: 10px;
-    overflow-y: auto;
-  }
-
-  .gpt-account-list:empty::before {
-    content: '还没有导入账号。粘贴 access_token 或 auth.json 后点「导入账号」。';
-    color: var(--ink-faint);
-    font-size: 12px;
-  }
-
-  .gpt-account-row {
-    padding: 12px 4px;
-    border: 0;
-    border-bottom: 1px solid var(--line-soft);
-    border-radius: 0;
-    background: transparent;
-  }
-
-  .gpt-account-row:last-child { border-bottom: 0; }
-
-  .gpt-account-row:hover { background: var(--surface-subtle); }
-
-  .gpt-account-main {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .gpt-account-main strong {
-    font-size: 13px;
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  .gpt-account-main code {
-    color: var(--ink-faint);
-    font-family: Consolas, "SFMono-Regular", monospace;
-    font-size: 11px;
-  }
-
-  .gpt-account-state {
-    padding: 1px 7px;
-    border-radius: var(--radius-pill);
-    background: var(--surface-sunken);
-    border: 1px solid var(--line-soft);
-    font-size: 11px;
-    color: var(--ink-soft);
-  }
-
-  .gpt-account-state.active { color: #2f6b45; border-color: rgba(47, 107, 69, 0.35); background: rgba(47, 107, 69, 0.08); }
-  .gpt-account-state.invalid { color: #a33a2a; border-color: rgba(163, 58, 42, 0.35); background: rgba(163, 58, 42, 0.08); }
-  .gpt-account-state.limited { color: #8a6413; border-color: rgba(138, 100, 19, 0.35); background: rgba(138, 100, 19, 0.08); }
-
-  .gpt-account-side {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 6px;
-  }
-
-  .gpt-account-side .gpt-inflight {
-    margin-right: auto;
-    color: var(--ink-faint);
-    font-size: 11px;
-  }
-
-  .gpt-account-error {
-    margin: 5px 0 0;
-    font-size: 11px;
-    line-height: 1.5;
-    color: #a33a2a;
-    word-break: break-all;
-  }
-
-  html[data-theme="dark"] .gpt-account-state.active { color: #8fd0a6; border-color: rgba(143, 208, 166, 0.35); background: rgba(143, 208, 166, 0.08); }
-  html[data-theme="dark"] .gpt-account-state.invalid { color: #e8a091; border-color: rgba(232, 160, 145, 0.35); background: rgba(232, 160, 145, 0.08); }
-  html[data-theme="dark"] .gpt-account-error { color: #e8a091; }
-
   /* ---------- 徽标 ---------- */
 
   .chip {
@@ -2532,10 +2278,6 @@
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.2 9.8l3.6-3.6"/><path d="M7 4.4l1.1-1.1a2.5 2.5 0 0 1 3.6 3.6L10.6 8"/><path d="M9 11.6l-1.1 1.1a2.5 2.5 0 0 1-3.6-3.6L5.4 8"/></svg>
       <span>上游与模型</span>
     </button>
-    <button class="side-link" type="button" data-page="gpt">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2l1.2 2.6 2.6 1.2-2.6 1.2L8 9.8 6.8 7.2 4.2 6l2.6-1.2z"/><path d="M11.7 9.4l.6 1.3 1.3.6-1.3.6-.6 1.3-.6-1.3-1.3-.6 1.3-.6z"/></svg>
-      <span>GPT 账号池</span>
-    </button>
     <button class="side-link" type="button" data-page="limits">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5a5.5 5.5 0 1 1 11 0"/><path d="M8 12.5L10.6 7"/><circle cx="8" cy="12.5" r="1.1"/></svg>
       <span>限流与并发</span>
@@ -2649,7 +2391,7 @@
           <div class="rt-grid" id="rt-overview"></div>
         </section>
         <section class="rt-block">
-          <header>入口与出口<span>闸门、账号、窗口</span></header>
+          <header>入口与出口<span>闸门、队列、窗口</span></header>
           <div class="rt-grid" id="rt-entry"></div>
         </section>
         <section class="rt-block">
@@ -2657,7 +2399,7 @@
           <div class="rt-grid" id="rt-upstream"></div>
         </section>
         <section class="rt-block">
-          <header>当前状态<span>分支、阶段、账号池</span></header>
+          <header>当前状态<span>分支与阶段</span></header>
           <div class="rt-chips" id="rt-status"></div>
         </section>
       </div>
@@ -2808,140 +2550,6 @@
       </fieldset>
       <p class="current" id="upstream-meta">读取中…</p>
       <p class="current" id="upstream-result"></p>
-    </div>
-  </section>
-
-  <section data-page-panel="gpt" class="card page span-6" aria-labelledby="gpt-accounts-title">
-    <div class="card-head">
-      <h2 id="gpt-accounts-title">导入与账号列表</h2>
-      <div class="head-actions">
-        <button class="button mini" type="button" id="btn-gpt-accounts-refresh">刷新</button>
-      </div>
-    </div>
-    <div class="card-body">
-      <div class="notice" id="gpt-accounts-notice" hidden></div>
-      <p class="hint">
-        导入 ChatGPT / Codex 账号的 access_token，用账号自己的额度生图。当前只启用 Codex 通道
-        （/backend-api/codex/responses）；Web 账号可以保存，但暂不参与生图。
-      </p>
-      <div class="gpt-import">
-        <div class="gpt-import-bar">
-          <div class="gpt-import-menu-wrap">
-            <button class="button primary gpt-import-toggle" type="button" id="gpt-import-toggle"
-              aria-haspopup="menu" aria-expanded="false">导入 / 添加<span class="caret">▾</span></button>
-            <div class="gpt-import-menu" id="gpt-import-menu" role="menu" hidden>
-              <button type="button" role="menuitem" data-gpt-mode="manual">手动添加账号</button>
-              <button type="button" role="menuitem" data-gpt-mode="oauth" disabled title="需要 Web 通道（Sentinel / PoW），当前版本暂未启用">OAuth 登录已有账号<small>需 Web 通道</small></button>
-              <button type="button" role="menuitem" data-gpt-mode="token">导入 Access Token</button>
-              <button type="button" role="menuitem" data-gpt-mode="session">导入 Session JSON</button>
-              <button type="button" role="menuitem" data-gpt-mode="cpa">导入 CPA JSON 文件</button>
-              <button type="button" role="menuitem" data-gpt-mode="remote-cpa">从 CPA 服务器导入</button>
-              <button type="button" role="menuitem" data-gpt-mode="sub2api" disabled title="Sub2API 账号需要 Web 通道，当前版本暂未接入">从 Sub2API 服务器导入<small>暂未接入</small></button>
-            </div>
-          </div>
-          <button class="button" type="button" id="gpt-check-all">测试全部</button>
-          <span class="current" id="gpt-import-status" role="status" aria-live="polite"></span>
-        </div>
-
-        <div class="gpt-mode-panel" id="gpt-panel-token" data-gpt-panel="token">
-          <div class="form-row">
-            <label>账号类型
-              <select id="gpt-import-source">
-                <option value="">自动识别（默认 Codex）</option>
-                <option value="codex">Codex</option>
-                <option value="web">Web（仅保存）</option>
-              </select>
-            </label>
-            <button class="button mini" type="button" id="gpt-import-file">从文件读取</button>
-            <input type="file" id="gpt-import-file-input" accept=".json,.jsonl,.txt" hidden />
-          </div>
-          <textarea id="gpt-import-text" class="textarea" rows="4" spellcheck="false"
-            placeholder="每行一个 access_token，或 email----token；也可以粘贴 auth.json / JSON 数组 / JSONL"></textarea>
-          <div class="form-row">
-            <button class="button primary" type="button" id="gpt-import-submit">导入账号</button>
-          </div>
-        </div>
-
-        <div class="gpt-mode-panel" id="gpt-panel-session" data-gpt-panel="session" hidden>
-          <p class="gpt-mode-note">
-            粘贴浏览器导出的 Session JSON（顶层含 accessToken / access_token）。
-            这类账号会按 Web 账号保存，当前版本只启用 Codex 通道，暂不参与生图。
-          </p>
-          <textarea id="gpt-session-text" class="textarea" rows="4" spellcheck="false"
-            placeholder='{"accessToken":"eyJ...","email":"you@example.com","type":"free"}'></textarea>
-          <div class="form-row">
-            <button class="button mini" type="button" id="gpt-session-file">选择文件</button>
-            <input type="file" id="gpt-session-input" accept=".json,.txt" hidden />
-            <button class="button primary" type="button" id="gpt-session-submit">导入 Session</button>
-          </div>
-        </div>
-
-        <div class="gpt-mode-panel" id="gpt-panel-cpa" data-gpt-panel="cpa" hidden>
-          <p class="gpt-mode-note">
-            选择 CLIProxyAPI / Codex CLI 导出的 auth JSON 文件，可以多选。文件里的
-            access_token、refresh_token 会被直接读取。
-          </p>
-          <div class="form-row">
-            <button class="button" type="button" id="gpt-cpa-file">选择 CPA JSON 文件</button>
-            <input type="file" id="gpt-cpa-input" accept=".json" multiple hidden />
-            <span class="hint" id="gpt-cpa-file-meta"></span>
-          </div>
-        </div>
-
-        <div class="gpt-mode-panel" id="gpt-panel-remote-cpa" data-gpt-panel="remote-cpa" hidden>
-          <p class="gpt-mode-note">
-            从 CLIProxyAPI 的 management 接口读取 auth 文件（Bearer 密钥）。
-            地址示例：http://127.0.0.1:8317
-          </p>
-          <div class="form-row">
-            <label class="grow">服务器地址
-              <input id="gpt-cpa-base" type="url" placeholder="http://127.0.0.1:8317" spellcheck="false" autocomplete="off" />
-            </label>
-            <label class="grow">管理密钥
-              <input id="gpt-cpa-secret" type="password" placeholder="secret key" autocomplete="off" />
-            </label>
-            <button class="button" type="button" id="gpt-cpa-connect">连接</button>
-          </div>
-          <div class="gpt-remote-list" id="gpt-cpa-list"></div>
-          <div class="form-row">
-            <button class="button primary" type="button" id="gpt-cpa-import">导入选中</button>
-            <span class="hint" id="gpt-cpa-meta"></span>
-          </div>
-        </div>
-
-        <div class="gpt-mode-panel" id="gpt-panel-manual" data-gpt-panel="manual" hidden>
-          <div class="gpt-form-grid">
-            <label>邮箱
-              <input id="gpt-manual-email" type="text" placeholder="you@example.com" autocomplete="off" />
-            </label>
-            <label>账号类型
-              <select id="gpt-manual-source">
-                <option value="codex">Codex</option>
-                <option value="web">Web（仅保存）</option>
-              </select>
-            </label>
-            <label>套餐（可选）
-              <input id="gpt-manual-plan" type="text" placeholder="plus / pro / team" autocomplete="off" />
-            </label>
-            <label>显示名（可选）
-              <input id="gpt-manual-label" type="text" placeholder="备注名" autocomplete="off" />
-            </label>
-          </div>
-          <label class="gpt-manual-token">Access Token
-            <textarea id="gpt-manual-token" class="textarea" rows="3" spellcheck="false"
-              placeholder="粘贴 access_token / accessToken"></textarea>
-          </label>
-          <div class="form-row">
-            <label class="grow">Refresh Token（可选）
-              <input id="gpt-manual-refresh" type="password" placeholder="refresh_token" autocomplete="off" />
-            </label>
-            <button class="button primary" type="button" id="gpt-manual-submit">添加账号</button>
-          </div>
-        </div>
-      </div>
-      <div class="gpt-model-list" id="gpt-model-list"></div>
-      <div class="gpt-account-list" id="gpt-account-list"></div>
-      <p class="current" id="gpt-accounts-meta">读取中…</p>
     </div>
   </section>
 
@@ -3205,8 +2813,6 @@
     upstreamClientModelList: $('upstream-client-model-list'),
     providerList: $('provider-list'),
     providerAdd: $('provider-add'),
-    gptAccountsNotice: $('gpt-accounts-notice'),
-    btnGptAccountsRefresh: $('btn-gpt-accounts-refresh'),
     panelPageTitle: $('panel-page-title'),
     rtAuto: $('rt-auto'),
     rtInterval: $('rt-interval'),
@@ -3226,38 +2832,6 @@
     panelPageSub: $('panel-page-sub'),
     panelThemeToggle: $('panel-theme-toggle'),
     sideVersion: $('side-version'),
-    gptImportToggle: $('gpt-import-toggle'),
-    gptImportMenu: $('gpt-import-menu'),
-    gptSessionText: $('gpt-session-text'),
-    gptSessionFile: $('gpt-session-file'),
-    gptSessionInput: $('gpt-session-input'),
-    gptSessionSubmit: $('gpt-session-submit'),
-    gptCpaFile: $('gpt-cpa-file'),
-    gptCpaInput: $('gpt-cpa-input'),
-    gptCpaFileMeta: $('gpt-cpa-file-meta'),
-    gptCpaBase: $('gpt-cpa-base'),
-    gptCpaSecret: $('gpt-cpa-secret'),
-    gptCpaConnect: $('gpt-cpa-connect'),
-    gptCpaList: $('gpt-cpa-list'),
-    gptCpaImport: $('gpt-cpa-import'),
-    gptCpaMeta: $('gpt-cpa-meta'),
-    gptManualEmail: $('gpt-manual-email'),
-    gptManualSource: $('gpt-manual-source'),
-    gptManualPlan: $('gpt-manual-plan'),
-    gptManualLabel: $('gpt-manual-label'),
-    gptManualToken: $('gpt-manual-token'),
-    gptManualRefresh: $('gpt-manual-refresh'),
-    gptManualSubmit: $('gpt-manual-submit'),
-    gptImportSource: $('gpt-import-source'),
-    gptImportText: $('gpt-import-text'),
-    gptImportFile: $('gpt-import-file'),
-    gptImportFileInput: $('gpt-import-file-input'),
-    gptImportSubmit: $('gpt-import-submit'),
-    gptImportStatus: $('gpt-import-status'),
-    gptCheckAll: $('gpt-check-all'),
-    gptModelList: $('gpt-model-list'),
-    gptAccountList: $('gpt-account-list'),
-    gptAccountsMeta: $('gpt-accounts-meta'),
     upstreamTest: $('upstream-test'),
     upstreamSave: $('upstream-save'),
     upstreamMeta: $('upstream-meta'),
@@ -3424,11 +2998,6 @@
   let upstreamProviders = []
   let upstreamModelAliases = {}
   let upstreamModelVisibility = {}
-  let upstreamAccountImageModels = []
-  let gptAccountsState = { enabled: true, accounts: [], models: [] }
-  let gptCheckTimer = null
-  let gptImportMode = 'token'
-  let gptCpaFiles = []
 
   // 实时监控：默认 5 秒轮询，页面不可见或不在监控页时跳过
   let rtAuto = true
@@ -3762,7 +3331,6 @@
       loadRegistrations(),
       loadLimits(),
       loadUpstream(),
-      loadGptAccounts(),
       loadFeedback(feedbackFilter),
       loadStats(),
     ])
@@ -4339,539 +3907,6 @@
     })
   }
 
-  // ---------- GPT 账号池 ----------
-
-  const GPT_STATUS_LABELS = {
-    unchecked: '待检测',
-    active: '可用',
-    limited: '冷却中',
-    invalid: '已失效',
-    disabled: '已停用',
-  }
-
-  function gptPlanLabel(plan) {
-    const labels = {
-      free: 'Free',
-      plus: 'Plus',
-      pro: 'Pro',
-      prolite: 'Pro Lite',
-      team: 'Team',
-      enterprise: 'Enterprise',
-      unknown: '套餐未知',
-    }
-    return labels[plan] || plan || '套餐未知'
-  }
-
-  function renderGptModels() {
-    if (!dom.gptModelList) return
-    const models = gptAccountsState.models || []
-    if (!models.length) {
-      dom.gptModelList.innerHTML = '<div class="gpt-model-row is-empty">还没有可用的账号模型。</div>'
-      return
-    }
-    dom.gptModelList.innerHTML = models
-      .map(model => {
-        const count = Number(model.accounts) || 0
-        return `<div class="gpt-model-row${count ? '' : ' is-empty'}">
-          <code>${escapeHtml(model.id)}</code>
-          <span>${escapeHtml(model.label || '')}</span>
-          <span class="gpt-model-count">${count ? `${count} 个账号可用` : '暂无可用账号'}</span>
-        </div>`
-      })
-      .join('')
-  }
-
-  function renderGptAccounts() {
-    if (!dom.gptAccountList) return
-    const accounts = gptAccountsState.accounts || []
-    if (!accounts.length) {
-      dom.gptAccountList.innerHTML = ''
-    } else {
-      dom.gptAccountList.innerHTML = accounts
-        .map(account => {
-          const status = GPT_STATUS_LABELS[account.status] || account.status
-          const name = account.label || account.email || account.id
-          const plan = gptPlanLabel(account.plan)
-          const source = account.source === 'codex' ? 'Codex' : 'Web'
-          const cooling = account.cooldownUntil && account.cooldownUntil > Date.now()
-            ? ` · 冷却至 ${new Date(account.cooldownUntil).toLocaleTimeString()}`
-            : ''
-          const error = account.lastError
-            ? `<p class="gpt-account-error">${escapeHtml(account.lastError)}</p>`
-            : ''
-          return `<div class="gpt-account-row" data-id="${escapeHtml(account.id)}">
-            <div class="gpt-account-main">
-              <strong>${escapeHtml(name)}</strong>
-              <span class="gpt-account-state ${escapeHtml(account.status)}">${escapeHtml(status)}</span>
-              <code>${escapeHtml(plan)} · ${escapeHtml(source)} · ${escapeHtml(account.tokenPreview || '')}</code>
-            </div>
-            <div class="gpt-account-side">
-              <span class="gpt-inflight">在途 ${Number(account.inflight) || 0}/${Number(account.maxConcurrency) || 1}${escapeHtml(cooling)}</span>
-              <button class="button mini" type="button" data-gpt-act="check">测试</button>
-              <button class="button mini" type="button" data-gpt-act="toggle">${account.enabled ? '停用' : '启用'}</button>
-              <button class="button mini" type="button" data-gpt-act="cooldown">清冷却</button>
-              <button class="button mini" type="button" data-gpt-act="delete">删除</button>
-            </div>
-            ${error}
-          </div>`
-        })
-        .join('')
-    }
-
-    if (dom.gptAccountsMeta) {
-      const usable = accounts.filter(
-        account => account.enabled && account.status !== 'invalid' && account.status !== 'disabled',
-      ).length
-      dom.gptAccountsMeta.textContent = gptAccountsState.enabled
-        ? `共 ${accounts.length} 个账号，可用 ${usable} 个 · 改动会立即影响客户端模型列表`
-        : '账号池总开关已关闭（GPT_ACCOUNTS_ENABLED=0），账号仍可导入但不参与生图'
-    }
-    renderGptModels()
-  }
-
-  function applyGptPayload(data) {
-    if (!data || typeof data !== 'object') return
-    gptAccountsState = {
-      enabled: data.enabled !== false,
-      accounts: Array.isArray(data.accounts) ? data.accounts : [],
-      models: Array.isArray(data.models) ? data.models : [],
-    }
-    renderGptAccounts()
-    // 账号变化后顺手刷新上游里的默认模型下拉
-    if (Array.isArray(data.accountImageModels)) {
-      upstreamAccountImageModels = data.accountImageModels
-      renderUpstreamImageModelOptions()
-    } else {
-      void loadUpstream()
-    }
-  }
-
-  async function loadGptAccounts() {
-    if (!dom.gptAccountList) return
-    clearNotice(dom.gptAccountsNotice)
-    const result = await api('/api/admin/gpt-accounts')
-    if (isAuthFailure(result)) {
-      showNotice(dom.gptAccountsNotice, AUTH_HINT)
-      return
-    }
-    if (!result.ok) {
-      showNotice(dom.gptAccountsNotice, result.error || '账号池读取失败')
-      return
-    }
-    applyGptPayload(result.data)
-  }
-
-  function gptSelectedIds() {
-    return [...(dom.gptAccountList?.querySelectorAll('.gpt-account-row') || [])].map(
-      row => row.dataset.id,
-    )
-  }
-
-  function gptImportResultText(data) {
-    const parts = [
-      `新增 ${Number(data.imported) || 0}`,
-      `更新 ${Number(data.updated) || 0}`,
-    ]
-    if (Number(data.skipped)) parts.push(`跳过 ${data.skipped}`)
-    if (Array.isArray(data.invalid) && data.invalid.length) parts.push(`无效 ${data.invalid.length}`)
-    if (Array.isArray(data.failures) && data.failures.length) parts.push(`失败 ${data.failures.length}`)
-    return parts.join(' · ')
-  }
-
-  async function runGptImport({ text, mode, source, button, clear }) {
-    if (!String(text || '').trim()) {
-      setCurrent(dom.gptImportStatus, '先填写账号内容', 'error')
-      return false
-    }
-    let ok = false
-    await withBusy(button || dom.gptImportSubmit, async () => {
-      setCurrent(dom.gptImportStatus, '正在导入…')
-      const result = await api('/api/admin/gpt-accounts/import', {
-        method: 'POST',
-        body: {
-          text,
-          ...(mode ? { mode } : {}),
-          ...(source ? { source } : {}),
-        },
-      })
-      if (!result.ok) {
-        setCurrent(dom.gptImportStatus, result.error || '导入失败', 'error')
-        return
-      }
-      const data = result.data || {}
-      setCurrent(dom.gptImportStatus, gptImportResultText(data), 'ok')
-      if (clear) clear.value = ''
-      applyGptPayload(data)
-      ok = true
-    })
-    return ok
-  }
-
-  function importGptAccounts() {
-    return runGptImport({
-      text: dom.gptImportText?.value || '',
-      source: dom.gptImportSource?.value || '',
-      button: dom.gptImportSubmit,
-      clear: dom.gptImportText,
-    })
-  }
-
-  function setGptImportMode(mode) {
-    gptImportMode = mode
-    for (const panel of document.querySelectorAll('[data-gpt-panel]')) {
-      panel.hidden = panel.dataset.gptPanel !== mode
-    }
-    if (dom.gptImportMenu) dom.gptImportMenu.hidden = true
-    if (dom.gptImportToggle) dom.gptImportToggle.setAttribute('aria-expanded', 'false')
-    const focusTarget = {
-      token: dom.gptImportText,
-      session: dom.gptSessionText,
-      'remote-cpa': dom.gptCpaBase,
-      manual: dom.gptManualToken,
-    }[mode]
-    focusTarget?.focus()
-  }
-
-  function readTextFile(file, onText) {
-    const reader = new FileReader()
-    reader.onload = () => onText(String(reader.result || ''))
-    reader.onerror = () => setCurrent(dom.gptImportStatus, '文件读取失败', 'error')
-    reader.readAsText(file)
-  }
-
-  async function importGptSession() {
-    await runGptImport({
-      text: dom.gptSessionText?.value || '',
-      mode: 'session',
-      button: dom.gptSessionSubmit,
-      clear: dom.gptSessionText,
-    })
-  }
-
-  function importGptCpaFiles(fileList) {
-    const files = [...(fileList || [])].filter(file => file && file.size <= 2 * 1024 * 1024)
-    if (!files.length) {
-      setCurrent(dom.gptImportStatus, '没有可读取的 JSON 文件（单文件上限 2MB）', 'error')
-      return
-    }
-    const objects = []
-    let pending = files.length
-    let failed = 0
-    const done = () => {
-      pending -= 1
-      if (pending > 0) return
-      if (!objects.length) {
-        setCurrent(dom.gptImportStatus, '选中的文件里没有可识别的账号 JSON', 'error')
-        return
-      }
-      if (dom.gptCpaFileMeta) {
-        dom.gptCpaFileMeta.textContent = `已读取 ${objects.length} 个账号${failed ? `，${failed} 个文件解析失败` : ''}`
-      }
-      void runGptImport({
-        text: JSON.stringify(objects),
-        mode: 'cpa',
-        button: dom.gptCpaFile,
-      })
-    }
-    for (const file of files) {
-      readTextFile(file, text => {
-        try {
-          const parsed = JSON.parse(text)
-          if (Array.isArray(parsed)) objects.push(...parsed)
-          else objects.push(parsed)
-        } catch {
-          failed += 1
-        }
-        done()
-      })
-    }
-  }
-
-  async function connectGptCpa() {
-    const baseUrl = dom.gptCpaBase?.value.trim() || ''
-    const secretKey = dom.gptCpaSecret?.value || ''
-    if (!baseUrl || !secretKey) {
-      setCurrent(dom.gptCpaMeta, '先填写服务器地址与管理密钥', 'error')
-      return
-    }
-    await withBusy(dom.gptCpaConnect, async () => {
-      setCurrent(dom.gptCpaMeta, '正在连接…')
-      const result = await api('/api/admin/gpt-accounts/remote/cpa/list', {
-        method: 'POST',
-        body: { baseUrl, secretKey },
-      })
-      if (!result.ok) {
-        setCurrent(dom.gptCpaMeta, result.error || '连接失败', 'error')
-        return
-      }
-      gptCpaFiles = Array.isArray(result.data?.files) ? result.data.files : []
-      if (!gptCpaFiles.length) {
-        dom.gptCpaList.innerHTML = ''
-        setCurrent(dom.gptCpaMeta, '服务器上没有账号文件', 'warn')
-        return
-      }
-      dom.gptCpaList.innerHTML = gptCpaFiles
-        .map(
-          (file, index) => `<label class="gpt-remote-row">
-            <input type="checkbox" value="${escapeHtml(file.name)}" data-index="${index}">
-            <code>${escapeHtml(file.name)}</code>
-            <span>${escapeHtml(file.email || '')}</span>
-          </label>`,
-        )
-        .join('')
-      setCurrent(dom.gptCpaMeta, `共 ${gptCpaFiles.length} 个文件`)
-    })
-  }
-
-  async function importGptCpa() {
-    const names = [...(dom.gptCpaList?.querySelectorAll('input[type="checkbox"]:checked') || [])].map(
-      input => input.value,
-    )
-    if (!names.length) {
-      setCurrent(dom.gptCpaMeta, '先勾选要导入的文件', 'error')
-      return
-    }
-    const baseUrl = dom.gptCpaBase?.value.trim() || ''
-    const secretKey = dom.gptCpaSecret?.value || ''
-    await withBusy(dom.gptCpaImport, async () => {
-      setCurrent(dom.gptCpaMeta, '正在导入…')
-      const result = await api('/api/admin/gpt-accounts/remote/cpa/import', {
-        method: 'POST',
-        body: { baseUrl, secretKey, names },
-      })
-      if (!result.ok) {
-        setCurrent(dom.gptCpaMeta, result.error || '导入失败', 'error')
-        return
-      }
-      const data = result.data || {}
-      const failures = Array.isArray(data.failures) ? data.failures : []
-      setCurrent(
-        dom.gptCpaMeta,
-        gptImportResultText(data) + (failures.length ? ` · ${failures[0].name}：${failures[0].message}` : ''),
-        failures.length ? 'warn' : 'ok',
-      )
-      applyGptPayload(data)
-    })
-  }
-
-  async function addGptManual() {
-    const accessToken = dom.gptManualToken?.value.trim() || ''
-    if (!accessToken) {
-      setCurrent(dom.gptImportStatus, '先填写 Access Token', 'error')
-      return
-    }
-    const payload = {
-      access_token: accessToken,
-      type: dom.gptManualSource?.value || 'codex',
-      ...(dom.gptManualEmail?.value.trim() ? { email: dom.gptManualEmail.value.trim() } : {}),
-      ...(dom.gptManualRefresh?.value.trim() ? { refresh_token: dom.gptManualRefresh.value.trim() } : {}),
-      ...(dom.gptManualPlan?.value.trim() ? { plan: dom.gptManualPlan.value.trim() } : {}),
-      ...(dom.gptManualLabel?.value.trim() ? { label: dom.gptManualLabel.value.trim() } : {}),
-    }
-    const ok = await runGptImport({
-      text: JSON.stringify(payload),
-      mode: 'manual',
-      button: dom.gptManualSubmit,
-    })
-    if (ok) {
-      if (dom.gptManualToken) dom.gptManualToken.value = ''
-      if (dom.gptManualRefresh) dom.gptManualRefresh.value = ''
-      if (dom.gptManualEmail) dom.gptManualEmail.value = ''
-      if (dom.gptManualLabel) dom.gptManualLabel.value = ''
-      setGptImportMode('token')
-    }
-  }
-
-  async function checkGptAccounts(ids) {
-    if (!ids.length) {
-      setCurrent(dom.gptImportStatus, '没有可测试的账号', 'error')
-      return
-    }
-    if (gptCheckTimer) {
-      clearInterval(gptCheckTimer)
-      gptCheckTimer = null
-    }
-    const started = await api('/api/admin/gpt-accounts/check', {
-      method: 'POST',
-      body: { ids },
-    })
-    if (!started.ok) {
-      setCurrent(dom.gptImportStatus, started.error || '启动校验失败', 'error')
-      return
-    }
-    const jobId = started.data?.jobId
-    const total = Number(started.data?.total) || ids.length
-    if (!jobId) {
-      setCurrent(dom.gptImportStatus, '校验任务创建失败', 'error')
-      return
-    }
-    setCurrent(dom.gptImportStatus, `正在校验 0/${total}…`)
-
-    const poll = async () => {
-      const result = await api(`/api/admin/gpt-accounts/check/${encodeURIComponent(jobId)}`)
-      if (!result.ok) {
-        if (gptCheckTimer) clearInterval(gptCheckTimer)
-        gptCheckTimer = null
-        setCurrent(dom.gptImportStatus, result.error || '校验失败', 'error')
-        return
-      }
-      const job = result.data || {}
-      const done = Number(job.done) || 0
-      const all = Number(job.total) || total
-      if (job.status !== 'done') {
-        setCurrent(dom.gptImportStatus, `正在校验 ${done}/${all}…`)
-        return
-      }
-      if (gptCheckTimer) clearInterval(gptCheckTimer)
-      gptCheckTimer = null
-      const failed = Number(job.failed) || 0
-      setCurrent(
-        dom.gptImportStatus,
-        failed ? `校验完成：${all - failed} 个可用，${failed} 个失败` : `校验完成：${all} 个账号都可用`,
-        failed ? 'warn' : 'ok',
-      )
-      void loadGptAccounts()
-    }
-
-    void poll()
-    gptCheckTimer = setInterval(poll, 1500)
-  }
-
-  if (dom.btnGptAccountsRefresh) {
-    dom.btnGptAccountsRefresh.addEventListener('click', () => void loadGptAccounts())
-  }
-  if (dom.gptImportSubmit) {
-    dom.gptImportSubmit.addEventListener('click', () => void importGptAccounts())
-  }
-  if (dom.gptImportFile && dom.gptImportFileInput) {
-    dom.gptImportFile.addEventListener('click', () => dom.gptImportFileInput.click())
-    dom.gptImportFileInput.addEventListener('change', () => {
-      const file = dom.gptImportFileInput.files?.[0]
-      if (!file) return
-      const reader = new FileReader()
-      reader.onload = () => {
-        if (dom.gptImportText) dom.gptImportText.value = String(reader.result || '')
-        setCurrent(dom.gptImportStatus, `已读取 ${file.name}`)
-      }
-      reader.onerror = () => setCurrent(dom.gptImportStatus, '文件读取失败', 'error')
-      reader.readAsText(file)
-      dom.gptImportFileInput.value = ''
-    })
-  }
-  if (dom.gptImportToggle && dom.gptImportMenu) {
-    dom.gptImportToggle.addEventListener('click', event => {
-      event.stopPropagation()
-      const willOpen = dom.gptImportMenu.hidden
-      dom.gptImportMenu.hidden = !willOpen
-      dom.gptImportToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false')
-    })
-    dom.gptImportMenu.addEventListener('click', event => {
-      const item = event.target.closest('[data-gpt-mode]')
-      if (!item || item.disabled) return
-      setGptImportMode(item.dataset.gptMode)
-    })
-    document.addEventListener('click', event => {
-      if (dom.gptImportMenu.hidden) return
-      if (dom.gptImportMenu.contains(event.target) || dom.gptImportToggle.contains(event.target)) return
-      dom.gptImportMenu.hidden = true
-      dom.gptImportToggle.setAttribute('aria-expanded', 'false')
-    })
-    document.addEventListener('keydown', event => {
-      if (event.key !== 'Escape' || dom.gptImportMenu.hidden) return
-      dom.gptImportMenu.hidden = true
-      dom.gptImportToggle.setAttribute('aria-expanded', 'false')
-    })
-  }
-
-  if (dom.gptSessionSubmit) {
-    dom.gptSessionSubmit.addEventListener('click', () => void importGptSession())
-  }
-  if (dom.gptSessionFile && dom.gptSessionInput) {
-    dom.gptSessionFile.addEventListener('click', () => dom.gptSessionInput.click())
-    dom.gptSessionInput.addEventListener('change', () => {
-      const file = dom.gptSessionInput.files?.[0]
-      if (file) readTextFile(file, text => {
-        if (dom.gptSessionText) dom.gptSessionText.value = text
-      })
-      dom.gptSessionInput.value = ''
-    })
-  }
-
-  if (dom.gptCpaFile && dom.gptCpaInput) {
-    dom.gptCpaFile.addEventListener('click', () => dom.gptCpaInput.click())
-    dom.gptCpaInput.addEventListener('change', () => {
-      importGptCpaFiles(dom.gptCpaInput.files)
-      dom.gptCpaInput.value = ''
-    })
-  }
-  if (dom.gptCpaConnect) {
-    dom.gptCpaConnect.addEventListener('click', () => void connectGptCpa())
-  }
-  if (dom.gptCpaImport) {
-    dom.gptCpaImport.addEventListener('click', () => void importGptCpa())
-  }
-  if (dom.gptManualSubmit) {
-    dom.gptManualSubmit.addEventListener('click', () => void addGptManual())
-  }
-
-  if (dom.gptCheckAll) {
-    dom.gptCheckAll.addEventListener('click', () => void checkGptAccounts(gptSelectedIds()))
-  }
-
-  if (dom.gptAccountList) {
-    dom.gptAccountList.addEventListener('click', async event => {
-      const button = event.target.closest('[data-gpt-act]')
-      const row = event.target.closest('.gpt-account-row')
-      if (!button || !row) return
-      const id = row.dataset.id || ''
-      if (!id) return
-      const account = (gptAccountsState.accounts || []).find(item => item.id === id)
-      if (!account) return
-
-      const action = button.dataset.gptAct
-      if (action === 'check') {
-        void checkGptAccounts([id])
-        return
-      }
-      if (action === 'toggle') {
-        const result = await api('/api/admin/gpt-accounts/update', {
-          method: 'POST',
-          body: { id, enabled: !account.enabled },
-        })
-        if (!result.ok) {
-          setCurrent(dom.gptImportStatus, result.error || '更新失败', 'error')
-          return
-        }
-        applyGptPayload(result.data)
-        return
-      }
-      if (action === 'cooldown') {
-        const result = await api('/api/admin/gpt-accounts/clear-cooldown', {
-          method: 'POST',
-          body: { ids: [id] },
-        })
-        if (!result.ok) {
-          setCurrent(dom.gptImportStatus, result.error || '清除失败', 'error')
-          return
-        }
-        applyGptPayload(result.data)
-        return
-      }
-      if (action === 'delete') {
-        if (!window.confirm(`确定删除账号「${account.label || account.email || account.id}」？`)) return
-        const result = await api('/api/admin/gpt-accounts/delete', {
-          method: 'POST',
-          body: { ids: [id] },
-        })
-        if (!result.ok) {
-          setCurrent(dom.gptImportStatus, result.error || '删除失败', 'error')
-          return
-        }
-        applyGptPayload(result.data)
-      }
-    })
-  }
-
   // ---------- 上游 ----------
 
   async function loadUpstream() {
@@ -4902,9 +3937,6 @@
       data.modelAliases && typeof data.modelAliases === 'object' ? data.modelAliases : {}
     upstreamModelVisibility =
       data.modelVisibility && typeof data.modelVisibility === 'object' ? data.modelVisibility : {}
-    upstreamAccountImageModels = Array.isArray(data.accountImageModels)
-      ? data.accountImageModels
-      : []
     renderProviderCards()
     renderUpstreamModelOptions()
     renderUpstreamTitleModelOptions()
@@ -5037,14 +4069,6 @@
       options.push({ value: model.id, label: `${model.id}${suffix}` })
     }
 
-    // GPT 账号池的模型（只读，由导入的账号决定）
-    for (const model of upstreamAccountImageModels) {
-      options.push({
-        value: model.id,
-        label: `${model.label || model.id}${model.accounts ? ` · ${model.accounts} 个账号` : ''}`,
-      })
-    }
-
     // 自定义供应商的模型也能设为默认
     for (const provider of upstreamProviders) {
       if (provider.enabled === false) continue
@@ -5109,7 +4133,7 @@
     </div>`
   }
 
-  /** 客户端可选模型：内置、自定义供应商、GPT 账号池统一列出，并标注来源 */
+  /** 客户端可选模型：内置与自定义供应商统一列出，并标注来源 */
   function renderClientModelFlags() {
     if (!dom.upstreamClientModelList) return
     const enabled = new Set(upstreamEnabledImageModels)
@@ -5141,19 +4165,6 @@
           alias: upstreamModelAliases[id] || '',
         }))
       }
-    }
-
-    for (const model of upstreamAccountImageModels) {
-      const accounts = Number(model.accounts) || 0
-      rows.push(clientModelRowHtml({
-        id: model.id,
-        label: model.label || model.id,
-        source: 'GPT 账号池',
-        kind: 'extra',
-        checked: visibility[model.id] !== false && accounts > 0,
-        alias: upstreamModelAliases[model.id] || '',
-        disabled: accounts === 0,
-      }))
     }
 
     dom.upstreamClientModelList.innerHTML =
@@ -5479,7 +4490,7 @@
     const enabledImageModels = [...dom.upstreamClientModelList.querySelectorAll('input[data-kind="builtin"]:checked')]
       .map(input => input.value)
 
-    // 非内置模型的可见性：自定义供应商与账号池都走同一张表
+    // 非内置模型的可见性：自定义供应商走同一张表
     const modelVisibility = {}
     let visibleExtra = 0
     for (const input of dom.upstreamClientModelList.querySelectorAll('input[data-kind="extra"]')) {
@@ -6352,7 +5363,7 @@
 
   // ---------- 实时监控 ----------
 
-  const RT_BRANCH_LABELS = { account: '账号池', custom: '自定义供应商', magpie: 'Magpie' }
+  const RT_BRANCH_LABELS = { custom: '自定义供应商', magpie: 'Magpie' }
   const RT_STATUS_LABELS = { running: '进行中', success: '成功', failed: '失败' }
 
   function rtMs(value) {
@@ -6403,7 +5414,6 @@
     const summary = data.summary || {}
     const limits = data.limits || {}
     const gate = limits.gate || {}
-    const accounts = limits.accounts || null
     const caps = data.caps || {}
     const slow = summary.slow_counts || {}
     const events = Array.isArray(data.events) ? data.events : []
@@ -6427,8 +5437,8 @@
         rtTile('入口排队', String(gate.waiting || 0), `线程容量 ${gate.limit == null ? '—' : gate.limit}`),
         rtTile('当前在跑', String(gate.active || 0), `闸门占用 ${gate.busy || 0}`),
         rtTile('排队等待 P95', rtMetricP95(data, 'queue_wait_ms'), '进入闸门前的等待'),
-        rtTile('账号领取 P95', rtMetricP95(data, 'account_acquire_ms'), accounts ? `池 ${accounts.pool_size || 0} 个` : '账号池未启用'),
-        rtTile('令牌刷新 P95', rtMetricP95(data, 'token_refresh_ms'), '账号池令牌'),
+        rtTile('模型解析 P95', rtMetricP95(data, 'model_resolve_ms'), '客户端模型到上游'),
+        rtTile('配置读取 P95', rtMetricP95(data, 'config_read_ms'), '上游地址与设置'),
         rtTile('完成窗口', String(summary.completed || 0), `容量 ${caps.completed || '—'}`),
         rtTile('事件缓冲', String(events.length), `容量 ${caps.events || '—'}`),
         rtTile('本地拒绝/繁忙', String(slow.local_reject_or_busy || 0), '窗口内失败'),
@@ -6440,8 +5450,8 @@
         rtTile('参考图读取 P95', rtMetricP95(data, 'reference_load_ms'), '本地文件'),
         rtTile('上游响应头 P95', rtMetricP95(data, 'upstream_headers_ms'), '建连到首字节'),
         rtTile('上游请求 P95', rtMetricP95(data, 'upstream_ms'), '完整上游耗时'),
-        rtTile('SSE 首事件 P95', rtMetricP95(data, 'sse_first_event_ms'), '账号池流式'),
-        rtTile('SSE 最大空窗 P95', rtMetricP95(data, 'sse_max_gap_ms'), '事件间隔'),
+        rtTile('图片下载 P95', rtMetricP95(data, 'download_ms'), '远程图片落盘'),
+        rtTile('标题生成 P95', rtMetricP95(data, 'title_ms'), '拼图卡片标题'),
         rtTile('图片解析 P95', rtMetricP95(data, 'parse_ms'), '解码与取图'),
         rtTile('图片存储 P95', rtMetricP95(data, 'store_ms'), '写盘与记录'),
         rtTile('单图总耗时 P95', rtMetricP95(data, 'image_total_ms'), '单张图片'),
@@ -6457,11 +5467,6 @@
       }
       for (const [key, count] of Object.entries(byStage)) {
         chips.push(rtBadge(`${key} ${count}`, 'warn'))
-      }
-      if (accounts) {
-        chips.push(rtBadge(`账号池在途 ${accounts.inflight || 0} · 池 ${accounts.pool_size || 0} · 可用 ${accounts.usable || 0}`, 'ok'))
-      } else {
-        chips.push(rtBadge('账号池未启用'))
       }
       chips.push(rtBadge(`慢请求样本 ${Array.isArray(data.slow) ? data.slow.length : 0}`))
       dom.rtStatus.innerHTML = chips.join('')
@@ -6519,7 +5524,6 @@
             const metrics = item.metrics || {}
             const parts = [
               ['排队', metrics.queue_wait_ms],
-              ['账号', metrics.account_acquire_ms],
               ['上游', metrics.upstream_ms],
               ['解析', metrics.parse_ms],
               ['存储', metrics.store_ms],
@@ -6584,7 +5588,6 @@
     monitor: ['实时监控', '生图请求的阶段耗时、活跃与慢请求'],
     accounts: ['账号管理', '注册审核、账号与每日额度'],
     upstream: ['上游与模型', 'Magpie 地址、生图模型与自定义供应商'],
-    gpt: ['GPT 账号池', '导入账号并用账号自己的额度生图'],
     limits: ['限流与并发', '请求限流、生图排队与客户端统计'],
     feedback: ['意见反馈', '用户提交的问题与建议'],
     stats: ['统计与维护', '生成量、成功率与运行维护'],

@@ -37,7 +37,6 @@ mpimage/
 │   │   │   │   ├── serial-gate.ts 生图闸门（并发数可配置）
 │   │   │   │   └── traffic-scope.ts 统计口径
 │   │   │   ├── control/       控制面
-│   │   │   │   ├── accounts/   GPT 账号池：账号库 / 导入解析 / 调度
 │   │   │   │   ├── settings-store.ts    运行期设置落盘 settings.json
 │   │   │   │   ├── model-catalog.ts     上游对话模型清单
 │   │   │   │   ├── image-model-catalog.ts 上游生图模型清单
@@ -46,7 +45,6 @@ mpimage/
 │   │   │   │   ├── concurrency-store.ts 生图并发上限
 │   │   │   │   └── rate-limiter.ts      请求限流
 │   │   │   └── products/      业务能力
-│   │   │       ├── openai/    GPT 账号生图：Codex 通道 / 令牌刷新 / 账号适配
 │   │   │       ├── images/    magpie / imaging / reference-images / image-title / face-design
 │   │   │       ├── prompts/   prompt-optimizer / rulebook / constraints / chat-completion / image-analysis
 │   │   │       ├── styles/    style-library
@@ -82,7 +80,6 @@ mpimage/
 │   └── paths.mjs              安装目录 / 数据目录 / 日志目录
 ├── scripts/dev.mjs            一条命令同时起前后端
 ├── users.json                 账号库
-├── gpt-accounts.json          GPT 账号池（含 token，已在 .gitignore；可通过 GPT_ACCOUNTS_FILE 改位置）
 ├── projects.json              项目库（每个项目带 ownerId，按账号隔离）
 ├── usage.json                 生图统计与生成记录
 ├── styles/                    风格库目录（每个账号一份 <userId>.json）

@@ -283,40 +283,6 @@ export const config = {
     'http://localhost:4173',
     'http://127.0.0.1:4173',
   ]),
-  /**
-   * GPT 账号池：导入 ChatGPT/Codex 账号的 access_token，用账号自己的额度生图。
-   * 只启用 Codex 通道（/backend-api/codex/responses）：仅需 Bearer + JSON，
-   * 不依赖 Sentinel/PoW 与浏览器 TLS 指纹，Node 端可稳定复刻。
-   */
-  gptAccounts: {
-    enabled: process.env.GPT_ACCOUNTS_ENABLED !== '0',
-    /** 上游站点；测试时可指向 mock 服务 */
-    baseUrl: (process.env.GPT_ACCOUNTS_BASE_URL || 'https://chatgpt.com').replace(/\/+$/, ''),
-    oauthTokenUrl: process.env.GPT_OAUTH_TOKEN_URL || 'https://auth.openai.com/oauth/token',
-    oauthClientId: process.env.GPT_OAUTH_CLIENT_ID || 'app_2SKx67EdpoN0G6j64rFvigXD',
-    /** 账号库文件；留空用 <项目根>/gpt-accounts.json */
-    file: process.env.GPT_ACCOUNTS_FILE || '',
-    maxAccountsPerImport: intFromEnv('GPT_ACCOUNTS_MAX_IMPORT', 200, 1),
-    /** 单个账号同时在途的生图数 */
-    defaultMaxConcurrency: intFromEnv('GPT_ACCOUNT_CONCURRENCY', 2, 1),
-    refreshSkewMs: intFromEnv('GPT_ACCOUNT_REFRESH_SKEW_MS', 600000, 0),
-    maxAccountAttempts: intFromEnv('GPT_ACCOUNT_MAX_ATTEMPTS', 3, 1),
-    acquireTimeoutMs: intFromEnv('GPT_ACCOUNT_ACQUIRE_TIMEOUT_MS', 15000, 1000),
-    cooldownMs: {
-      rateLimit: intFromEnv('GPT_ACCOUNT_RATE_LIMIT_COOLDOWN_MS', 60000, 1000),
-      server: intFromEnv('GPT_ACCOUNT_SERVER_COOLDOWN_MS', 15000, 1000),
-      transport: intFromEnv('GPT_ACCOUNT_TRANSPORT_COOLDOWN_MS', 600000, 1000),
-    },
-    codex: {
-      responsesModel: process.env.GPT_CODEX_MODEL || 'gpt-5.5',
-      imageModel: process.env.GPT_CODEX_IMAGE_MODEL || 'gpt-image-2',
-      size: process.env.GPT_CODEX_IMAGE_SIZE || '1024x1024',
-      quality: process.env.GPT_CODEX_IMAGE_QUALITY || 'auto',
-      instructions:
-        "Use the image_generation tool to create exactly one image for the user's request. "
-        + 'Return the generated image result.',
-    },
-  },
   ratios,
   imageModels,
   defaultDisabledImageModels,

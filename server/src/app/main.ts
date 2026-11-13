@@ -31,10 +31,7 @@ import { registerProjectRoutes } from '../api/projects.js'
 import { registerStyleRoutes } from '../api/styles.js'
 import { registerUpstreamRoutes } from '../api/upstream.js'
 import { registerUpdateRoutes } from '../api/update.js'
-import { registerGptAccountRoutes } from '../api/gpt-accounts.js'
 import { ProjectStore } from './products/projects/project-store.js'
-import { GptAccountStore } from './control/accounts/gpt-account-store.js'
-import { GptAccountPool } from './control/accounts/account-pool.js'
 import { LocalFileStorage } from '../services/storage.js'
 import { SettingsStore } from './control/settings-store.js'
 import { StyleLibraryStore } from './products/styles/style-library.js'
@@ -186,18 +183,6 @@ await rateLimiter.init()
 await quotas.init()
 await feedback.init()
 
-// GPT 账号池：导入的 access_token 只落在服务端文件里，
-// 生图时按账号额度走 Codex 通道；GPT_ACCOUNTS_ENABLED=0 可整体关闭。
-const gptAccountsFile = config.gptAccounts.file
-  ? resolvePath(config.gptAccounts.file)
-  : join(projectRoot, 'gpt-accounts.json')
-const gptAccounts = new GptAccountStore(gptAccountsFile, {
-  defaultMaxConcurrency: config.gptAccounts.defaultMaxConcurrency,
-  maxAccountsPerImport: config.gptAccounts.maxAccountsPerImport,
-  enabled: () => config.gptAccounts.enabled,
-})
-await gptAccounts.init()
-const gptPool = new GptAccountPool(gptAccounts)
 const processStartedAt = Date.now()
 const realtimeMonitor = new RealtimeMonitor()
 
@@ -243,9 +228,6 @@ async function shutdown(reason: string): Promise<void> {
     await traffic.flushIfDirty()
   } catch {}
   try {
-    await gptAccounts.flush()
-  } catch {}
-  try {
     await app.close()
   } catch {}
   // 兜底：onClose 没跑到（例如 listen 之前就退出）时也要关掉日志流
@@ -264,7 +246,6 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 registerMetaRoutes(app, {
   concurrency: () => gate.limitCount,
   settings,
-  accounts: gptAccounts,
 })
 registerAuthRoutes(app, { users, sessions })
 registerAdminRoutes(app, { users, usage, quotas })
@@ -274,7 +255,6 @@ registerImageRoutes(app, {
   usage,
   quotas,
   settings,
-  accounts: { store: gptAccounts, pool: gptPool },
   monitor: realtimeMonitor,
 })
 registerPromptRoutes(app, { settings })
@@ -290,11 +270,9 @@ registerMonitorRoutes(app, {
   gate,
   concurrency,
   monitor: realtimeMonitor,
-  accounts: { store: gptAccounts, pool: gptPool },
 })
 registerFeedbackRoutes(app, { feedback })
-registerUpstreamRoutes(app, { settings, accounts: gptAccounts })
-registerGptAccountRoutes(app, { store: gptAccounts, pool: gptPool })
+registerUpstreamRoutes(app, { settings })
 registerUpdateRoutes(app, { checker: updateChecker })
 
 /* 优雅退出入口：只在注入了 SHUTDOWN_TOKEN 时开放，且必须带同一个 token 头。

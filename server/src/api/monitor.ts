@@ -7,8 +7,6 @@ import type { RateLimiter } from '../app/control/rate-limiter.js'
 import type { TrafficStore } from '../services/traffic-store.js'
 import type { SerialGate } from '../app/platform/serial-gate.js'
 import type { RealtimeMonitor } from '../services/realtime-monitor.js'
-import type { GptAccountPool } from '../app/control/accounts/account-pool.js'
-import type { GptAccountStore } from '../app/control/accounts/gpt-account-store.js'
 
 export function registerMonitorRoutes(
   app: FastifyInstance,
@@ -19,7 +17,6 @@ export function registerMonitorRoutes(
     gate: SerialGate
     concurrency: ConcurrencyStore
     monitor?: RealtimeMonitor
-    accounts?: { store: GptAccountStore; pool: GptAccountPool }
   },
 ): void {
   // 管理端监控总览：流量、运行时间、限流状态
@@ -65,13 +62,6 @@ export function registerMonitorRoutes(
       return { updated_at: new Date().toISOString(), summary: null, active: [], recent: [], slow: [], events: [], metric_labels: {} }
     }
     const snapshot = deps.monitor.snapshot() as Record<string, unknown>
-    const accounts = deps.accounts
-      ? {
-          inflight: [...deps.accounts.pool.snapshotInflight().values()].reduce((sum, value) => sum + value, 0),
-          pool_size: deps.accounts.store.list().length,
-          usable: deps.accounts.store.listUsable().length,
-        }
-      : null
     return {
       ...snapshot,
       limits: {
@@ -81,7 +71,6 @@ export function registerMonitorRoutes(
           waiting: deps.gate.queueLength,
           busy: deps.gate.isBusy,
         },
-        accounts,
         window: snapshot.caps,
       },
     }

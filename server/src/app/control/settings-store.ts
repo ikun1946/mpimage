@@ -186,7 +186,7 @@ export class SettingsStore {
     return enabled
   }
 
-  /** 非内置模型（p: / g:）的客户端可见性；没写过的默认可见 */
+  /** 非内置模型（p: 自定义供应商）的客户端可见性；没写过的默认可见 */
   getModelVisibility(): Record<string, boolean> {
     const raw = this.cache.clientModelVisibility
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
