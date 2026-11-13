@@ -54,6 +54,7 @@ export async function listClientImageModels(
   const magpieCatalogIds = catalog.map(model => model.id)
   const enabled = new Set(settings.getEnabledImageModels(magpieCatalogIds))
   const aliases = settings.getModelAliases()
+  const visibility = settings.getModelVisibility()
 
   const models: ClientImageModel[] = catalog
     .filter(model => enabled.has(model.id))
@@ -67,9 +68,11 @@ export async function listClientImageModels(
     if (provider.enabled === false) continue
     for (const model of provider.models) {
       if (model.enabled === false) continue
+      const publicId = customModelId(provider.id, model.id)
+      if (visibility[publicId] === false) continue
       models.push({
-        id: customModelId(provider.id, model.id),
-        label: model.label || model.id,
+        id: publicId,
+        label: aliases[publicId] || model.label || model.id,
         provider: provider.id,
       })
     }
@@ -78,7 +81,12 @@ export async function listClientImageModels(
   // 账号池模型：只有存在可用账号时才出现，导入/停用账号后立即生效
   if (accounts) {
     for (const spec of accounts.availableModels()) {
-      models.push({ id: spec.id, label: spec.label, provider: 'gpt-accounts' })
+      if (visibility[spec.id] === false) continue
+      models.push({
+        id: spec.id,
+        label: aliases[spec.id] || spec.label,
+        provider: 'gpt-accounts',
+      })
     }
   }
 

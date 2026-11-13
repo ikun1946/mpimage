@@ -37,6 +37,8 @@ interface SettingsFile {
   providers?: unknown
   /** 模型显示名覆写：{ [模型 id]: 显示名 }，内置模型也适用 */
   modelAliases?: unknown
+  /** 非内置模型的客户端可见性：{ [公开模型 id]: false } 表示隐藏 */
+  clientModelVisibility?: unknown
 }
 
 export class SettingsStore {
@@ -182,6 +184,23 @@ export class SettingsStore {
     const enabled = ids.map(id => id.trim()).filter(Boolean)
     await this.write({ magpieEnabledImageModels: enabled })
     return enabled
+  }
+
+  /** 非内置模型（p: / g:）的客户端可见性；没写过的默认可见 */
+  getModelVisibility(): Record<string, boolean> {
+    const raw = this.cache.clientModelVisibility
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+    const visibility: Record<string, boolean> = {}
+    for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+      const id = key.trim()
+      if (!id || id.length > 200 || typeof value !== 'boolean') continue
+      visibility[id] = value
+    }
+    return visibility
+  }
+
+  async setModelVisibility(visibility: Record<string, boolean>): Promise<void> {
+    await this.write({ clientModelVisibility: visibility })
   }
 
   /** 读自定义供应商；坏条目直接跳过，不让一份手改坏的 JSON 拖垮启动 */

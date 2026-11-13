@@ -24,6 +24,13 @@ export interface MagpieImageResult {
   buffer: Buffer
   model: string
   tokens: TokenUsage
+  /** 监控用的阶段耗时（毫秒）；取不到的值不填 */
+  metrics?: {
+    upstream_headers_ms?: number
+    upstream_ms?: number
+    parse_ms?: number
+    download_ms?: number
+  }
 }
 
 export interface ReferenceImage {
@@ -98,6 +105,7 @@ async function callImageEndpoint(
   promptText: string,
 ): Promise<MagpieImageResult> {
   let upstream: Response
+  const fetchStartedAt = Date.now()
 
   try {
     upstream = await fetch(url, {
@@ -113,20 +121,26 @@ async function callImageEndpoint(
     )
   }
 
+  const headersMs = Date.now() - fetchStartedAt
   const raw = await upstream.text()
+  const upstreamMs = Date.now() - fetchStartedAt
   let payload: unknown
+  const parseStartedAt = Date.now()
   try {
     payload = JSON.parse(raw)
   } catch {
     throw new ApiError('UPSTREAM_BAD_RESPONSE', 'Magpie 返回了无法解析的响应', 502)
   }
+  const parseMs = Date.now() - parseStartedAt
 
   if (!upstream.ok) {
     const message = extractErrorMessage(payload) || '图片生成失败'
     throw new ApiError('UPSTREAM_ERROR', translateUpstreamError(message), upstream.status)
   }
 
+  const downloadStartedAt = Date.now()
   const buffer = await readImagePayload(payload, options.timeoutMs)
+  const downloadMs = Date.now() - downloadStartedAt
   if (!buffer || buffer.byteLength === 0) {
     throw new ApiError('UPSTREAM_BAD_RESPONSE', 'Magpie 没有返回图片数据', 502)
   }
@@ -135,6 +149,12 @@ async function callImageEndpoint(
     buffer,
     model: extractModel(payload) || options.model,
     tokens: extractTokenUsage(payload) ?? estimateTokens(promptText),
+    metrics: {
+      upstream_headers_ms: headersMs,
+      upstream_ms: upstreamMs,
+      parse_ms: parseMs,
+      download_ms: downloadMs,
+    },
   }
 }
 

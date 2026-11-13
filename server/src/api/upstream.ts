@@ -174,6 +174,25 @@ function parseProviders(raw: unknown): ProviderConfig[] {
   return providers
 }
 
+/** 非内置模型的可见性：{ 公开模型 id: boolean }；只接受布尔值 */
+function parseModelVisibility(raw: unknown): Record<string, boolean> | undefined {
+  if (raw === undefined) return undefined
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new ApiError('UPSTREAM_INVALID', '模型可见性必须是对象', 400)
+  }
+  const visibility: Record<string, boolean> = {}
+  const entries = Object.entries(raw as Record<string, unknown>)
+  if (entries.length > 500) {
+    throw new ApiError('UPSTREAM_INVALID', '模型可见性条目过多', 400)
+  }
+  for (const [key, value] of entries) {
+    const id = key.trim()
+    if (!id || id.length > 200 || typeof value !== 'boolean') continue
+    visibility[id] = value
+  }
+  return visibility
+}
+
 /** 模型改名：{ 模型 id: 显示名 }；显示名留空即清除 */
 function parseModelAliases(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -230,6 +249,7 @@ export function registerUpstreamRoutes(
       /** 自定义供应商与模型改名，控制台据此画供应商卡片 */
       providers: deps.settings.getProviders(),
       modelAliases: deps.settings.getModelAliases(),
+      modelVisibility: deps.settings.getModelVisibility(),
       /** 账号池当前可用的生图模型；只读，由导入的账号决定 */
       accountImageModels: deps.accounts
         ? deps.accounts.availableModels().map(spec => ({
@@ -263,6 +283,7 @@ export function registerUpstreamRoutes(
       enabledImageModels?: unknown
       providers?: unknown
       modelAliases?: unknown
+      modelVisibility?: unknown
     }
     const baseUrl = parseBaseUrl(body.baseUrl)
 
@@ -275,13 +296,32 @@ export function registerUpstreamRoutes(
     const enabledImageModels = parseEnabledModels(body.enabledImageModels, catalogIds)
     const providers = body.providers === undefined ? undefined : parseProviders(body.providers)
     const modelAliases = body.modelAliases === undefined ? undefined : parseModelAliases(body.modelAliases)
+    const modelVisibility =
+      body.modelVisibility === undefined ? undefined : parseModelVisibility(body.modelVisibility)
 
-    // 内置模型可以全部不勾，但至少要有一个模型可用（可以是自定义供应商的）
-    const customEnabled = (providers ?? deps.settings.getProviders())
+    // 内置、自定义供应商、账号池三类里至少留一个对客户端可见的模型
+    const visibilityForCheck = modelVisibility ?? deps.settings.getModelVisibility()
+    const visibleBuiltins =
+      enabledImageModels !== undefined
+        ? enabledImageModels.length
+        : deps.settings.getEnabledImageModels(catalogIds).length
+    const visibleCustom = (providers ?? deps.settings.getProviders())
       .filter(provider => provider.enabled !== false)
-      .reduce((count, provider) => count + provider.models.filter(model => model.enabled !== false).length, 0)
-    if (enabledImageModels !== undefined && enabledImageModels.length === 0 && customEnabled === 0) {
-      throw new ApiError('UPSTREAM_INVALID', '客户端至少需要一个可用模型（内置或自定义供应商）', 400)
+      .reduce(
+        (count, provider) =>
+          count +
+          provider.models.filter(
+            model =>
+              model.enabled !== false &&
+              visibilityForCheck[customModelId(provider.id, model.id)] !== false,
+          ).length,
+        0,
+      )
+    const visibleAccounts = deps.accounts
+      ? deps.accounts.availableModels().filter(model => visibilityForCheck[model.id] !== false).length
+      : 0
+    if (visibleBuiltins + visibleCustom + visibleAccounts === 0) {
+      throw new ApiError('UPSTREAM_INVALID', '客户端至少需要一个可见模型（内置、自定义供应商或账号池）', 400)
     }
 
     // 生图模型可以是内置的，也可以是自定义供应商里的公开 ID
@@ -330,6 +370,10 @@ export function registerUpstreamRoutes(
       await deps.settings.setModelAliases(modelAliases)
       request.log.info({ count: Object.keys(modelAliases).length }, '模型显示名已更新')
     }
+    if (modelVisibility !== undefined) {
+      await deps.settings.setModelVisibility(modelVisibility)
+      request.log.info({ count: Object.keys(modelVisibility).length }, '客户端模型可见性已更新')
+    }
 
     return reply.send({
       ok: true,
@@ -348,6 +392,7 @@ export function registerUpstreamRoutes(
       enabledImageModelsFromSettings: deps.settings.isEnabledImageModelsFromSettings(),
       providers: deps.settings.getProviders(),
       modelAliases: deps.settings.getModelAliases(),
+      modelVisibility: deps.settings.getModelVisibility(),
       accountImageModels: deps.accounts
         ? deps.accounts.availableModels().map(spec => ({
             id: spec.id,

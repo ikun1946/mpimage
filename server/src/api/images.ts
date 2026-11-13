@@ -10,6 +10,7 @@ import { listClientImageModels, resolveCustomProviderModel } from '../app/contro
 import { requestAccountImage, resolveAccountModel } from '../app/products/openai/account-image.js'
 import type { GptAccountPool } from '../app/control/accounts/account-pool.js'
 import type { GptAccountStore } from '../app/control/accounts/gpt-account-store.js'
+import type { RealtimeMonitor } from '../services/realtime-monitor.js'
 import { detectImageType, readImageSize } from '../app/products/images/imaging.js'
 import { generateImageTitle } from '../app/products/images/image-title.js'
 import { MAX_REFERENCE_IMAGES, loadReferenceImages } from '../app/products/images/reference-images.js'
@@ -95,6 +96,8 @@ export function registerImageRoutes(
     settings: SettingsStore
     /** GPT 账号池（可选）：导入账号后客户端会出现 g: 前缀的模型 */
     accounts?: { store: GptAccountStore; pool: GptAccountPool }
+    /** 实时监控（可选）：记录每个请求的阶段耗时 */
+    monitor?: RealtimeMonitor
   },
 ): void {
   /**
@@ -194,6 +197,7 @@ export function registerImageRoutes(
     }
 
     // 客户端只能选服务端开启的模型（含自定义供应商）；不传就跟随服务端当前配置
+    const modelResolveStartedAt = Date.now()
     const clientModels = await listClientImageModels(deps.settings, deps.accounts?.store)
     const knownModelIds = clientModels.models.map(model => model.id)
     const requestedModel = typeof body.model === 'string' ? body.model.trim() : ''
@@ -204,6 +208,7 @@ export function registerImageRoutes(
     const selectedModel =
       requestedModel ||
       (knownModelIds.includes(configuredModel) ? configuredModel : knownModelIds[0] || configuredModel)
+    const modelResolveMs = Date.now() - modelResolveStartedAt
 
     // 参考图：只接受上传接口产出的「参考图/」路径，防止拿任意文件当输入。
     // 单张 referencePath 是角色资产等老调用；referencePaths 是自由创作的多图直传，
@@ -333,42 +338,100 @@ export function registerImageRoutes(
       120_000 + Math.min(180_000, promptChars * 120),
     )
 
+    const callId = randomUUID()
+    const receivedAt = request.receivedAt ?? job.startedAt
+    deps.monitor?.start({
+      callId,
+      jobId,
+      endpoint: '/api/images',
+      model: selectedModel,
+      branch: 'magpie',
+      imageCount,
+      referenceCount: referencePaths.length,
+      userId: auth.userId,
+      userName: auth.displayName || auth.username,
+      receivedAt,
+      startedAt: job.startedAt,
+    })
+    deps.monitor?.metric(callId, 'validate_ms', job.startedAt - receivedAt)
+    deps.monitor?.metric(callId, 'model_resolve_ms', modelResolveMs)
+
     try {
     // 参考图与上游配置对本次任务的所有图片都一致，只读一次
+    const referenceLoadStartedAt = Date.now()
     const references = await loadReferenceImages(referencePaths)
+    deps.monitor?.metric(callId, 'reference_load_ms', Date.now() - referenceLoadStartedAt)
     // 每次生图都重读上游地址：后台改完立即生效，无需重启服务
     // 账号池模型：用导入账号的额度走 Codex 通道
     const accountTarget = deps.accounts ? resolveAccountModel(selectedModel) : null
     // 自定义供应商：换成它自己的地址、密钥与上游模型名；否则走 Magpie
     const customModel = accountTarget ? null : resolveCustomProviderModel(deps.settings, selectedModel)
-    const upstreamOptions = customModel
-      ? {
-          baseUrl: customModel.provider.baseUrl,
-          model: customModel.model.id,
-          apiKey: customModel.provider.apiKey || undefined,
-          timeoutMs: promptTimeoutMs,
-        }
-      : {
-          baseUrl: await deps.settings.getBaseUrl(),
-          // 客户端选了就用客户端的，否则每次重读服务端配置（后台改完立即生效）
-          model: selectedModel,
-          timeoutMs: promptTimeoutMs,
-        }
+    deps.monitor?.annotate(callId, {
+      branch: accountTarget ? 'account' : customModel ? 'custom' : 'magpie',
+    })
+    let upstreamOptions
+    if (customModel) {
+      upstreamOptions = {
+        baseUrl: customModel.provider.baseUrl,
+        model: customModel.model.id,
+        apiKey: customModel.provider.apiKey || undefined,
+        timeoutMs: promptTimeoutMs,
+      }
+    } else {
+      const configReadStartedAt = Date.now()
+      const baseUrl = await deps.settings.getBaseUrl()
+      deps.monitor?.metric(callId, 'config_read_ms', Date.now() - configReadStartedAt)
+      upstreamOptions = {
+        baseUrl,
+        // 客户端选了就用客户端的，否则每次重读服务端配置（后台改完立即生效）
+        model: selectedModel,
+        timeoutMs: promptTimeoutMs,
+      }
+    }
 
     /**
      * 一次生成 1-4 张。每张单独进生图闸门（并发由服务端配置决定，串行时就是逐张出图），
      * 每完成一张更新任务进度；个别失败不拖累其他张，全部失败才算这次任务失败。
      */
+    const queuedAt = Date.now()
     const settled = await Promise.allSettled(
-      Array.from({ length: imageCount }, async () => {
+      Array.from({ length: imageCount }, async (_value, imageIndex) => {
+        const index = imageIndex + 1
+        const imageStartedAt = Date.now()
+        let attemptNumber = 0
         try {
           const upstream = await deps.gate.run(async () => {
+            deps.monitor?.imageStart(callId, index)
+            deps.monitor?.imageMetric(callId, index, 'queue_wait_ms', Date.now() - queuedAt)
+            deps.monitor?.stage(callId, 'generating')
+
             if (accountTarget && deps.accounts) {
               return requestAccountImage(deps.accounts, selectedModel, {
                 prompt,
                 ratioHint: ratio.promptHint,
                 images: references,
                 timeoutMs: promptTimeoutMs,
+                onAttempt: attempt => {
+                  attemptNumber += 1
+                  deps.monitor?.attempt(callId, {
+                    attempt: attemptNumber,
+                    account_id: attempt.accountId,
+                    account_label: attempt.label,
+                    account_email: attempt.email ? `${attempt.email.slice(0, 1)}***` : '',
+                    plan: attempt.plan,
+                    acquire_ms: attempt.acquireMs,
+                    refresh_ms: attempt.refreshMs,
+                    upstream_ms: attempt.upstreamMs,
+                    outcome: attempt.outcome,
+                    error: attempt.error,
+                  })
+                  deps.monitor?.annotateAccount(callId, {
+                    id: attempt.accountId,
+                    label: attempt.label,
+                    email: attempt.email,
+                    plan: attempt.plan,
+                  })
+                },
               })
             }
             return references.length
@@ -382,7 +445,10 @@ export function registerImageRoutes(
               )
           })
 
+          deps.monitor?.mergeUpstreamMetrics(callId, index, upstream.metrics)
+
           let type
+          const storeStartedAt = Date.now()
           try {
             type = detectImageType(upstream.buffer)
           } catch {
@@ -397,6 +463,17 @@ export function registerImageRoutes(
             width: size?.width,
             height: size?.height,
           })
+          deps.monitor?.imageMetric(callId, index, 'store_ms', Date.now() - storeStartedAt)
+          deps.monitor?.imageMetric(callId, index, 'image_total_ms', Date.now() - imageStartedAt)
+          deps.monitor?.imageFinish(callId, index, {
+            status: 'success',
+            model: upstream.model,
+            mime_type: type.mimeType,
+            bytes: stored.bytes,
+            width: size?.width,
+            height: size?.height,
+            stored_path: stored.relativePath,
+          })
 
           return {
             stored,
@@ -405,6 +482,13 @@ export function registerImageRoutes(
             size,
             tokens: upstream.tokens,
           }
+        } catch (error) {
+          deps.monitor?.imageMetric(callId, index, 'image_total_ms', Date.now() - imageStartedAt)
+          deps.monitor?.imageFinish(callId, index, {
+            status: 'failed',
+            error: error instanceof Error ? error.message : '生成失败',
+          })
+          throw error
         } finally {
           // 成功或失败都算「这一张结束了」，进度才不会卡在同一格
           const done = Math.min(imageCount, (job.progress?.done ?? 0) + 1)
@@ -436,9 +520,12 @@ export function registerImageRoutes(
     }
 
     // 标题已在生图期间并行生成；模型失败时 generateImageTitle 自己会兜底
+    const titleStartedAt = Date.now()
     const displayName = (await titleTask) || assetName
+    deps.monitor?.metric(callId, 'title_ms', Date.now() - titleStartedAt)
 
     const payloads: GeneratedImageInfo[] = []
+    const usageWriteStartedAt = Date.now()
     for (const generated of generatedList) {
       const width = generated.size?.width ?? ratio.nativeWidth
       const height = generated.size?.height ?? ratio.nativeHeight
@@ -519,6 +606,9 @@ export function registerImageRoutes(
     job.result = payloads[0]
 
     // 顶层仍然展开第一张（imageUrl/width/height），老客户端不改也能用
+    deps.monitor?.metric(callId, 'usage_write_ms', Date.now() - usageWriteStartedAt)
+    deps.monitor?.finish(callId, { status: 'success' })
+
     return reply.send({
       ...payloads[0],
       images: payloads,
@@ -544,6 +634,10 @@ export function registerImageRoutes(
         message: error instanceof ApiError ? error.message : '生成失败',
         code: error instanceof ApiError ? error.code : 'INTERNAL_ERROR',
       }
+      deps.monitor?.finish(callId, {
+        status: 'failed',
+        error: error instanceof ApiError ? error.message : '生成失败',
+      })
       throw error
     } finally {
       // 成功/失败都归还在途名额（按张数），额度判断才能保持准确

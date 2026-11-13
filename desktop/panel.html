@@ -826,6 +826,16 @@
     min-width: 0;
   }
 
+  .model-source {
+    padding: 1px 7px;
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    background: var(--surface-subtle);
+    color: var(--ink-faint);
+    font-size: 10.5px;
+    white-space: nowrap;
+  }
+
   .client-model-row .model-alias {
     flex: 0 0 150px;
     min-width: 120px;
@@ -2301,6 +2311,185 @@
       linear-gradient(180deg, var(--paper) 0%, var(--paper) 100%);
   }
 
+  /* 账号管理：自动刷新 */
+  .acct-live {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .acct-meta {
+    margin: 0;
+    min-height: 16px;
+    color: var(--ink-faint);
+    font-size: 11.5px;
+  }
+
+  .acct-meta[data-tone="error"] { color: var(--danger); }
+  .acct-meta[data-tone="warn"] { color: var(--gold); }
+
+  .acct-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .acct-controls select { height: 26px; font-size: 12px; padding: 0 8px; }
+
+  /* 实时监控 */
+  .rt-page .card-body { display: grid; gap: 16px; }
+  .rt-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .rt-controls select { height: 26px; font-size: 12px; padding: 0 8px; }
+  .rt-note { margin: 0; color: var(--ink-faint); font-size: 11.5px; }
+
+  .rt-panels {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 14px;
+  }
+
+  .rt-block {
+    border: 1px solid var(--line-soft);
+    border-radius: 13px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .rt-block > header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .rt-block > header span { font-size: 10.5px; font-weight: 400; color: var(--ink-faint); }
+
+  .rt-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--line-soft);
+  }
+
+  .rt-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 10px 12px;
+    background: var(--surface);
+  }
+
+  .rt-tile-label { font-size: 10.5px; color: var(--ink-faint); }
+  .rt-tile-value { font-size: 16px; font-weight: 600; line-height: 1.3; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .rt-tile-value.hot { color: var(--gold); }
+  .rt-tile-value.muted { color: var(--ink-faint); font-weight: 500; }
+  .rt-tile-sub { font-size: 10.5px; color: var(--ink-faint); min-height: 14px; }
+
+  .rt-list { display: grid; }
+
+  .rt-active-row {
+    display: grid;
+    grid-template-columns: 62px minmax(0, 1.6fr) 84px 128px 64px;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 14px;
+    border-top: 1px solid var(--line-soft);
+    font-size: 12px;
+  }
+
+  .rt-active-row:first-child { border-top: 0; }
+  .rt-active-row .rt-time { color: var(--ink-faint); font-family: var(--font-mono); font-size: 11px; }
+  .rt-active-row .rt-model { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rt-active-row .rt-muted { color: var(--ink-soft); }
+
+  .rt-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--line-soft);
+    background: var(--surface-subtle);
+    color: var(--ink-soft);
+    font-size: 10.5px;
+    white-space: nowrap;
+  }
+
+  .rt-badge.ok { color: var(--success); border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+  .rt-badge.err { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+  .rt-badge.warn { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
+
+  .rt-table { display: grid; }
+  .rt-table-head,
+  .rt-table-row {
+    display: grid;
+    grid-template-columns: 86px 52px minmax(0, 1fr) 112px 44px;
+    gap: 8px;
+    align-items: center;
+    padding: 7px 14px;
+    font-size: 11.5px;
+  }
+
+  .rt-table-head {
+    color: var(--ink-faint);
+    font-size: 10.5px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .rt-table-row { border-top: 1px solid var(--line-soft); color: var(--ink-soft); }
+  .rt-table-row:first-of-type { border-top: 0; }
+  .rt-table-row .rt-model { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rt-table-row .num { font-variant-numeric: tabular-nums; }
+  .rt-table-row .rt-cell { min-width: 0; }
+  .rt-table-row .rt-cell small { display: block; margin-top: 1px; color: var(--ink-faint); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rt-table-row .rt-call { color: var(--ink-soft); font-family: var(--font-mono); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; }
+
+  .rt-bottom {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
+  }
+
+  .rt-slow-list { display: grid; gap: 8px; padding: 10px 12px; max-height: 360px; overflow-y: auto; }
+
+  .rt-slow-card {
+    padding: 9px 11px;
+    border: 1px solid var(--line-soft);
+    border-radius: 9px;
+    background: var(--surface-subtle);
+  }
+
+  .rt-slow-card header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .rt-slow-card strong { font-size: 12px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rt-slow-card .dur { color: var(--gold); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rt-slow-card small { display: block; margin-top: 2px; color: var(--ink-faint); font-size: 10.5px; }
+  .rt-slow-card p { margin: 5px 0 0; color: var(--ink-soft); font-size: 11px; line-height: 1.5; }
+
+  .rt-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; }
+  .rt-empty { margin: 0; padding: 18px 14px; color: var(--ink-faint); font-size: 12px; text-align: center; }
+
+  @media (max-width: 1280px) {
+    .rt-bottom { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  @media (max-width: 1180px) {
+    .rt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
   @media (max-width: 980px) {
     :root { --side-w: 64px; }
     .side { padding: 14px 8px; }
@@ -2330,6 +2519,10 @@
     <button class="side-link is-active" type="button" data-page="service">
       <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="4.5" rx="1.2"/><rect x="2" y="9" width="12" height="4.5" rx="1.2"/><path d="M4.5 4.75h.01M4.5 11.25h.01"/></svg>
       <span>服务状态</span>
+    </button>
+    <button class="side-link" type="button" data-page="monitor">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8.5h2.4L6 4.5l2.2 7L10 6.5l1.4 2h2.6"/></svg>
+      <span>实时监控</span>
     </button>
     <button class="side-link" type="button" data-page="accounts">
       <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="5" r="2.4"/><path d="M2.2 13c.4-2.2 1.9-3.4 3.8-3.4S9.4 10.8 9.8 13"/><path d="M10.7 5.4a2 2 0 0 1 0 3.6M12 13c-.1-1.1-.5-2-1.2-2.6"/></svg>
@@ -2432,6 +2625,61 @@
 <h1 class="sr-only" id="admin-title">后台管理</h1>
 
 <main class="grid pages">
+  <section data-page-panel="monitor" class="card page rt-page" aria-labelledby="monitor-title">
+    <div class="card-head">
+      <h2 id="monitor-title">请求耗时与状态</h2>
+      <div class="head-actions rt-controls">
+        <label class="switch"><input type="checkbox" id="rt-auto" checked /><span>自动刷新</span></label>
+        <select id="rt-interval" class="select" aria-label="刷新间隔">
+          <option value="1000">1 秒</option>
+          <option value="2000">2 秒</option>
+          <option value="5000" selected>5 秒</option>
+          <option value="10000">10 秒</option>
+        </select>
+        <button class="button mini" type="button" id="rt-refresh">立即刷新</button>
+        <button class="button mini" type="button" id="rt-pause">暂停刷新</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <p class="rt-note" id="rt-meta">读取中…</p>
+
+      <div class="rt-panels">
+        <section class="rt-block">
+          <header>实时概览<span>窗口、成功率、瓶颈</span></header>
+          <div class="rt-grid" id="rt-overview"></div>
+        </section>
+        <section class="rt-block">
+          <header>入口与出口<span>闸门、账号、窗口</span></header>
+          <div class="rt-grid" id="rt-entry"></div>
+        </section>
+        <section class="rt-block">
+          <header>上游与结果<span>各阶段 P95</span></header>
+          <div class="rt-grid" id="rt-upstream"></div>
+        </section>
+        <section class="rt-block">
+          <header>当前状态<span>分支、阶段、账号池</span></header>
+          <div class="rt-chips" id="rt-status"></div>
+        </section>
+      </div>
+
+      <section class="rt-block">
+        <header>活跃请求<span id="rt-active-meta"></span></header>
+        <div class="rt-list" id="rt-active"></div>
+      </section>
+
+      <div class="rt-bottom">
+        <section class="rt-block">
+          <header>最近完成<span id="rt-recent-meta"></span></header>
+          <div class="rt-table" id="rt-recent"></div>
+        </section>
+        <section class="rt-block">
+          <header>慢请求<span id="rt-slow-meta"></span></header>
+          <div class="rt-slow-list" id="rt-slow"></div>
+        </section>
+      </div>
+    </div>
+  </section>
+
   <section data-page-panel="accounts" class="card page span-6" aria-labelledby="accounts-title">
     <div class="card-head">
       <h2 id="accounts-title">账号与额度</h2>
@@ -2443,6 +2691,20 @@
       </div>
     </div>
     <div class="card-body">
+      <div class="acct-live">
+        <p class="acct-meta" id="acct-meta" role="status" aria-live="polite">读取中…</p>
+        <div class="acct-controls">
+          <label class="switch"><input type="checkbox" id="acct-auto" checked /><span>自动刷新</span></label>
+          <select id="acct-interval" class="select" aria-label="账号自动刷新间隔">
+            <option value="5000">5 秒</option>
+            <option value="10000" selected>10 秒</option>
+            <option value="30000">30 秒</option>
+            <option value="60000">60 秒</option>
+          </select>
+          <button class="button mini" type="button" id="acct-refresh">立即刷新</button>
+          <button class="button mini" type="button" id="acct-pause" aria-pressed="false">暂停自动刷新</button>
+        </div>
+      </div>
       <button class="pending-bar" type="button" id="pending-toggle" aria-expanded="false" aria-controls="pending-list">
         <span>待审核</span>
         <span class="count" id="regs-count"></span>
@@ -2533,7 +2795,7 @@
       <fieldset class="client-models">
         <legend>客户端可选的生图模型</legend>
         <div class="client-models-list" id="upstream-client-model-list"></div>
-        <p class="hint">只有勾选的模型才会出现在客户端下拉里；至少要勾一个。右侧可以给模型改一个客户端显示名，留空用默认名字。</p>
+        <p class="hint">勾选后才会出现在客户端；右侧可以设置客户端显示名，每行右侧标注了模型来源。</p>
       </fieldset>
       <fieldset class="providers">
         <legend>自定义供应商</legend>
@@ -2899,6 +3161,11 @@
     adminFlash: $('admin-flash'),
     pendingToggle: $('pending-toggle'),
     pendingList: $('pending-list'),
+    acctAuto: $('acct-auto'),
+    acctInterval: $('acct-interval'),
+    acctRefresh: $('acct-refresh'),
+    acctPause: $('acct-pause'),
+    acctMeta: $('acct-meta'),
     usersNotice: $('users-notice'),
     usersBody: $('users-body'),
     usersEmpty: $('users-empty'),
@@ -2941,6 +3208,21 @@
     gptAccountsNotice: $('gpt-accounts-notice'),
     btnGptAccountsRefresh: $('btn-gpt-accounts-refresh'),
     panelPageTitle: $('panel-page-title'),
+    rtAuto: $('rt-auto'),
+    rtInterval: $('rt-interval'),
+    rtRefresh: $('rt-refresh'),
+    rtPause: $('rt-pause'),
+    rtMeta: $('rt-meta'),
+    rtOverview: $('rt-overview'),
+    rtEntry: $('rt-entry'),
+    rtUpstream: $('rt-upstream'),
+    rtStatus: $('rt-status'),
+    rtActive: $('rt-active'),
+    rtActiveMeta: $('rt-active-meta'),
+    rtRecent: $('rt-recent'),
+    rtRecentMeta: $('rt-recent-meta'),
+    rtSlow: $('rt-slow'),
+    rtSlowMeta: $('rt-slow-meta'),
     panelPageSub: $('panel-page-sub'),
     panelThemeToggle: $('panel-theme-toggle'),
     sideVersion: $('side-version'),
@@ -3069,7 +3351,27 @@
   let monitorStartedAtMs = 0
   let usersCache = []
   let quotaCache = new Map()
+  let registrationsCache = []
   let flashTimer = 0
+
+  // 账号页自动刷新：默认 10 秒，只在账号页可见时轮询
+  const ACCT_INTERVALS = [5000, 10000, 30000, 60000]
+  let acctAuto = true
+  let acctPaused = false
+  let acctInterval = 10000
+  let acctTimer = 0
+  let acctLoading = false
+  let acctUpdatedAt = 0
+  let usersSeq = 0
+  let regsSeq = 0
+  let usersSignature = ''
+  let regsSignature = ''
+  const acctPartErrors = { users: '', quotas: '', regs: '' }
+  try {
+    if (localStorage.getItem('huajing.acctAuto') === '0') acctAuto = false
+    const savedInterval = Number(localStorage.getItem('huajing.acctInterval'))
+    if (ACCT_INTERVALS.includes(savedInterval)) acctInterval = savedInterval
+  } catch {}
 
   // ---------- 上游模型下拉 ----------
   /** 下拉里代表「手填模型 ID」的哨兵值，真正的模型 ID 不可能撞上它 */
@@ -3121,11 +3423,21 @@
   let upstreamEnabledImageModels = []
   let upstreamProviders = []
   let upstreamModelAliases = {}
+  let upstreamModelVisibility = {}
   let upstreamAccountImageModels = []
   let gptAccountsState = { enabled: true, accounts: [], models: [] }
   let gptCheckTimer = null
   let gptImportMode = 'token'
   let gptCpaFiles = []
+
+  // 实时监控：默认 5 秒轮询，页面不可见或不在监控页时跳过
+  let rtAuto = true
+  let rtPaused = false
+  let rtInterval = 5000
+  let rtTimer = 0
+  let rtLoading = false
+  let rtLastData = null
+  let activePanelPage = 'service'
 
   // ---------- 小工具 ----------
 
@@ -3474,13 +3786,107 @@
 
   // ---------- 账号 ----------
 
-  async function loadUsers() {
-    clearNotice(dom.usersNotice)
+  function acctClock(value) {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '—'
+    const pad = part => String(part).padStart(2, '0')
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  }
+
+  function acctDirtyQuota() {
+    if (!dom.usersBody) return false
+    return [...dom.usersBody.querySelectorAll('.quota input')].some(
+      input => input.value !== input.dataset.savedValue,
+    )
+  }
+
+  function acctBlockedByUi() {
+    if (dom.userDialog && dom.userDialog.open) return true
+    if (acctDirtyQuota()) return true
+    const active = document.activeElement
+    if (active && active.matches && active.matches('.quota input')) return true
+    if (dom.usersBody && dom.usersBody.querySelector('[data-armed="1"], [data-busy="1"]')) return true
+    if (dom.regsList && dom.regsList.querySelector('[data-busy="1"]')) return true
+    return false
+  }
+
+  function acctWriteMeta() {
+    if (!dom.acctMeta) return
+    const error = acctPartErrors.users || acctPartErrors.quotas || acctPartErrors.regs
+    const editing = acctDirtyQuota() && acctAuto && !acctPaused
+    let text = ''
+    if (error) {
+      text = `自动刷新失败：${error}`
+      if (acctUpdatedAt) text += ` · 上次成功 ${acctClock(acctUpdatedAt)}`
+    } else {
+      const updated = acctUpdatedAt ? `更新于 ${acctClock(acctUpdatedAt)}` : '尚未更新'
+      const mode = !acctAuto ? '自动刷新已关闭' : acctPaused ? '已暂停自动刷新' : `自动刷新 ${Math.round(acctInterval / 1000)} 秒`
+      text = `${updated} · ${mode} · ${usersCache.length} 个账号 · ${registrationsCache.length} 条待审核`
+      if (editing) text += ' · 有未保存的额度修改，暂停刷新'
+    }
+    if (dom.acctMeta.textContent !== text) dom.acctMeta.textContent = text
+    dom.acctMeta.dataset.tone = error ? 'error' : editing ? 'warn' : ''
+  }
+
+  function acctSchedule() {
+    window.clearInterval(acctTimer)
+    acctTimer = 0
+    if (!acctAuto || acctPaused || activePanelPage !== 'accounts') return
+    acctTimer = window.setInterval(() => {
+      if (document.hidden || activePanelPage !== 'accounts') return
+      void acctRefreshAll({ auto: true })
+    }, acctInterval)
+  }
+
+  function acctUpdateControls() {
+    if (dom.acctAuto) dom.acctAuto.checked = acctAuto
+    if (dom.acctInterval) dom.acctInterval.value = String(acctInterval)
+    if (dom.acctPause) {
+      dom.acctPause.textContent = acctPaused ? '继续自动刷新' : '暂停自动刷新'
+      dom.acctPause.disabled = !acctAuto
+      dom.acctPause.setAttribute('aria-pressed', acctPaused ? 'true' : 'false')
+    }
+    acctWriteMeta()
+    acctSchedule()
+  }
+
+  async function acctRefreshAll(options = {}) {
+    const auto = options.auto === true
+    if (auto) {
+      if (acctLoading) return
+      if (document.hidden || activePanelPage !== 'accounts') return
+      if (acctBlockedByUi()) {
+        acctWriteMeta()
+        return
+      }
+      acctLoading = true
+    }
+    try {
+      await Promise.all([loadUsers({ auto }), loadRegistrations({ auto })])
+    } finally {
+      if (auto) acctLoading = false
+      acctWriteMeta()
+    }
+  }
+
+
+  async function loadUsers(options = {}) {
+    const auto = options.auto === true
+    if (!auto) clearNotice(dom.usersNotice)
+    const seq = ++usersSeq
     const [usersResult, quotasResult] = await Promise.all([api('/api/admin/users'), api('/api/admin/quotas')])
+    if (seq !== usersSeq) return
 
     if (isAuthFailure(usersResult)) {
+      if (auto) {
+        acctPartErrors.users = '登录失效或服务未运行'
+        acctWriteMeta()
+        return
+      }
       usersCache = []
       quotaCache = new Map()
+      usersSignature = 'auth'
       renderUsers()
       dom.usersEmpty.hidden = true
       showNotice(dom.usersNotice, AUTH_HINT)
@@ -3488,20 +3894,57 @@
     }
 
     if (!usersResult.ok) {
+      if (auto) {
+        acctPartErrors.users = usersResult.error || '账号列表读取失败'
+        acctWriteMeta()
+        return
+      }
       renderUsers()
       showNotice(dom.usersNotice, usersResult.error || '账号列表读取失败')
       return
     }
 
+    acctPartErrors.users = ''
     usersCache = Array.isArray(usersResult.data && usersResult.data.users) ? usersResult.data.users : []
-    const quotaRows = quotasResult.ok && Array.isArray(quotasResult.data && quotasResult.data.quotas)
-      ? quotasResult.data.quotas
-      : []
-    quotaCache = new Map(quotaRows.map(row => [row.userId, row]))
-    renderUsers()
+    if (quotasResult.ok && Array.isArray(quotasResult.data && quotasResult.data.quotas)) {
+      const quotaRows = quotasResult.data.quotas
+      quotaCache = new Map(quotaRows.map(row => [row.userId, row]))
+      acctPartErrors.quotas = ''
+    } else {
+      const message = quotasResult.error || '额度读取失败'
+      if (auto) {
+        acctPartErrors.quotas = message
+      } else {
+        // 额度接口失败时保留上次额度，不要把所有人的额度显示成 0
+        showNotice(dom.usersNotice, `${message}，暂时显示上次额度`)
+      }
+    }
+
+    const signature = JSON.stringify([usersCache, [...quotaCache.entries()]])
+    if (signature !== usersSignature) {
+      usersSignature = signature
+      renderUsers()
+    }
+    acctUpdatedAt = Date.now()
+    acctWriteMeta()
   }
 
   function renderUsers() {
+    const edits = new Map()
+    const active = document.activeElement
+    for (const row of dom.usersBody.querySelectorAll('tr[data-id]')) {
+      const input = row.querySelector('.quota input')
+      if (!input) continue
+      if (input.value !== input.dataset.savedValue || input === active) {
+        edits.set(row.dataset.id, {
+          value: input.value,
+          focused: input === active,
+          start: input.selectionStart,
+          end: input.selectionEnd,
+        })
+      }
+    }
+
     if (!usersCache.length) {
       dom.usersBody.innerHTML = ''
       dom.usersEmpty.hidden = false
@@ -3528,7 +3971,7 @@
           <td class="num">${formatNumber(usedToday)}</td>
           <td>
             <div class="quota">
-              <input type="number" min="0" max="10000" step="1" inputmode="numeric" value="${dailyLimit}" aria-label="${escapeHtml(user.username)} 的每日额度，0 表示不限" />
+              <input type="number" min="0" max="10000" step="1" inputmode="numeric" value="${dailyLimit}" data-saved-value="${dailyLimit}" aria-label="${escapeHtml(user.username)} 的每日额度，0 表示不限" />
               <button class="button mini" type="button" data-action="quota">设额度</button>
             </div>
           </td>
@@ -3539,24 +3982,38 @@
           </td>
         </tr>`
     }).join('')
+
+    for (const row of dom.usersBody.querySelectorAll('tr[data-id]')) {
+      const edit = edits.get(row.dataset.id)
+      if (!edit) continue
+      const input = row.querySelector('.quota input')
+      if (!input) continue
+      input.value = edit.value
+      if (edit.focused) {
+        try { input.focus({ preventScroll: true }) } catch { input.focus() }
+        try { input.setSelectionRange(edit.start, edit.end) } catch {}
+      }
+    }
   }
 
   function findUser(id) {
     return usersCache.find(user => user.id === id) || null
   }
 
-  async function toggleUser(user) {
+  async function toggleUser(user, button) {
     const nextDisabled = !user.disabled
-    const result = await api(`/api/admin/users/${encodeURIComponent(user.id)}`, {
-      method: 'PATCH',
-      body: { disabled: nextDisabled },
+    await withBusy(button, async () => {
+      const result = await api(`/api/admin/users/${encodeURIComponent(user.id)}`, {
+        method: 'PATCH',
+        body: { disabled: nextDisabled },
+      })
+      if (!result.ok) {
+        flash(result.error || '状态更新失败', 'error')
+        return
+      }
+      flash(`账号 ${user.username} ${nextDisabled ? '已停用' : '已启用'}`)
+      await loadUsers()
     })
-    if (!result.ok) {
-      flash(result.error || '状态更新失败', 'error')
-      return
-    }
-    flash(`账号 ${user.username} ${nextDisabled ? '已停用' : '已启用'}`)
-    await loadUsers()
   }
 
   async function saveQuota(user, row) {
@@ -3567,16 +4024,19 @@
       return
     }
     const dailyLimit = Math.min(10000, Math.floor(raw))
-    const result = await api(`/api/admin/users/${encodeURIComponent(user.id)}/quota`, {
-      method: 'PUT',
-      body: { dailyLimit },
+    const button = row.querySelector('button[data-action="quota"]')
+    await withBusy(button, async () => {
+      const result = await api(`/api/admin/users/${encodeURIComponent(user.id)}/quota`, {
+        method: 'PUT',
+        body: { dailyLimit },
+      })
+      if (!result.ok) {
+        flash(result.error || '额度保存失败', 'error')
+        return
+      }
+      flash(`账号 ${user.username} 的每日额度已设为 ${dailyLimit ? `${dailyLimit} 张` : '不限'}`)
+      await loadUsers()
     })
-    if (!result.ok) {
-      flash(result.error || '额度保存失败', 'error')
-      return
-    }
-    flash(`账号 ${user.username} 的每日额度已设为 ${dailyLimit ? `${dailyLimit} 张` : '不限'}`)
-    await loadUsers()
   }
 
   async function deleteUser(user, button) {
@@ -3676,12 +4136,22 @@
 
   // ---------- 待审核 ----------
 
-  async function loadRegistrations() {
-    clearNotice(dom.regsNotice)
+  async function loadRegistrations(options = {}) {
+    const auto = options.auto === true
+    if (!auto) clearNotice(dom.regsNotice)
+    const seq = ++regsSeq
     const result = await api('/api/admin/registrations')
+    if (seq !== regsSeq) return
 
     if (isAuthFailure(result)) {
+      if (auto) {
+        acctPartErrors.regs = '登录失效或服务未运行'
+        acctWriteMeta()
+        return
+      }
       dom.regsList.innerHTML = ''
+      registrationsCache = []
+      regsSignature = 'auth'
       dom.regsEmpty.hidden = true
       dom.regsCount.textContent = ''
       showNotice(dom.regsNotice, AUTH_HINT)
@@ -3689,17 +4159,29 @@
     }
 
     if (!result.ok) {
+      if (auto) {
+        acctPartErrors.regs = result.error || '待审核列表读取失败'
+        acctWriteMeta()
+        return
+      }
       dom.regsList.innerHTML = ''
+      registrationsCache = []
+      regsSignature = ''
       dom.regsEmpty.hidden = true
       showNotice(dom.regsNotice, result.error || '待审核列表读取失败')
       return
     }
 
     const list = Array.isArray(result.data && result.data.registrations) ? result.data.registrations : []
+    registrationsCache = list
+    acctPartErrors.regs = ''
     dom.regsCount.textContent = list.length ? `${list.length} 条` : ''
     dom.regsEmpty.hidden = list.length > 0
 
-    dom.regsList.innerHTML = list.map(item => `
+    const signature = JSON.stringify(list)
+    if (signature !== regsSignature) {
+      regsSignature = signature
+      dom.regsList.innerHTML = list.map(item => `
       <div class="reg" data-id="${escapeHtml(item.id)}">
         <div class="reg-main">
           <strong>${escapeHtml(item.displayName || item.username)}</strong>
@@ -3711,6 +4193,9 @@
           <button class="button mini danger" type="button" data-action="reject">拒绝</button>
         </div>
       </div>`).join('')
+    }
+    acctUpdatedAt = Date.now()
+    acctWriteMeta()
   }
 
   async function handleRegistration(button, approve) {
@@ -4415,6 +4900,8 @@
     upstreamProviders = Array.isArray(data.providers) ? data.providers : []
     upstreamModelAliases =
       data.modelAliases && typeof data.modelAliases === 'object' ? data.modelAliases : {}
+    upstreamModelVisibility =
+      data.modelVisibility && typeof data.modelVisibility === 'object' ? data.modelVisibility : {}
     upstreamAccountImageModels = Array.isArray(data.accountImageModels)
       ? data.accountImageModels
       : []
@@ -4610,16 +5097,67 @@
   }
 
   /** 客户端可见模型：勾选框 + 显示名输入，按服务端白名单渲染 */
+  function clientModelRowHtml({ id, label, source, kind, checked, alias, disabled }) {
+    return `<div class="client-model-row">
+      <label>
+        <input type="checkbox" data-kind="${kind}" value="${escapeHtml(id)}"${checked ? ' checked' : ''}${disabled ? ' disabled' : ''}>
+        <span>${escapeHtml(label)}</span>
+        <code>${escapeHtml(id)}</code>
+        <span class="model-source">${escapeHtml(source)}</span>
+      </label>
+      <input type="text" class="model-alias" data-model-id="${escapeHtml(id)}" value="${escapeHtml(alias || '')}" placeholder="客户端显示名" autocomplete="off">
+    </div>`
+  }
+
+  /** 客户端可选模型：内置、自定义供应商、GPT 账号池统一列出，并标注来源 */
   function renderClientModelFlags() {
     if (!dom.upstreamClientModelList) return
     const enabled = new Set(upstreamEnabledImageModels)
-    dom.upstreamClientModelList.innerHTML = upstreamImageModels
-      .map(model => {
-        const checked = enabled.has(model.id) ? ' checked' : ''
-        const alias = upstreamModelAliases[model.id] || ''
-        return `<div class="client-model-row"><label><input type="checkbox" value="${escapeHtml(model.id)}"${checked}> <span>${escapeHtml(model.label || model.id)}</span> <code>${escapeHtml(model.id)}</code></label><input type="text" class="model-alias" data-model-id="${escapeHtml(model.id)}" value="${escapeHtml(alias)}" placeholder="客户端显示名" autocomplete="off"></div>`
-      })
-      .join('')
+    const visibility = upstreamModelVisibility || {}
+    const rows = []
+
+    for (const model of upstreamImageModels) {
+      rows.push(clientModelRowHtml({
+        id: model.id,
+        label: model.label || model.id,
+        source: 'Magpie',
+        kind: 'builtin',
+        checked: enabled.has(model.id),
+        alias: upstreamModelAliases[model.id] || '',
+      }))
+    }
+
+    for (const provider of upstreamProviders) {
+      if (provider.enabled === false) continue
+      for (const model of Array.isArray(provider.models) ? provider.models : []) {
+        if (model.enabled === false) continue
+        const id = `p:${provider.id}:${model.id}`
+        rows.push(clientModelRowHtml({
+          id,
+          label: model.label || model.id,
+          source: provider.name || provider.id,
+          kind: 'extra',
+          checked: visibility[id] !== false,
+          alias: upstreamModelAliases[id] || '',
+        }))
+      }
+    }
+
+    for (const model of upstreamAccountImageModels) {
+      const accounts = Number(model.accounts) || 0
+      rows.push(clientModelRowHtml({
+        id: model.id,
+        label: model.label || model.id,
+        source: 'GPT 账号池',
+        kind: 'extra',
+        checked: visibility[model.id] !== false && accounts > 0,
+        alias: upstreamModelAliases[model.id] || '',
+        disabled: accounts === 0,
+      }))
+    }
+
+    dom.upstreamClientModelList.innerHTML =
+      rows.join('') || '<p class="hint">还没有可配置的模型。</p>'
   }
 
   // ---------- 自定义供应商 ----------
@@ -4938,8 +5476,17 @@
       return
     }
 
-    const enabledImageModels = [...dom.upstreamClientModelList.querySelectorAll('input[type="checkbox"]:checked')]
+    const enabledImageModels = [...dom.upstreamClientModelList.querySelectorAll('input[data-kind="builtin"]:checked')]
       .map(input => input.value)
+
+    // 非内置模型的可见性：自定义供应商与账号池都走同一张表
+    const modelVisibility = {}
+    let visibleExtra = 0
+    for (const input of dom.upstreamClientModelList.querySelectorAll('input[data-kind="extra"]')) {
+      if (input.disabled) continue
+      modelVisibility[input.value] = input.checked
+      if (input.checked) visibleExtra += 1
+    }
 
     // 模型显示名：留空表示用默认名字
     const modelAliases = {}
@@ -4983,10 +5530,24 @@
       return
     }
 
+    if (!enabledImageModels.length && !visibleExtra) {
+      setCurrent(dom.upstreamResult, '客户端至少要保留一个可见模型', 'error')
+      return
+    }
+
     await withBusy(dom.upstreamSave, async () => {
       const result = await api('/api/admin/upstream', {
         method: 'PUT',
-        body: { baseUrl, textModel, titleModel, imageModel, enabledImageModels, providers, modelAliases },
+        body: {
+          baseUrl,
+          textModel,
+          titleModel,
+          imageModel,
+          enabledImageModels,
+          providers,
+          modelAliases,
+          modelVisibility,
+        },
       })
       if (isAuthFailure(result)) {
         setCurrent(dom.upstreamResult, AUTH_HINT, 'error')
@@ -5573,7 +6134,51 @@
     })
 
     dom.btnUsersRefresh.addEventListener('click', () => loadUsers())
+
+    if (dom.rtAuto) {
+      dom.rtAuto.addEventListener('change', () => {
+        rtAuto = dom.rtAuto.checked
+        if (rtAuto) rtPaused = false
+        rtUpdateControls()
+        if (rtAuto && activePanelPage === 'monitor') void loadRealtimeMonitor()
+      })
+    }
+    if (dom.rtInterval) {
+      dom.rtInterval.addEventListener('change', () => {
+        const value = Number(dom.rtInterval.value)
+        rtInterval = [1000, 2000, 5000, 10000].includes(value) ? value : 5000
+        rtUpdateControls()
+      })
+    }
+    if (dom.rtRefresh) {
+      dom.rtRefresh.addEventListener('click', () => {
+        void loadRealtimeMonitor()
+      })
+    }
+    if (dom.rtPause) {
+      dom.rtPause.addEventListener('click', () => {
+        rtPaused = !rtPaused
+        if (!rtPaused && !rtAuto) {
+          rtAuto = true
+          if (dom.rtAuto) dom.rtAuto.checked = true
+        }
+        rtUpdateControls()
+        if (!rtPaused) void loadRealtimeMonitor()
+      })
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return
+      if (activePanelPage === 'monitor' && rtAuto && !rtPaused) {
+        void loadRealtimeMonitor()
+      }
+      if (activePanelPage === 'accounts' && acctAuto && !acctPaused) {
+        void acctRefreshAll({ auto: true })
+      }
+    })
     dom.btnNewUser.addEventListener('click', () => openUserDialog(null))
+    dom.usersBody.addEventListener('input', event => {
+      if (event.target.matches && event.target.matches('.quota input')) acctWriteMeta()
+    })
     dom.usersBody.addEventListener('click', event => {
       const button = event.target.closest('button[data-action]')
       if (!button) return
@@ -5581,7 +6186,7 @@
       const user = row && findUser(row.dataset.id)
       if (!user) return
       if (button.dataset.action === 'edit') openUserDialog(user)
-      if (button.dataset.action === 'toggle') toggleUser(user)
+      if (button.dataset.action === 'toggle') toggleUser(user, button)
       if (button.dataset.action === 'quota') saveQuota(user, row)
       if (button.dataset.action === 'delete') deleteUser(user, button)
     })
@@ -5593,6 +6198,36 @@
     })
 
     dom.btnRegsRefresh.addEventListener('click', () => loadRegistrations())
+    if (dom.acctAuto) {
+      dom.acctAuto.addEventListener('change', () => {
+        acctAuto = dom.acctAuto.checked
+        if (!acctAuto) acctPaused = false
+        try { localStorage.setItem('huajing.acctAuto', acctAuto ? '1' : '0') } catch {}
+        acctUpdateControls()
+        if (acctAuto && activePanelPage === 'accounts') void acctRefreshAll({ auto: true })
+      })
+    }
+    if (dom.acctInterval) {
+      dom.acctInterval.addEventListener('change', () => {
+        const value = Number(dom.acctInterval.value)
+        acctInterval = ACCT_INTERVALS.includes(value) ? value : 10000
+        try { localStorage.setItem('huajing.acctInterval', String(acctInterval)) } catch {}
+        acctUpdateControls()
+      })
+    }
+    if (dom.acctRefresh) {
+      dom.acctRefresh.addEventListener('click', () => {
+        void withBusy(dom.acctRefresh, () => acctRefreshAll())
+      })
+    }
+    if (dom.acctPause) {
+      dom.acctPause.addEventListener('click', () => {
+        if (!acctAuto) return
+        acctPaused = !acctPaused
+        acctUpdateControls()
+        if (!acctPaused && activePanelPage === 'accounts') void acctRefreshAll({ auto: true })
+      })
+    }
     dom.regsList.addEventListener('click', event => {
       const button = event.target.closest('button[data-action]')
       if (!button) return
@@ -5715,8 +6350,238 @@
     }
   }
 
+  // ---------- 实时监控 ----------
+
+  const RT_BRANCH_LABELS = { account: '账号池', custom: '自定义供应商', magpie: 'Magpie' }
+  const RT_STATUS_LABELS = { running: '进行中', success: '成功', failed: '失败' }
+
+  function rtMs(value) {
+    const n = Number(value)
+    if (!Number.isFinite(n) || n <= 0) return '—'
+    if (n < 1000) return `${Math.round(n)}ms`
+    if (n < 60_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}s`
+    return `${Math.floor(n / 60_000)}m ${Math.round((n % 60_000) / 1000)}s`
+  }
+
+  function rtClock(iso) {
+    const date = new Date(iso)
+    if (Number.isNaN(date.getTime())) return '—'
+    const pad = value => String(value).padStart(2, '0')
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  }
+
+  function rtMetricP95(data, key) {
+    const metrics = data && data.summary && data.summary.metric_p95
+    const value = metrics ? Number(metrics[key]) : 0
+    return value > 0 ? rtMs(value) : '—'
+  }
+
+  function rtTile(label, value, sub, tone) {
+    const toneClass = tone ? ` ${tone}` : ''
+    return `<div class="rt-tile"><span class="rt-tile-label">${escapeHtml(label)}</span>` +
+      `<strong class="rt-tile-value${toneClass}">${escapeHtml(value)}</strong>` +
+      `<span class="rt-tile-sub">${escapeHtml(sub || '')}</span></div>`
+  }
+
+  function rtBadge(text, tone) {
+    return `<span class="rt-badge${tone ? ` ${tone}` : ''}">${escapeHtml(text)}</span>`
+  }
+
+  function rtWriteMeta() {
+    if (!dom.rtMeta) return
+    if (!rtLastData) {
+      dom.rtMeta.textContent = rtPaused ? '已暂停刷新' : '读取中…'
+      return
+    }
+    const summary = rtLastData.summary || {}
+    const mode = !rtAuto ? '自动刷新已关闭' : rtPaused ? '已暂停' : `自动刷新 ${rtInterval / 1000} 秒`
+    dom.rtMeta.textContent = `更新于 ${rtClock(rtLastData.updated_at)} · ${mode} · 窗口内 ${summary.completed || 0} 条记录`
+  }
+
+  function rtRender(data) {
+    rtLastData = data
+    const summary = data.summary || {}
+    const limits = data.limits || {}
+    const gate = limits.gate || {}
+    const accounts = limits.accounts || null
+    const caps = data.caps || {}
+    const slow = summary.slow_counts || {}
+    const events = Array.isArray(data.events) ? data.events : []
+    const bottleneck = summary.bottleneck || null
+
+    if (dom.rtOverview) {
+      dom.rtOverview.innerHTML = [
+        rtTile('当前并发', String(summary.active || 0), `窗口 ${summary.completed || 0} 条`, summary.active > 0 ? 'hot' : ''),
+        rtTile('完成窗口', String(summary.completed || 0), `容量 ${caps.completed || '—'}`),
+        rtTile('成功率', `${Number(summary.success_rate || 0).toFixed(1)}%`, `成功 ${summary.success || 0}`),
+        rtTile('失败数', String(summary.failed || 0), `本地拒绝 ${slow.local_reject_or_busy || 0}`),
+        rtTile('平均耗时', rtMs(summary.avg_duration_ms), '窗口均值'),
+        rtTile('P95 耗时', rtMs(summary.p95_duration_ms), '窗口 95 分位'),
+        rtTile('当前瓶颈', bottleneck ? bottleneck.label || '—' : '—', bottleneck ? rtMs(bottleneck.value_ms) : '暂无样本', bottleneck ? 'hot' : ''),
+        rtTile('上游超 60s', String(slow.upstream_over_60s || 0), `总耗时超 120s ${slow.total_over_120s || 0}`),
+      ].join('')
+    }
+
+    if (dom.rtEntry) {
+      dom.rtEntry.innerHTML = [
+        rtTile('入口排队', String(gate.waiting || 0), `线程容量 ${gate.limit == null ? '—' : gate.limit}`),
+        rtTile('当前在跑', String(gate.active || 0), `闸门占用 ${gate.busy || 0}`),
+        rtTile('排队等待 P95', rtMetricP95(data, 'queue_wait_ms'), '进入闸门前的等待'),
+        rtTile('账号领取 P95', rtMetricP95(data, 'account_acquire_ms'), accounts ? `池 ${accounts.pool_size || 0} 个` : '账号池未启用'),
+        rtTile('令牌刷新 P95', rtMetricP95(data, 'token_refresh_ms'), '账号池令牌'),
+        rtTile('完成窗口', String(summary.completed || 0), `容量 ${caps.completed || '—'}`),
+        rtTile('事件缓冲', String(events.length), `容量 ${caps.events || '—'}`),
+        rtTile('本地拒绝/繁忙', String(slow.local_reject_or_busy || 0), '窗口内失败'),
+      ].join('')
+    }
+
+    if (dom.rtUpstream) {
+      dom.rtUpstream.innerHTML = [
+        rtTile('参考图读取 P95', rtMetricP95(data, 'reference_load_ms'), '本地文件'),
+        rtTile('上游响应头 P95', rtMetricP95(data, 'upstream_headers_ms'), '建连到首字节'),
+        rtTile('上游请求 P95', rtMetricP95(data, 'upstream_ms'), '完整上游耗时'),
+        rtTile('SSE 首事件 P95', rtMetricP95(data, 'sse_first_event_ms'), '账号池流式'),
+        rtTile('SSE 最大空窗 P95', rtMetricP95(data, 'sse_max_gap_ms'), '事件间隔'),
+        rtTile('图片解析 P95', rtMetricP95(data, 'parse_ms'), '解码与取图'),
+        rtTile('图片存储 P95', rtMetricP95(data, 'store_ms'), '写盘与记录'),
+        rtTile('单图总耗时 P95', rtMetricP95(data, 'image_total_ms'), '单张图片'),
+      ].join('')
+    }
+
+    if (dom.rtStatus) {
+      const chips = []
+      const byBranch = summary.active_by_branch || {}
+      const byStage = summary.active_by_stage || {}
+      for (const [key, count] of Object.entries(byBranch)) {
+        chips.push(rtBadge(`${RT_BRANCH_LABELS[key] || key} ${count}`))
+      }
+      for (const [key, count] of Object.entries(byStage)) {
+        chips.push(rtBadge(`${key} ${count}`, 'warn'))
+      }
+      if (accounts) {
+        chips.push(rtBadge(`账号池在途 ${accounts.inflight || 0} · 池 ${accounts.pool_size || 0} · 可用 ${accounts.usable || 0}`, 'ok'))
+      } else {
+        chips.push(rtBadge('账号池未启用'))
+      }
+      chips.push(rtBadge(`慢请求样本 ${Array.isArray(data.slow) ? data.slow.length : 0}`))
+      dom.rtStatus.innerHTML = chips.join('')
+    }
+
+    const active = Array.isArray(data.active) ? data.active : []
+    if (dom.rtActiveMeta) dom.rtActiveMeta.textContent = active.length ? `${active.length} 个请求` : ''
+    if (dom.rtActive) {
+      dom.rtActive.innerHTML = active.length
+        ? active.map(item => {
+            const branch = RT_BRANCH_LABELS[item.branch] || item.branch || '—'
+            const stage = item.stage_label || item.stage || '—'
+            return `<div class="rt-active-row">` +
+              `<span class="rt-time">${escapeHtml(rtClock(item.started_at))}</span>` +
+              `<span class="rt-model" title="${escapeHtml(item.model)}">${escapeHtml(item.model || '—')}</span>` +
+              `<span>${rtBadge(branch)}</span>` +
+              `<span class="rt-muted">${escapeHtml(stage)} · ${escapeHtml(rtMs(item.stage_elapsed_ms))}</span>` +
+              `<span class="rt-time">${escapeHtml(rtMs(item.elapsed_ms))}</span>` +
+              `</div>`
+          }).join('')
+        : '<p class="rt-empty">暂无活跃请求，发起图片请求后这里会实时显示</p>'
+    }
+
+    const recent = Array.isArray(data.recent) ? data.recent : []
+    if (dom.rtRecentMeta) dom.rtRecentMeta.textContent = recent.length ? `最近 ${recent.length} 条` : ''
+    if (dom.rtRecent) {
+      const head = `<div class="rt-table-head"><span>请求</span><span>状态</span><span>模型</span>` +
+        `<span>耗时</span><span>图片</span></div>`
+      const rows = recent.slice(0, 12).map(item => {
+        const tone = item.status === 'success' ? 'ok' : item.status === 'failed' ? 'err' : 'warn'
+        const status = RT_STATUS_LABELS[item.status] || item.status
+        const images = item.image_count
+          ? `${item.images_done || 0}/${item.image_count}`
+          : '—'
+        return `<div class="rt-table-row">` +
+          `<span class="rt-cell"><span class="rt-call" title="${escapeHtml(item.call_id)}">${escapeHtml(String(item.call_id || '').slice(0, 8))}</span>` +
+          `<small>${escapeHtml(rtClock(item.started_at))}</small></span>` +
+          `<span>${rtBadge(status, tone)}</span>` +
+          `<span class="rt-model" title="${escapeHtml(item.model)}">${escapeHtml(item.model || '—')}</span>` +
+          `<span class="rt-cell"><span class="num">${escapeHtml(rtMs(item.duration_ms))}</span>` +
+          `<small>排 ${escapeHtml(rtMs(item.metrics && item.metrics.queue_wait_ms))} · 上 ${escapeHtml(rtMs(item.metrics && item.metrics.upstream_ms))}</small></span>` +
+          `<span class="num">${escapeHtml(images)}</span>` +
+          `</div>`
+      }).join('')
+      dom.rtRecent.innerHTML = recent.length
+        ? head + rows
+        : '<p class="rt-empty">暂无已完成请求</p>'
+    }
+
+    const slowList = Array.isArray(data.slow) ? data.slow : []
+    if (dom.rtSlowMeta) dom.rtSlowMeta.textContent = slowList.length ? `最慢 ${slowList.length} 条` : ''
+    if (dom.rtSlow) {
+      dom.rtSlow.innerHTML = slowList.length
+        ? slowList.slice(0, 10).map(item => {
+            const metrics = item.metrics || {}
+            const parts = [
+              ['排队', metrics.queue_wait_ms],
+              ['账号', metrics.account_acquire_ms],
+              ['上游', metrics.upstream_ms],
+              ['解析', metrics.parse_ms],
+              ['存储', metrics.store_ms],
+            ].filter(([, value]) => Number(value) > 0)
+              .map(([label, value]) => `${label} ${rtMs(value)}`)
+            const branch = RT_BRANCH_LABELS[item.branch] || item.branch || '—'
+            return `<article class="rt-slow-card">` +
+              `<header><strong title="${escapeHtml(item.model)}">${escapeHtml(item.model || '—')}</strong>` +
+              `<span class="dur">${escapeHtml(rtMs(item.duration_ms))}</span></header>` +
+              `<small>${escapeHtml(String(item.call_id || '').slice(0, 8))} · ${escapeHtml(branch)} · ${escapeHtml(rtClock(item.started_at))}</small>` +
+              `<p>${escapeHtml(parts.length ? parts.join(' · ') : '暂无阶段明细')}</p>` +
+              `</article>`
+          }).join('')
+        : '<p class="rt-empty">暂无慢请求</p>'
+    }
+
+    rtWriteMeta()
+  }
+
+  async function loadRealtimeMonitor() {
+    if (rtLoading) return
+    rtLoading = true
+    try {
+      const result = await api('/api/admin/monitor/realtime')
+      if (isAuthFailure(result)) {
+        if (dom.rtMeta) dom.rtMeta.textContent = AUTH_HINT
+        return
+      }
+      if (!result.ok) {
+        if (dom.rtMeta) dom.rtMeta.textContent = `监控接口读取失败：${result.error || `HTTP ${result.status || 0}`}`
+        return
+      }
+      rtRender(result.data || {})
+    } finally {
+      rtLoading = false
+    }
+  }
+
+  function rtSchedule() {
+    window.clearInterval(rtTimer)
+    rtTimer = 0
+    if (!rtAuto || rtPaused) return
+    rtTimer = window.setInterval(() => {
+      if (document.hidden || activePanelPage !== 'monitor') return
+      void loadRealtimeMonitor()
+    }, rtInterval)
+  }
+
+  function rtUpdateControls() {
+    if (dom.rtAuto) dom.rtAuto.checked = rtAuto
+    if (dom.rtInterval) dom.rtInterval.value = String(rtInterval)
+    if (dom.rtPause) {
+      dom.rtPause.textContent = rtPaused ? '继续刷新' : '暂停刷新'
+      dom.rtPause.dataset.tone = rtPaused ? 'warn' : ''
+    }
+    rtWriteMeta()
+    rtSchedule()
+  }
+
   const PANEL_PAGES = {
     service: ['服务状态', '启停服务、访问地址与局域网'],
+    monitor: ['实时监控', '生图请求的阶段耗时、活跃与慢请求'],
     accounts: ['账号管理', '注册审核、账号与每日额度'],
     upstream: ['上游与模型', 'Magpie 地址、生图模型与自定义供应商'],
     gpt: ['GPT 账号池', '导入账号并用账号自己的额度生图'],
@@ -5727,6 +6592,7 @@
 
   function showPanelPage(name, persist = true) {
     const target = PANEL_PAGES[name] ? name : 'service'
+    activePanelPage = target
     for (const panel of document.querySelectorAll('[data-page-panel]')) {
       panel.hidden = panel.dataset.pagePanel !== target
     }
@@ -5739,6 +6605,14 @@
     if (persist) {
       try { localStorage.setItem('huajing.panelPage', target) } catch {}
     }
+    if (target === 'monitor') {
+      if (!rtPaused) void loadRealtimeMonitor()
+      rtSchedule()
+    }
+    if (target === 'accounts' && acctAuto && !acctPaused) {
+      void acctRefreshAll({ auto: true })
+    }
+    acctSchedule()
   }
 
   function applyPanelTheme(mode) {
@@ -5782,6 +6656,7 @@
     })
 
     bindEvents()
+    acctUpdateControls()
     renderState(state)
 
     if (!bridge) {

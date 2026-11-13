@@ -62,6 +62,13 @@ export interface CodexImageParams {
 export interface CodexImageResult {
   buffer: Buffer
   tokens: TokenUsage
+  metrics: {
+    upstream_headers_ms: number
+    upstream_ms: number
+    sse_first_event_ms?: number
+    sse_max_gap_ms?: number
+    parse_ms?: number
+  }
 }
 
 /** 内容政策类拒绝，不重试其他账号 */
@@ -180,25 +187,44 @@ function buildBody(params: CodexImageParams): Record<string, unknown> {
 }
 
 /** 逐行解析 SSE，拿到第一张结果就返回 */
+interface SseImageResult {
+  buffer: Buffer
+  firstEventMs?: number
+  maxGapMs: number
+  parseMs: number
+}
+
 async function readSseImage(
   body: ReadableStream<Uint8Array>,
   timeoutMs: number,
-): Promise<Buffer> {
+): Promise<SseImageResult> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
   let failure: CodexUpstreamError | null = null
   const deadline = Date.now() + timeoutMs
   let image: Buffer | null = null
+  const startedAt = Date.now()
+  let firstEventAt: number | null = null
+  let lastEventAt = startedAt
+  let maxGapMs = 0
+  let parseMs = 0
 
   const handleEvent = (event: unknown) => {
     if (!event || typeof event !== 'object') return
     const record = event as Record<string, unknown>
     const type = typeof record.type === 'string' ? record.type : ''
 
+    const now = Date.now()
+    if (firstEventAt === null) firstEventAt = now
+    else maxGapMs = Math.max(maxGapMs, now - lastEventAt)
+    lastEventAt = now
+
     const result = findImageResult(event)
     if (result) {
+      const decodeStartedAt = Date.now()
       const decoded = decodeImage(result)
+      parseMs += Date.now() - decodeStartedAt
       if (decoded) image = decoded
       return
     }
@@ -263,7 +289,12 @@ async function readSseImage(
   if (!image) {
     throw new CodexUpstreamError('上游没有返回图片数据', 'bad-response')
   }
-  return image
+  return {
+    buffer: image,
+    firstEventMs: firstEventAt ? firstEventAt - startedAt : undefined,
+    maxGapMs,
+    parseMs,
+  }
 }
 
 export async function requestCodexImage(params: CodexImageParams): Promise<CodexImageResult> {
@@ -271,6 +302,7 @@ export async function requestCodexImage(params: CodexImageParams): Promise<Codex
   const promptText = `${params.prompt}\n\n${params.ratioHint}`
 
   let response: Response
+  const fetchStartedAt = Date.now()
   try {
     response = await fetch(url, {
       method: 'POST',
@@ -318,11 +350,14 @@ export async function requestCodexImage(params: CodexImageParams): Promise<Codex
     throw new CodexUpstreamError(detail || `上游返回 HTTP ${status}`, 'bad-response', { status })
   }
 
+  const headersMs = Date.now() - fetchStartedAt
   const contentType = (response.headers.get('content-type') || '').toLowerCase()
   let buffer: Buffer
+  let sse: SseImageResult | null = null
 
   if (contentType.includes('text/event-stream') && response.body) {
-    buffer = await readSseImage(response.body, params.timeoutMs)
+    sse = await readSseImage(response.body, params.timeoutMs)
+    buffer = sse.buffer
   } else {
     // 少数网关直接返回 JSON；兼容 data[].b64_json 与 image_generation_call.result
     const text = await response.text().catch(() => '')
@@ -344,5 +379,15 @@ export async function requestCodexImage(params: CodexImageParams): Promise<Codex
     buffer = decoded
   }
 
-  return { buffer, tokens: estimateTokens(promptText) }
+  return {
+    buffer,
+    tokens: estimateTokens(promptText),
+    metrics: {
+      upstream_headers_ms: headersMs,
+      upstream_ms: Date.now() - fetchStartedAt,
+      sse_first_event_ms: sse?.firstEventMs,
+      sse_max_gap_ms: sse?.maxGapMs,
+      parse_ms: sse?.parseMs,
+    },
+  }
 }

@@ -6,6 +6,9 @@ import type { ConcurrencyStore } from '../app/control/concurrency-store.js'
 import type { RateLimiter } from '../app/control/rate-limiter.js'
 import type { TrafficStore } from '../services/traffic-store.js'
 import type { SerialGate } from '../app/platform/serial-gate.js'
+import type { RealtimeMonitor } from '../services/realtime-monitor.js'
+import type { GptAccountPool } from '../app/control/accounts/account-pool.js'
+import type { GptAccountStore } from '../app/control/accounts/gpt-account-store.js'
 
 export function registerMonitorRoutes(
   app: FastifyInstance,
@@ -15,6 +18,8 @@ export function registerMonitorRoutes(
     processStartedAt: number
     gate: SerialGate
     concurrency: ConcurrencyStore
+    monitor?: RealtimeMonitor
+    accounts?: { store: GptAccountStore; pool: GptAccountPool }
   },
 ): void {
   // 管理端监控总览：流量、运行时间、限流状态
@@ -48,6 +53,36 @@ export function registerMonitorRoutes(
         active: deps.gate.activeCount,
         limit: deps.gate.limitCount,
         waiting: deps.gate.queueLength,
+      },
+    }
+  })
+
+  // 实时监控：生图请求的阶段耗时、活跃/最近/慢请求（轮询拉取）
+  app.get('/api/admin/monitor/realtime', async (request, reply) => {
+    requireAdmin(request)
+    reply.header('Cache-Control', 'no-store')
+    if (!deps.monitor) {
+      return { updated_at: new Date().toISOString(), summary: null, active: [], recent: [], slow: [], events: [], metric_labels: {} }
+    }
+    const snapshot = deps.monitor.snapshot() as Record<string, unknown>
+    const accounts = deps.accounts
+      ? {
+          inflight: [...deps.accounts.pool.snapshotInflight().values()].reduce((sum, value) => sum + value, 0),
+          pool_size: deps.accounts.store.list().length,
+          usable: deps.accounts.store.listUsable().length,
+        }
+      : null
+    return {
+      ...snapshot,
+      limits: {
+        gate: {
+          active: deps.gate.activeCount,
+          limit: deps.gate.limitCount,
+          waiting: deps.gate.queueLength,
+          busy: deps.gate.isBusy,
+        },
+        accounts,
+        window: snapshot.caps,
       },
     }
   })

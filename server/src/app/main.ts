@@ -41,11 +41,14 @@ import { StyleLibraryStore } from './products/styles/style-library.js'
 import { UpdateChecker } from '../services/update-checker.js'
 import { UsageStore } from '../services/usage-store.js'
 import { UserStore } from '../services/user-store.js'
+import { RealtimeMonitor } from '../services/realtime-monitor.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
     /** 本次请求是否被限流拒绝：onRequest 只标记，onResponse 统一记一次统计 */
     trafficRejected: boolean
+    /** 进入 Fastify 的时间，用于实时监控的总耗时（含参数校验与排队） */
+    receivedAt?: number
   }
 }
 
@@ -196,9 +199,11 @@ const gptAccounts = new GptAccountStore(gptAccountsFile, {
 await gptAccounts.init()
 const gptPool = new GptAccountPool(gptAccounts)
 const processStartedAt = Date.now()
+const realtimeMonitor = new RealtimeMonitor()
 
 // 每个请求：限流 → 解析登录身份；统计只在 onResponse 写一次
 app.addHook('onRequest', async request => {
+  request.receivedAt = Date.now()
   const retryAfterSec = rateLimiter.tryAccept(request.ip)
   // 这里只标记结果：限流的请求同样是"一次请求"，交给 onResponse 统一记账，
   // 否则 429 会在 onRequest 与 onResponse 各记一次。
@@ -270,6 +275,7 @@ registerImageRoutes(app, {
   quotas,
   settings,
   accounts: { store: gptAccounts, pool: gptPool },
+  monitor: realtimeMonitor,
 })
 registerPromptRoutes(app, { settings })
 registerFileRoutes(app, { storage })
@@ -277,7 +283,15 @@ registerUploadRoutes(app, { storage })
 registerStyleRoutes(app, { library: styleLibrary })
 registerProjectRoutes(app, { projects })
 registerHistoryRoutes(app, { usage, quotas })
-registerMonitorRoutes(app, { traffic, rateLimiter, processStartedAt, gate, concurrency })
+registerMonitorRoutes(app, {
+  traffic,
+  rateLimiter,
+  processStartedAt,
+  gate,
+  concurrency,
+  monitor: realtimeMonitor,
+  accounts: { store: gptAccounts, pool: gptPool },
+})
 registerFeedbackRoutes(app, { feedback })
 registerUpstreamRoutes(app, { settings, accounts: gptAccounts })
 registerGptAccountRoutes(app, { store: gptAccounts, pool: gptPool })

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Menu, Tray, clipboard, dialog, ipcMain, nativeImage, powerMonitor, shell } from 'electron'
 import { execFile, spawn } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { open, readdir, stat } from 'node:fs/promises'
+import { open, readdir, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
@@ -357,6 +357,28 @@ ipcMain.handle('logs:read', async (_event, name, offset) => {
 
 ipcMain.handle('logs:open-dir', () => shell.openPath(LOG_DIR))
 
+ipcMain.handle('logs:export', async (event, content, suggestedName) => {
+  const text = typeof content === 'string' ? content : ''
+  if (!text) return { ok: false, canceled: false }
+  const safeName = /^[\w.-]+\.(log|txt)$/.test(String(suggestedName || ''))
+    ? String(suggestedName)
+    : 'huajing-log.log'
+  const options = {
+    title: '导出日志',
+    defaultPath: join(LOG_DIR, safeName),
+    filters: [{ name: '日志文件', extensions: ['log', 'txt'] }],
+  }
+  const owner = BrowserWindow.fromWebContents(event.sender)
+  const result = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options)
+  if (result.canceled || !result.filePath) return { ok: false, canceled: true }
+  try {
+    await writeFile(result.filePath, text, 'utf8')
+    return { ok: true, path: result.filePath }
+  } catch (error) {
+    return { ok: false, canceled: false, error: error.message || '写入失败' }
+  }
+})
+
 function openLogWindow() {
   if (logWindow) {
     if (logWindow.isMinimized()) logWindow.restore()
@@ -366,10 +388,10 @@ function openLogWindow() {
   }
 
   logWindow = new BrowserWindow({
-    width: 860,
-    height: 640,
-    minWidth: 640,
-    minHeight: 420,
+    width: 1040,
+    height: 740,
+    minWidth: 720,
+    minHeight: 460,
     title: '画境 · 运行日志',
     backgroundColor: '#f4f0e6',
     icon: iconPath(),

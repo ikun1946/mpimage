@@ -22,11 +22,25 @@ export interface AccountImageDeps {
   pool: GptAccountPool
 }
 
+export interface AccountAttemptInfo {
+  accountId: string
+  label: string
+  email: string
+  plan: string
+  acquireMs: number
+  refreshMs: number
+  upstreamMs?: number
+  outcome: string
+  error?: string
+}
+
 export interface AccountImageParams {
   prompt: string
   ratioHint: string
   images: ReferenceImage[]
   timeoutMs: number
+  /** 监控用：每次选号/失败都回调一次，便于记录账号维度 */
+  onAttempt?: (attempt: AccountAttemptInfo) => void
 }
 
 /** 只认 ACCOUNT_MODELS 里的 ID；其他一律返回 null，交给别的分支 */
@@ -70,16 +84,29 @@ export async function requestAccountImage(
   let lastError: unknown = null
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const acquireStartedAt = Date.now()
     const lease = await deps.pool.acquire({
       filter: account =>
         account.source === 'codex' && (!spec.plans || spec.plans.includes(account.plan)),
       exclude,
       timeoutMs: config.gptAccounts.acquireTimeoutMs,
     })
+    const acquireMs = Date.now() - acquireStartedAt
 
     try {
+      const refreshStartedAt = Date.now()
       const account = await ensureFreshAccount(deps.store, lease.account)
+      const refreshMs = Date.now() - refreshStartedAt
+      const attemptInfo = {
+        accountId: account.id,
+        label: account.label,
+        email: account.email,
+        plan: account.plan,
+        acquireMs,
+        refreshMs,
+      }
 
+      const upstreamStartedAt = Date.now()
       try {
         const result = await requestCodexImage({
           baseUrl: config.gptAccounts.baseUrl,
@@ -91,13 +118,27 @@ export async function requestAccountImage(
           codex: config.gptAccounts.codex,
         })
         deps.pool.markSuccess(account.id)
+        params.onAttempt?.({
+          ...attemptInfo,
+          upstreamMs: Date.now() - upstreamStartedAt,
+          outcome: 'success',
+        })
         return {
           buffer: result.buffer,
           model: publicId,
           tokens: result.tokens,
+          metrics: result.metrics,
         }
       } catch (error) {
         lastError = error
+        if (error instanceof CodexUpstreamError) {
+          params.onAttempt?.({
+            ...attemptInfo,
+            upstreamMs: Date.now() - upstreamStartedAt,
+            outcome: error.kind,
+            error: error.message,
+          })
+        }
         if (!(error instanceof CodexUpstreamError)) throw error
 
         const mapped = mapUpstreamError(error)

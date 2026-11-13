@@ -312,6 +312,118 @@
     background: var(--ink-faint);
     background-clip: padding-box;
   }
+
+  /* 结构化日志行：时间 + 级别 + 消息，命中的请求再补一行方法和状态 */
+  .log-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .log-stat {
+    padding: 2px 9px;
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    background: var(--surface-subtle);
+    color: var(--ink-soft);
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  .log-stat.warn { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
+  .log-stat.error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+
+  .log-item { border-bottom: 1px solid var(--line-soft); }
+
+  .log-row {
+    display: grid;
+    grid-template-columns: 74px 52px minmax(0, 1fr);
+    gap: 10px;
+    padding: 7px 12px;
+    cursor: pointer;
+    align-items: start;
+  }
+
+  .log-row:hover { background: var(--surface-subtle); }
+
+  .log-time {
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.7;
+  }
+
+  .log-level {
+    justify-self: start;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--line-soft);
+    color: var(--ink-soft);
+    font-size: 10.5px;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+  }
+
+  .log-level.warn { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 35%, transparent); background: var(--gold-tint); }
+  .log-level.error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); background: var(--danger-tint); }
+  .log-level.debug { color: var(--ink-faint); }
+
+  .log-main { min-width: 0; }
+  .log-msg { margin: 0; color: var(--ink); font-size: 12.5px; line-height: 1.65; word-break: break-word; }
+
+  .log-req {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 3px;
+    color: var(--ink-soft);
+    font-size: 11.5px;
+  }
+
+  .log-req code {
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    word-break: break-all;
+  }
+
+  .log-req .method {
+    padding: 0 6px;
+    border-radius: 5px;
+    background: var(--surface-subtle);
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+  }
+
+  .log-req .status { font-family: var(--font-mono); }
+  .log-req .status.ok { color: var(--success); }
+  .log-req .status.warn { color: var(--gold); }
+  .log-req .status.error { color: var(--danger); }
+  .log-req .dur { color: var(--ink-faint); font-family: var(--font-mono); }
+
+  .log-detail {
+    margin: 0 12px 10px 136px;
+    padding: 10px 12px;
+    max-height: 320px;
+    overflow: auto;
+    border: 1px solid var(--line-soft);
+    border-radius: 9px;
+    background: var(--surface-subtle);
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  @media (max-width: 620px) {
+    .log-row { grid-template-columns: 64px 46px minmax(0, 1fr); }
+    .log-detail { margin-left: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -326,9 +438,15 @@
         <span>跟随最新</span>
       </label>
       <button type="button" id="pause" class="button">暂停</button>
-      <label class="switch">
-        <input type="checkbox" id="warn-only" />
-        <span>只看警告与错误</span>
+      <label class="field">
+        <span>级别</span>
+        <select id="level-filter" aria-label="日志级别">
+          <option value="0">全部</option>
+          <option value="20">调试及以上</option>
+          <option value="30">信息及以上</option>
+          <option value="40">警告及以上</option>
+          <option value="50">仅错误</option>
+        </select>
       </label>
       <label class="field grow">
         <span>过滤</span>
@@ -341,9 +459,18 @@
         <span id="counter"></span>
       </span>
       <div class="meta-actions">
+        <button type="button" id="export" class="button">导出筛选结果</button>
         <button type="button" id="clear" class="button">清空视图</button>
         <button type="button" id="copy" class="button">复制当前内容</button>
         <button type="button" id="open-dir" class="button primary">打开日志目录</button>
+      </div>
+    </div>
+    <div class="bar-row meta">
+      <div class="log-stats" id="log-stats">
+        <span class="log-stat" id="stat-total">0 行</span>
+        <span class="log-stat" id="stat-requests">0 请求</span>
+        <span class="log-stat warn" id="stat-warn">0 警告</span>
+        <span class="log-stat error" id="stat-errors">0 错误</span>
       </div>
     </div>
   </header>
@@ -366,7 +493,12 @@
     files: document.getElementById('file-select'),
     follow: document.getElementById('follow'),
     pause: document.getElementById('pause'),
-    warnOnly: document.getElementById('warn-only'),
+    level: document.getElementById('level-filter'),
+    export: document.getElementById('export'),
+    statTotal: document.getElementById('stat-total'),
+    statRequests: document.getElementById('stat-requests'),
+    statWarn: document.getElementById('stat-warn'),
+    statErrors: document.getElementById('stat-errors'),
     filter: document.getElementById('filter'),
     clear: document.getElementById('clear'),
     copy: document.getElementById('copy'),
@@ -388,8 +520,9 @@
     decoder: new TextDecoder('utf-8'),
     paused: false,
     follow: true,
-    warnOnly: false,
+    minLevel: 0,
     filter: '',
+    visible: [],
     cleared: false,
     dirty: false,
     reading: false,
@@ -420,23 +553,65 @@
     return rest
   }
 
+  function parseTimestamp(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Date.parse(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+    return null
+  }
+
   function makeEntry(raw) {
     const body = stripPrefix(raw)
+    let data = null
     if (body.startsWith('{')) {
-      try {
-        const data = JSON.parse(body)
-        const level = Number(data.level)
-        const tone = Number.isFinite(level) ? level : 30
-        const message = typeof data.msg === 'string' ? data.msg : typeof data.message === 'string' ? data.message : ''
-        if (message) {
-          const time = clockText(data.time)
-          return { level: tone, text: [time, message].filter(Boolean).join('  ') }
-        }
-        // 解析得出来但没有消息体，就别把整段 JSON 铺满屏幕
-        return { level: tone, text: raw }
-      } catch {}
+      try { data = JSON.parse(body) } catch { data = null }
     }
-    return { level: 30, text: raw }
+    const levelRaw = Number(data?.level)
+    const level = Number.isFinite(levelRaw) ? levelRaw : 30
+    const message =
+      typeof data?.msg === 'string'
+        ? data.msg
+        : typeof data?.message === 'string'
+          ? data.message
+          : data
+            ? ''
+            : raw
+    const time = parseTimestamp(data?.time ?? data?.timestamp)
+
+    let request = null
+    if (data?.req && typeof data.req === 'object') {
+      const req = data.req
+      const res = data.res && typeof data.res === 'object' ? data.res : null
+      const method = typeof req.method === 'string' ? req.method : ''
+      const url = typeof req.url === 'string' ? req.url : ''
+      if (method || url) {
+        request = {
+          method,
+          url,
+          status: Number(res?.statusCode) || 0,
+          ms: Number(data.responseTime) || 0,
+          reqId: typeof data.reqId === 'string' ? data.reqId : '',
+        }
+      }
+    }
+
+    const searchText = [message, request?.method, request?.url, raw]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+
+    return {
+      level,
+      time,
+      message,
+      request,
+      raw: body,
+      text: [clockText(time), message].filter(Boolean).join('  '),
+      searchText,
+      detail: data ? JSON.stringify(data, null, 2) : body,
+    }
   }
 
   function pushLine(raw) {
@@ -470,32 +645,69 @@
     els.empty.hidden = !message
   }
 
+  function toneOf(line) {
+    return line.level >= 50 ? 'error' : line.level >= 40 ? 'warn' : line.level >= 30 ? 'info' : 'debug'
+  }
+
+  function levelLabel(tone) {
+    return tone === 'error' ? 'ERR' : tone === 'warn' ? 'WARN' : tone === 'info' ? 'INFO' : 'DEBUG'
+  }
+
+  function requestHtml(request) {
+    if (!request) return ''
+    const statusTone = request.status >= 500 ? 'error' : request.status >= 400 ? 'warn' : 'ok'
+    return `<p class="log-req">${request.method ? `<span class="method">${escapeHtml(request.method)}</span>` : ''}<code>${escapeHtml(request.url)}</code>${request.status ? `<span class="status ${statusTone}">${request.status}</span>` : ''}${request.ms ? `<span class="dur">${Math.round(request.ms)}ms</span>` : ''}</p>`
+  }
+
   function renderLines() {
     const keyword = state.filter.trim().toLowerCase()
     const visible = state.lines.filter(line => {
-      if (state.warnOnly && !(line.level >= 40)) return false
-      if (keyword && !line.text.toLowerCase().includes(keyword)) return false
+      if (line.level < state.minLevel) return false
+      if (keyword && !line.searchText.includes(keyword)) return false
       return true
     })
+    state.visible = visible
     els.lines.innerHTML = visible
-      .map(line => {
-        const tone = line.level >= 50 ? 'error' : line.level >= 40 ? 'warn' : line.level >= 30 ? 'info' : 'debug'
-        return `<div class="line ${tone}">${escapeHtml(line.text)}</div>`
+      .map((line, index) => {
+        const tone = toneOf(line)
+        const time = line.time ? clockText(line.time) : ''
+        const detail = line.detail
+          ? `<pre class="log-detail" hidden>${escapeHtml(line.detail)}</pre>`
+          : ''
+        return `<div class="log-item">
+          <div class="log-row" data-index="${index}">
+            <span class="log-time">${escapeHtml(time)}</span>
+            <span class="log-level ${tone}">${levelLabel(tone)}</span>
+            <div class="log-main"><p class="log-msg">${escapeHtml(line.message || '（无消息）')}</p>${requestHtml(line.request)}</div>
+          </div>
+          ${detail}
+        </div>`
       })
       .join('')
     els.counter.textContent = countText(visible.length)
+    updateStats()
     renderEmpty(visible.length)
     if (state.follow && state.file) els.view.scrollTop = els.view.scrollHeight
+  }
+
+  function updateStats() {
+    const total = state.lines.length
+    const requests = state.lines.filter(line => line.request).length
+    const warnings = state.lines.filter(line => line.level >= 40 && line.level < 50).length
+    const errors = state.lines.filter(line => line.level >= 50).length
+    els.statTotal.textContent = `${total} 行`
+    els.statRequests.textContent = `${requests} 请求`
+    els.statWarn.textContent = `${warnings} 警告`
+    els.statErrors.textContent = `${errors} 错误`
   }
 
   function countText(visible) {
     if (!state.file) return ''
     const keyword = state.filter.trim()
-    if (state.warnOnly) {
-      const extra = keyword ? '，含关键字' : ''
-      return `筛出 ${visible} / ${state.lines.length} 行（仅警告与错误${extra}）`
-    }
-    if (keyword) return `筛出 ${visible} / ${state.lines.length} 行`
+    const parts = []
+    if (state.minLevel) parts.push('按级别')
+    if (keyword) parts.push('含关键字')
+    if (parts.length) return `筛出 ${visible} / ${state.lines.length} 行（${parts.join('，')}）`
     return `已读 ${state.lines.length} 行`
   }
 
@@ -656,6 +868,15 @@
     return ok
   }
 
+  function flashButton(button, label, restore) {
+    button.textContent = label
+    button.disabled = true
+    setTimeout(() => {
+      button.textContent = restore
+      button.disabled = false
+    }, 1200)
+  }
+
   function flash(label) {
     els.copy.textContent = label
     els.copy.disabled = true
@@ -690,9 +911,37 @@
     renderLines()
   })
 
-  els.warnOnly.addEventListener('change', () => {
-    state.warnOnly = els.warnOnly.checked
+  els.level.addEventListener('change', () => {
+    state.minLevel = Number(els.level.value) || 0
     renderLines()
+  })
+
+  els.lines.addEventListener('click', event => {
+    const row = event.target.closest('.log-row')
+    if (!row) return
+    const detail = row.parentElement?.querySelector('.log-detail')
+    if (detail) detail.hidden = !detail.hidden
+  })
+
+  els.export.addEventListener('click', async () => {
+    const text = state.visible.map(line => line.raw).join('\n')
+    if (!text) {
+      flashButton(els.export, '没有可导出内容', '导出筛选结果')
+      return
+    }
+    const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
+    if (api?.exportFile) {
+      const result = await api.exportFile(text, `huajing-log-${stamp}.log`)
+      flashButton(els.export, result?.ok ? '已导出' : result?.canceled ? '已取消' : '导出失败', '导出筛选结果')
+      return
+    }
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `huajing-log-${stamp}.log`
+    link.click()
+    URL.revokeObjectURL(link.href)
+    flashButton(els.export, '已导出', '导出筛选结果')
   })
 
   els.clear.addEventListener('click', () => {
@@ -704,9 +953,7 @@
   })
 
   els.copy.addEventListener('click', async () => {
-    const text = Array.from(els.lines.children)
-      .map(node => node.textContent)
-      .join('\n')
+    const text = state.visible.map(line => line.raw).join('\n')
     if (!text) {
       flash('没有可复制的内容')
       return
