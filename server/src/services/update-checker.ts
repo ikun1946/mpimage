@@ -5,9 +5,8 @@
  * 任何失败都不抛异常，把原因写进 error 返回，前端照常渲染。
  */
 import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { config } from '../config.js'
+import { config } from '../app/platform/config.js'
+import { projectPath } from '../app/platform/paths.js'
 
 export interface UpdateStatus {
   currentVersion: string
@@ -57,10 +56,9 @@ const currentVersion = normalizeVersion(config.appVersion || readPackageVersion(
  * 打包后的后端目录是 app-server/server/dist/services——统一向上找 server/package.json。
  */
 function readPackageVersion(): string | null {
-  const here = dirname(fileURLToPath(import.meta.url))
   for (const candidate of [
-    resolve(here, '..', '..', 'package.json'),
-    resolve(here, '..', '..', '..', 'package.json'),
+    projectPath('server', 'package.json'),
+    projectPath('package.json'),
   ]) {
     try {
       const parsed = JSON.parse(readFileSync(candidate, 'utf8')) as { version?: unknown }

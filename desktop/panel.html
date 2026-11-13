@@ -814,6 +814,290 @@
     font-size: 11px;
   }
 
+  /* 客户端显示名：和勾选框同一行，留空就用默认名字 */
+  .client-model-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .client-model-row label {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .client-model-row .model-alias {
+    flex: 0 0 150px;
+    min-width: 120px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  /* 自定义供应商：一张卡片一个网关，模型列表可滚动 */
+  .providers {
+    margin: 14px 0 4px;
+    padding: 10px 14px 12px;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    background: var(--surface-subtle);
+  }
+
+  .providers legend {
+    padding: 0 6px;
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .provider-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 6px;
+  }
+
+  .provider-list:empty::before {
+    content: '还没有自定义供应商，点下面「添加供应商」开始接入。';
+    color: var(--ink-faint);
+    font-size: 12px;
+  }
+
+  .provider-card {
+    padding: 10px 12px 12px;
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+
+  .provider-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .provider-head .provider-name {
+    flex: 1;
+    min-width: 0;
+    height: 30px;
+    font-weight: 600;
+  }
+
+  .provider-card .form-row {
+    margin-bottom: 6px;
+  }
+
+  .provider-card .form-row label {
+    font-size: 12px;
+  }
+
+  .provider-card .form-row input {
+    height: 30px;
+    font-size: 12px;
+  }
+
+  .provider-model-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--line-soft);
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .provider-model-head .provider-model-add {
+    flex: 1;
+    min-width: 160px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  .provider-model-list {
+    display: grid;
+    gap: 4px;
+    max-height: 210px;
+    margin-top: 6px;
+    overflow-y: auto;
+  }
+
+  .provider-model-list:empty::before {
+    content: '还没有模型。可以拉取上游列表，或手动填写模型 ID。';
+    color: var(--ink-faint);
+    font-size: 12px;
+  }
+
+  .provider-model-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .provider-model-row code {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink);
+    font-family: Consolas, "SFMono-Regular", monospace;
+    font-size: 11px;
+  }
+
+  .provider-model-row .provider-model-label {
+    flex: 0 0 150px;
+    min-width: 110px;
+    height: 27px;
+    font-size: 12px;
+  }
+
+  .provider-model-remove {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink-faint);
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  .provider-model-remove:hover {
+    background: var(--surface-sunken);
+    color: var(--ink);
+  }
+
+  .provider-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  /* GPT 账号池：导入、状态与模型可用性 */
+  .gpt-import textarea {
+    width: 100%;
+    min-height: 78px;
+    margin-top: 8px;
+    font-family: Consolas, "SFMono-Regular", monospace;
+    font-size: 12px;
+  }
+
+  .gpt-model-list {
+    display: grid;
+    gap: 5px;
+    margin: 10px 0 4px;
+    padding: 9px 12px;
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    background: var(--surface-subtle);
+  }
+
+  .gpt-model-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .gpt-model-row code {
+    color: var(--ink);
+    font-family: Consolas, "SFMono-Regular", monospace;
+    font-size: 11px;
+  }
+
+  .gpt-model-row .gpt-model-count {
+    margin-left: auto;
+    color: var(--ink-faint);
+  }
+
+  .gpt-model-row.is-empty {
+    opacity: 0.55;
+  }
+
+  .gpt-account-list {
+    display: grid;
+    gap: 8px;
+    max-height: 320px;
+    margin-top: 10px;
+    overflow-y: auto;
+  }
+
+  .gpt-account-list:empty::before {
+    content: '还没有导入账号。粘贴 access_token 或 auth.json 后点「导入账号」。';
+    color: var(--ink-faint);
+    font-size: 12px;
+  }
+
+  .gpt-account-row {
+    padding: 8px 10px;
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+
+  .gpt-account-main {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .gpt-account-main strong {
+    font-size: 13px;
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .gpt-account-main code {
+    color: var(--ink-faint);
+    font-family: Consolas, "SFMono-Regular", monospace;
+    font-size: 11px;
+  }
+
+  .gpt-account-state {
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-sunken);
+    border: 1px solid var(--line-soft);
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+
+  .gpt-account-state.active { color: #2f6b45; border-color: rgba(47, 107, 69, 0.35); background: rgba(47, 107, 69, 0.08); }
+  .gpt-account-state.invalid { color: #a33a2a; border-color: rgba(163, 58, 42, 0.35); background: rgba(163, 58, 42, 0.08); }
+  .gpt-account-state.limited { color: #8a6413; border-color: rgba(138, 100, 19, 0.35); background: rgba(138, 100, 19, 0.08); }
+
+  .gpt-account-side {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .gpt-account-side .gpt-inflight {
+    margin-right: auto;
+    color: var(--ink-faint);
+    font-size: 11px;
+  }
+
+  .gpt-account-error {
+    margin: 5px 0 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #a33a2a;
+    word-break: break-all;
+  }
+
+  html[data-theme="dark"] .gpt-account-state.active { color: #8fd0a6; border-color: rgba(143, 208, 166, 0.35); background: rgba(143, 208, 166, 0.08); }
+  html[data-theme="dark"] .gpt-account-state.invalid { color: #e8a091; border-color: rgba(232, 160, 145, 0.35); background: rgba(232, 160, 145, 0.08); }
+  html[data-theme="dark"] .gpt-account-error { color: #e8a091; }
+
   /* ---------- 徽标 ---------- */
 
   .chip {
@@ -1679,10 +1963,58 @@
       <fieldset class="client-models">
         <legend>客户端可选的生图模型</legend>
         <div class="client-models-list" id="upstream-client-model-list"></div>
-        <p class="hint">只有勾选的模型才会出现在客户端下拉里；至少要勾一个。</p>
+        <p class="hint">只有勾选的模型才会出现在客户端下拉里；至少要勾一个。右侧可以给模型改一个客户端显示名，留空用默认名字。</p>
+      </fieldset>
+      <fieldset class="providers">
+        <legend>自定义供应商</legend>
+        <p class="hint">接入任何兼容 OpenAI 图片接口（/v1/images/generations、/v1/images/edits）的网关。勾选的模型会出现在客户端下拉里，显示名可以单独填写。</p>
+        <div class="provider-list" id="provider-list"></div>
+        <div class="provider-actions">
+          <button class="button mini" type="button" id="provider-add">添加供应商</button>
+          <span class="hint">供应商配置随下面「保存」一起提交。</span>
+        </div>
       </fieldset>
       <p class="current" id="upstream-meta">读取中…</p>
       <p class="current" id="upstream-result"></p>
+    </div>
+  </section>
+
+  <section class="card span-6" aria-labelledby="gpt-accounts-title">
+    <div class="card-head">
+      <h2 id="gpt-accounts-title">GPT 账号池</h2>
+      <div class="head-actions">
+        <button class="button mini" type="button" id="btn-gpt-accounts-refresh">刷新</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="notice" id="gpt-accounts-notice" hidden></div>
+      <p class="hint">
+        导入 ChatGPT / Codex 账号的 access_token，用账号自己的额度生图。当前只启用 Codex 通道
+        （/backend-api/codex/responses）；Web 账号可以保存，但暂不参与生图。
+      </p>
+      <div class="gpt-import">
+        <div class="form-row">
+          <label>账号类型
+            <select id="gpt-import-source">
+              <option value="">自动识别（默认 Codex）</option>
+              <option value="codex">Codex</option>
+              <option value="web">Web（仅保存）</option>
+            </select>
+          </label>
+          <button class="button" type="button" id="gpt-import-file">从文件导入</button>
+          <input type="file" id="gpt-import-file-input" accept=".json,.jsonl,.txt" hidden />
+        </div>
+        <textarea id="gpt-import-text" class="textarea" rows="4" spellcheck="false"
+          placeholder="每行一个 access_token，或 email----token；也可以粘贴 auth.json / JSON 数组 / JSONL"></textarea>
+        <div class="form-row">
+          <button class="button primary" type="button" id="gpt-import-submit">导入账号</button>
+          <button class="button" type="button" id="gpt-check-all">测试全部</button>
+          <span class="current" id="gpt-import-status" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+      <div class="gpt-model-list" id="gpt-model-list"></div>
+      <div class="gpt-account-list" id="gpt-account-list"></div>
+      <p class="current" id="gpt-accounts-meta">读取中…</p>
     </div>
   </section>
 
@@ -1936,6 +2268,20 @@
     upstreamImageModelCustom: $('upstream-image-model-custom'),
     upstreamImageModelStatus: $('upstream-image-model-status'),
     upstreamClientModelList: $('upstream-client-model-list'),
+    providerList: $('provider-list'),
+    providerAdd: $('provider-add'),
+    gptAccountsNotice: $('gpt-accounts-notice'),
+    btnGptAccountsRefresh: $('btn-gpt-accounts-refresh'),
+    gptImportSource: $('gpt-import-source'),
+    gptImportText: $('gpt-import-text'),
+    gptImportFile: $('gpt-import-file'),
+    gptImportFileInput: $('gpt-import-file-input'),
+    gptImportSubmit: $('gpt-import-submit'),
+    gptImportStatus: $('gpt-import-status'),
+    gptCheckAll: $('gpt-check-all'),
+    gptModelList: $('gpt-model-list'),
+    gptAccountList: $('gpt-account-list'),
+    gptAccountsMeta: $('gpt-accounts-meta'),
     upstreamTest: $('upstream-test'),
     upstreamSave: $('upstream-save'),
     upstreamMeta: $('upstream-meta'),
@@ -2079,6 +2425,11 @@
   /** 服务端白名单里的全部模型，以及客户端当前可见的模型 */
   let upstreamImageModels = []
   let upstreamEnabledImageModels = []
+  let upstreamProviders = []
+  let upstreamModelAliases = {}
+  let upstreamAccountImageModels = []
+  let gptAccountsState = { enabled: true, accounts: [], models: [] }
+  let gptCheckTimer = null
 
   // ---------- 小工具 ----------
 
@@ -2400,6 +2751,7 @@
       loadRegistrations(),
       loadLimits(),
       loadUpstream(),
+      loadGptAccounts(),
       loadFeedback(feedbackFilter),
       loadStats(),
     ])
@@ -2803,6 +3155,300 @@
     })
   }
 
+  // ---------- GPT 账号池 ----------
+
+  const GPT_STATUS_LABELS = {
+    unchecked: '待检测',
+    active: '可用',
+    limited: '冷却中',
+    invalid: '已失效',
+    disabled: '已停用',
+  }
+
+  function gptPlanLabel(plan) {
+    const labels = {
+      free: 'Free',
+      plus: 'Plus',
+      pro: 'Pro',
+      prolite: 'Pro Lite',
+      team: 'Team',
+      enterprise: 'Enterprise',
+      unknown: '套餐未知',
+    }
+    return labels[plan] || plan || '套餐未知'
+  }
+
+  function renderGptModels() {
+    if (!dom.gptModelList) return
+    const models = gptAccountsState.models || []
+    if (!models.length) {
+      dom.gptModelList.innerHTML = '<div class="gpt-model-row is-empty">还没有可用的账号模型。</div>'
+      return
+    }
+    dom.gptModelList.innerHTML = models
+      .map(model => {
+        const count = Number(model.accounts) || 0
+        return `<div class="gpt-model-row${count ? '' : ' is-empty'}">
+          <code>${escapeHtml(model.id)}</code>
+          <span>${escapeHtml(model.label || '')}</span>
+          <span class="gpt-model-count">${count ? `${count} 个账号可用` : '暂无可用账号'}</span>
+        </div>`
+      })
+      .join('')
+  }
+
+  function renderGptAccounts() {
+    if (!dom.gptAccountList) return
+    const accounts = gptAccountsState.accounts || []
+    if (!accounts.length) {
+      dom.gptAccountList.innerHTML = ''
+    } else {
+      dom.gptAccountList.innerHTML = accounts
+        .map(account => {
+          const status = GPT_STATUS_LABELS[account.status] || account.status
+          const name = account.label || account.email || account.id
+          const plan = gptPlanLabel(account.plan)
+          const source = account.source === 'codex' ? 'Codex' : 'Web'
+          const cooling = account.cooldownUntil && account.cooldownUntil > Date.now()
+            ? ` · 冷却至 ${new Date(account.cooldownUntil).toLocaleTimeString()}`
+            : ''
+          const error = account.lastError
+            ? `<p class="gpt-account-error">${escapeHtml(account.lastError)}</p>`
+            : ''
+          return `<div class="gpt-account-row" data-id="${escapeHtml(account.id)}">
+            <div class="gpt-account-main">
+              <strong>${escapeHtml(name)}</strong>
+              <span class="gpt-account-state ${escapeHtml(account.status)}">${escapeHtml(status)}</span>
+              <code>${escapeHtml(plan)} · ${escapeHtml(source)} · ${escapeHtml(account.tokenPreview || '')}</code>
+            </div>
+            <div class="gpt-account-side">
+              <span class="gpt-inflight">在途 ${Number(account.inflight) || 0}/${Number(account.maxConcurrency) || 1}${escapeHtml(cooling)}</span>
+              <button class="button mini" type="button" data-gpt-act="check">测试</button>
+              <button class="button mini" type="button" data-gpt-act="toggle">${account.enabled ? '停用' : '启用'}</button>
+              <button class="button mini" type="button" data-gpt-act="cooldown">清冷却</button>
+              <button class="button mini" type="button" data-gpt-act="delete">删除</button>
+            </div>
+            ${error}
+          </div>`
+        })
+        .join('')
+    }
+
+    if (dom.gptAccountsMeta) {
+      const usable = accounts.filter(
+        account => account.enabled && account.status !== 'invalid' && account.status !== 'disabled',
+      ).length
+      dom.gptAccountsMeta.textContent = gptAccountsState.enabled
+        ? `共 ${accounts.length} 个账号，可用 ${usable} 个 · 改动会立即影响客户端模型列表`
+        : '账号池总开关已关闭（GPT_ACCOUNTS_ENABLED=0），账号仍可导入但不参与生图'
+    }
+    renderGptModels()
+  }
+
+  function applyGptPayload(data) {
+    if (!data || typeof data !== 'object') return
+    gptAccountsState = {
+      enabled: data.enabled !== false,
+      accounts: Array.isArray(data.accounts) ? data.accounts : [],
+      models: Array.isArray(data.models) ? data.models : [],
+    }
+    renderGptAccounts()
+    // 账号变化后顺手刷新上游里的默认模型下拉
+    if (Array.isArray(data.accountImageModels)) {
+      upstreamAccountImageModels = data.accountImageModels
+      renderUpstreamImageModelOptions()
+    } else {
+      void loadUpstream()
+    }
+  }
+
+  async function loadGptAccounts() {
+    if (!dom.gptAccountList) return
+    clearNotice(dom.gptAccountsNotice)
+    const result = await api('/api/admin/gpt-accounts')
+    if (isAuthFailure(result)) {
+      showNotice(dom.gptAccountsNotice, AUTH_HINT)
+      return
+    }
+    if (!result.ok) {
+      showNotice(dom.gptAccountsNotice, result.error || '账号池读取失败')
+      return
+    }
+    applyGptPayload(result.data)
+  }
+
+  function gptSelectedIds() {
+    return [...(dom.gptAccountList?.querySelectorAll('.gpt-account-row') || [])].map(
+      row => row.dataset.id,
+    )
+  }
+
+  async function importGptAccounts() {
+    const text = dom.gptImportText?.value || ''
+    if (!text.trim()) {
+      setCurrent(dom.gptImportStatus, '先粘贴账号内容', 'error')
+      return
+    }
+    const source = dom.gptImportSource?.value || ''
+    await withBusy(dom.gptImportSubmit, async () => {
+      setCurrent(dom.gptImportStatus, '正在导入…')
+      const result = await api('/api/admin/gpt-accounts/import', {
+        method: 'POST',
+        body: { text, ...(source ? { source } : {}) },
+      })
+      if (!result.ok) {
+        setCurrent(dom.gptImportStatus, result.error || '导入失败', 'error')
+        return
+      }
+      const data = result.data || {}
+      const parts = [
+        `新增 ${Number(data.imported) || 0}`,
+        `更新 ${Number(data.updated) || 0}`,
+      ]
+      if (Number(data.skipped)) parts.push(`跳过 ${data.skipped}`)
+      if (Array.isArray(data.invalid) && data.invalid.length) {
+        parts.push(`无效 ${data.invalid.length}`)
+      }
+      setCurrent(dom.gptImportStatus, parts.join(' · '), 'ok')
+      if (dom.gptImportText) dom.gptImportText.value = ''
+      applyGptPayload(data)
+    })
+  }
+
+  async function checkGptAccounts(ids) {
+    if (!ids.length) {
+      setCurrent(dom.gptImportStatus, '没有可测试的账号', 'error')
+      return
+    }
+    if (gptCheckTimer) {
+      clearInterval(gptCheckTimer)
+      gptCheckTimer = null
+    }
+    const started = await api('/api/admin/gpt-accounts/check', {
+      method: 'POST',
+      body: { ids },
+    })
+    if (!started.ok) {
+      setCurrent(dom.gptImportStatus, started.error || '启动校验失败', 'error')
+      return
+    }
+    const jobId = started.data?.jobId
+    const total = Number(started.data?.total) || ids.length
+    if (!jobId) {
+      setCurrent(dom.gptImportStatus, '校验任务创建失败', 'error')
+      return
+    }
+    setCurrent(dom.gptImportStatus, `正在校验 0/${total}…`)
+
+    const poll = async () => {
+      const result = await api(`/api/admin/gpt-accounts/check/${encodeURIComponent(jobId)}`)
+      if (!result.ok) {
+        if (gptCheckTimer) clearInterval(gptCheckTimer)
+        gptCheckTimer = null
+        setCurrent(dom.gptImportStatus, result.error || '校验失败', 'error')
+        return
+      }
+      const job = result.data || {}
+      const done = Number(job.done) || 0
+      const all = Number(job.total) || total
+      if (job.status !== 'done') {
+        setCurrent(dom.gptImportStatus, `正在校验 ${done}/${all}…`)
+        return
+      }
+      if (gptCheckTimer) clearInterval(gptCheckTimer)
+      gptCheckTimer = null
+      const failed = Number(job.failed) || 0
+      setCurrent(
+        dom.gptImportStatus,
+        failed ? `校验完成：${all - failed} 个可用，${failed} 个失败` : `校验完成：${all} 个账号都可用`,
+        failed ? 'warn' : 'ok',
+      )
+      void loadGptAccounts()
+    }
+
+    void poll()
+    gptCheckTimer = setInterval(poll, 1500)
+  }
+
+  if (dom.btnGptAccountsRefresh) {
+    dom.btnGptAccountsRefresh.addEventListener('click', () => void loadGptAccounts())
+  }
+  if (dom.gptImportSubmit) {
+    dom.gptImportSubmit.addEventListener('click', () => void importGptAccounts())
+  }
+  if (dom.gptImportFile && dom.gptImportFileInput) {
+    dom.gptImportFile.addEventListener('click', () => dom.gptImportFileInput.click())
+    dom.gptImportFileInput.addEventListener('change', () => {
+      const file = dom.gptImportFileInput.files?.[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (dom.gptImportText) dom.gptImportText.value = String(reader.result || '')
+        setCurrent(dom.gptImportStatus, `已读取 ${file.name}`)
+      }
+      reader.onerror = () => setCurrent(dom.gptImportStatus, '文件读取失败', 'error')
+      reader.readAsText(file)
+      dom.gptImportFileInput.value = ''
+    })
+  }
+  if (dom.gptCheckAll) {
+    dom.gptCheckAll.addEventListener('click', () => void checkGptAccounts(gptSelectedIds()))
+  }
+
+  if (dom.gptAccountList) {
+    dom.gptAccountList.addEventListener('click', async event => {
+      const button = event.target.closest('[data-gpt-act]')
+      const row = event.target.closest('.gpt-account-row')
+      if (!button || !row) return
+      const id = row.dataset.id || ''
+      if (!id) return
+      const account = (gptAccountsState.accounts || []).find(item => item.id === id)
+      if (!account) return
+
+      const action = button.dataset.gptAct
+      if (action === 'check') {
+        void checkGptAccounts([id])
+        return
+      }
+      if (action === 'toggle') {
+        const result = await api('/api/admin/gpt-accounts/update', {
+          method: 'POST',
+          body: { id, enabled: !account.enabled },
+        })
+        if (!result.ok) {
+          setCurrent(dom.gptImportStatus, result.error || '更新失败', 'error')
+          return
+        }
+        applyGptPayload(result.data)
+        return
+      }
+      if (action === 'cooldown') {
+        const result = await api('/api/admin/gpt-accounts/clear-cooldown', {
+          method: 'POST',
+          body: { ids: [id] },
+        })
+        if (!result.ok) {
+          setCurrent(dom.gptImportStatus, result.error || '清除失败', 'error')
+          return
+        }
+        applyGptPayload(result.data)
+        return
+      }
+      if (action === 'delete') {
+        if (!window.confirm(`确定删除账号「${account.label || account.email || account.id}」？`)) return
+        const result = await api('/api/admin/gpt-accounts/delete', {
+          method: 'POST',
+          body: { ids: [id] },
+        })
+        if (!result.ok) {
+          setCurrent(dom.gptImportStatus, result.error || '删除失败', 'error')
+          return
+        }
+        applyGptPayload(result.data)
+      }
+    })
+  }
+
   // ---------- 上游 ----------
 
   async function loadUpstream() {
@@ -2828,6 +3474,13 @@
     upstreamEffectiveImageModel = String(data.imageModel || data.model || '').trim()
     upstreamImageModels = Array.isArray(data.imageModels) ? data.imageModels : []
     upstreamEnabledImageModels = Array.isArray(data.enabledImageModels) ? data.enabledImageModels : []
+    upstreamProviders = Array.isArray(data.providers) ? data.providers : []
+    upstreamModelAliases =
+      data.modelAliases && typeof data.modelAliases === 'object' ? data.modelAliases : {}
+    upstreamAccountImageModels = Array.isArray(data.accountImageModels)
+      ? data.accountImageModels
+      : []
+    renderProviderCards()
     renderUpstreamModelOptions()
     renderUpstreamTitleModelOptions()
     renderUpstreamImageModelOptions()
@@ -2959,6 +3612,25 @@
       options.push({ value: model.id, label: `${model.id}${suffix}` })
     }
 
+    // GPT 账号池的模型（只读，由导入的账号决定）
+    for (const model of upstreamAccountImageModels) {
+      options.push({
+        value: model.id,
+        label: `${model.label || model.id}${model.accounts ? ` · ${model.accounts} 个账号` : ''}`,
+      })
+    }
+
+    // 自定义供应商的模型也能设为默认
+    for (const provider of upstreamProviders) {
+      if (provider.enabled === false) continue
+      for (const model of Array.isArray(provider.models) ? provider.models : []) {
+        if (model.enabled === false) continue
+        const publicId = `p:${provider.id}:${model.id}`
+        const label = model.label || model.id
+        options.push({ value: publicId, label: `${label} · ${provider.name || provider.id}` })
+      }
+    }
+
     if (upstreamSavedImageModel && !IMAGE_MODEL_PRESETS.some(preset => preset.id === upstreamSavedImageModel)) {
       options.push({ value: upstreamSavedImageModel, label: `${upstreamSavedImageModel} · 已保存` })
     }
@@ -2999,16 +3671,192 @@
       `当前生效：${effective}（${source}）· 客户端可选 ${clientCount} 个 · 改动会在下一次生图时生效`
   }
 
-  /** 客户端可见模型：勾选框按服务端白名单渲染 */
+  /** 客户端可见模型：勾选框 + 显示名输入，按服务端白名单渲染 */
   function renderClientModelFlags() {
     if (!dom.upstreamClientModelList) return
     const enabled = new Set(upstreamEnabledImageModels)
     dom.upstreamClientModelList.innerHTML = upstreamImageModels
       .map(model => {
         const checked = enabled.has(model.id) ? ' checked' : ''
-        return `<label><input type="checkbox" value="${escapeHtml(model.id)}"${checked}> <span>${escapeHtml(model.label || model.id)}</span> <code>${escapeHtml(model.id)}</code></label>`
+        const alias = upstreamModelAliases[model.id] || ''
+        return `<div class="client-model-row"><label><input type="checkbox" value="${escapeHtml(model.id)}"${checked}> <span>${escapeHtml(model.label || model.id)}</span> <code>${escapeHtml(model.id)}</code></label><input type="text" class="model-alias" data-model-id="${escapeHtml(model.id)}" value="${escapeHtml(alias)}" placeholder="客户端显示名" autocomplete="off"></div>`
       })
       .join('')
+  }
+
+  // ---------- 自定义供应商 ----------
+
+  function providerCardHtml(provider) {
+    const models = Array.isArray(provider.models) ? provider.models : []
+    const rows = models
+      .map(model => providerModelRowHtml(model.id, model.label || '', model.enabled !== false))
+      .join('')
+    return `<div class="provider-card">
+      <div class="provider-head">
+        <label class="check"><input type="checkbox" class="provider-enabled"${provider.enabled === false ? '' : ' checked'}> 启用</label>
+        <input type="text" class="provider-name" value="${escapeHtml(provider.name || '')}" placeholder="供应商名称（仅供后台识别）" autocomplete="off">
+        <button type="button" class="button mini provider-remove">删除</button>
+      </div>
+      <div class="form-row">
+        <label>供应商 ID
+          <input type="text" class="provider-id" value="${escapeHtml(provider.id || '')}" placeholder="my-gateway" spellcheck="false" autocomplete="off">
+        </label>
+        <label class="grow">接口地址
+          <input type="url" class="provider-url" value="${escapeHtml(provider.baseUrl || '')}" placeholder="https://api.example.com" spellcheck="false" autocomplete="off">
+        </label>
+        <label class="grow">API Key
+          <input type="password" class="provider-key" value="${escapeHtml(provider.apiKey || '')}" placeholder="留空表示不需要" autocomplete="new-password">
+        </label>
+      </div>
+      <div class="provider-model-head">
+        <span>模型</span>
+        <button type="button" class="button mini provider-fetch">拉取模型</button>
+        <input type="text" class="provider-model-add" placeholder="手动添加模型 ID，如 gpt-image-1" spellcheck="false" autocomplete="off">
+        <button type="button" class="button mini provider-add-model">添加</button>
+      </div>
+      <div class="provider-model-list">${rows}</div>
+      <p class="current provider-status"></p>
+    </div>`
+  }
+
+  function providerModelRowHtml(id, label, enabled) {
+    return `<div class="provider-model-row">
+      <label class="check"><input type="checkbox" class="provider-model-enabled"${enabled ? ' checked' : ''}></label>
+      <code title="${escapeHtml(id)}">${escapeHtml(id)}</code>
+      <input type="hidden" class="provider-model-id" value="${escapeHtml(id)}">
+      <input type="text" class="provider-model-label" value="${escapeHtml(label || '')}" placeholder="客户端显示名" autocomplete="off">
+      <button type="button" class="provider-model-remove" title="移除" aria-label="移除">×</button>
+    </div>`
+  }
+
+  /** 从卡片里读回当前编辑值（增删卡片前先调用，避免丢掉未保存的输入） */
+  function collectProviders() {
+    if (!dom.providerList) return []
+    return [...dom.providerList.querySelectorAll('.provider-card')].map(card => ({
+      id: (card.querySelector('.provider-id')?.value || '').trim(),
+      name: (card.querySelector('.provider-name')?.value || '').trim(),
+      baseUrl: (card.querySelector('.provider-url')?.value || '').trim(),
+      apiKey: card.querySelector('.provider-key')?.value || '',
+      enabled: Boolean(card.querySelector('.provider-enabled')?.checked),
+      models: [...card.querySelectorAll('.provider-model-row')].map(row => ({
+        id: (row.querySelector('.provider-model-id')?.value || '').trim(),
+        label: (row.querySelector('.provider-model-label')?.value || '').trim(),
+        enabled: Boolean(row.querySelector('.provider-model-enabled')?.checked),
+      })),
+    }))
+  }
+
+  function renderProviderCards(providers) {
+    if (!dom.providerList) return
+    if (Array.isArray(providers)) upstreamProviders = providers
+    dom.providerList.innerHTML = upstreamProviders.map(providerCardHtml).join('')
+  }
+
+  function addProviderCard() {
+    const providers = collectProviders()
+    let n = providers.length + 1
+    const ids = new Set(providers.map(item => item.id))
+    while (ids.has(`provider-${n}`)) n += 1
+    providers.push({ id: `provider-${n}`, name: '', baseUrl: '', apiKey: '', enabled: true, models: [] })
+    renderProviderCards(providers)
+    const cards = dom.providerList.querySelectorAll('.provider-card')
+    const card = cards[cards.length - 1]
+    card?.querySelector('.provider-url')?.focus()
+  }
+
+  function appendModelRow(card, id, label, enabled) {
+    const list = card.querySelector('.provider-model-list')
+    if (!list) return false
+    const trimmed = String(id || '').trim()
+    if (!trimmed) return false
+    const existing = [...list.querySelectorAll('.provider-model-id')].map(input => input.value.trim())
+    if (existing.includes(trimmed)) return false
+    list.insertAdjacentHTML('beforeend', providerModelRowHtml(trimmed, label || '', enabled !== false))
+    return true
+  }
+
+  async function fetchProviderModels(card) {
+    const status = card.querySelector('.provider-status')
+    const url = (card.querySelector('.provider-url')?.value || '').trim()
+    const key = card.querySelector('.provider-key')?.value || ''
+    if (!url) {
+      setCurrent(status, '先填写供应商地址', 'error')
+      return
+    }
+    setCurrent(status, '正在读取上游模型列表…')
+    const result = await api('/api/admin/upstream/provider-models', {
+      method: 'POST',
+      body: { baseUrl: url, apiKey: key },
+    })
+    if (!result.ok) {
+      setCurrent(status, result.error || '拉取模型失败', 'error')
+      return
+    }
+    const data = result.data || {}
+    if (data.ok === false) {
+      setCurrent(status, data.detail || '拉取模型失败', 'error')
+      return
+    }
+    const models = Array.isArray(data.models) ? data.models : []
+    let added = 0
+    for (const model of models) {
+      // 拉回来的模型默认不勾选，由管理员挑出生图模型
+      if (appendModelRow(card, model.id, '', false)) added += 1
+    }
+    setCurrent(
+      status,
+      added
+        ? `拉取到 ${models.length} 个模型，新增 ${added} 个（默认未勾选，勾选后客户端才可见）`
+        : `拉取到 ${models.length} 个模型，列表里都已经有了`,
+      'ok',
+    )
+  }
+
+  if (dom.providerAdd) {
+    dom.providerAdd.addEventListener('click', addProviderCard)
+  }
+
+  if (dom.providerList) {
+    dom.providerList.addEventListener('click', event => {
+      const card = event.target.closest('.provider-card')
+      if (!card) return
+
+      if (event.target.closest('.provider-remove')) {
+        const providers = collectProviders()
+        const index = [...dom.providerList.querySelectorAll('.provider-card')].indexOf(card)
+        if (index >= 0) providers.splice(index, 1)
+        renderProviderCards(providers)
+        return
+      }
+
+      if (event.target.closest('.provider-add-model')) {
+        const input = card.querySelector('.provider-model-add')
+        if (appendModelRow(card, input?.value || '', '', true)) {
+          if (input) input.value = ''
+          const status = card.querySelector('.provider-status')
+          setCurrent(status, '')
+        }
+        return
+      }
+
+      if (event.target.closest('.provider-fetch')) {
+        void fetchProviderModels(card)
+        return
+      }
+
+      if (event.target.closest('.provider-model-remove')) {
+        event.target.closest('.provider-model-row')?.remove()
+      }
+    })
+
+    dom.providerList.addEventListener('keydown', event => {
+      if (event.key !== 'Enter') return
+      const input = event.target.closest('.provider-model-add')
+      if (!input) return
+      event.preventDefault()
+      const card = input.closest('.provider-card')
+      if (card && appendModelRow(card, input.value, '', true)) input.value = ''
+    })
   }
 
   /** 状态行 = 拉取说明 + 当前选中模型的能力提示 */
@@ -3154,15 +4002,53 @@
 
     const enabledImageModels = [...dom.upstreamClientModelList.querySelectorAll('input[type="checkbox"]:checked')]
       .map(input => input.value)
-    if (!enabledImageModels.length) {
-      setCurrent(dom.upstreamResult, '客户端至少要保留一个可用模型', 'error')
+
+    // 模型显示名：留空表示用默认名字
+    const modelAliases = {}
+    for (const input of dom.upstreamClientModelList.querySelectorAll('.model-alias')) {
+      const id = input.dataset.modelId || ''
+      const label = input.value.trim()
+      if (id && label) modelAliases[id] = label
+    }
+
+    // 供应商：前端只做基本必填检查，完整校验在服务端
+    const providers = collectProviders()
+    const providerIds = new Set()
+    for (const provider of providers) {
+      if (!provider.id) {
+        setCurrent(dom.upstreamResult, '每个供应商都要填 ID', 'error')
+        return
+      }
+      if (providerIds.has(provider.id)) {
+        setCurrent(dom.upstreamResult, `供应商 ID 重复：${provider.id}`, 'error')
+        return
+      }
+      providerIds.add(provider.id)
+      if (!provider.baseUrl) {
+        setCurrent(dom.upstreamResult, `供应商「${provider.name || provider.id}」还缺接口地址`, 'error')
+        return
+      }
+      if (!provider.models.length) {
+        setCurrent(dom.upstreamResult, `供应商「${provider.name || provider.id}」还没有模型`, 'error')
+        return
+      }
+    }
+
+    // 内置模型可以全部不勾，但整份配置里至少要留下一个可用的模型
+    const customEnabled = providers.reduce(
+      (count, provider) =>
+        count + (provider.enabled ? provider.models.filter(model => model.enabled).length : 0),
+      0,
+    )
+    if (!enabledImageModels.length && !customEnabled) {
+      setCurrent(dom.upstreamResult, '客户端至少需要一个可用模型（内置或自定义供应商）', 'error')
       return
     }
 
     await withBusy(dom.upstreamSave, async () => {
       const result = await api('/api/admin/upstream', {
         method: 'PUT',
-        body: { baseUrl, textModel, titleModel, imageModel, enabledImageModels },
+        body: { baseUrl, textModel, titleModel, imageModel, enabledImageModels, providers, modelAliases },
       })
       if (isAuthFailure(result)) {
         setCurrent(dom.upstreamResult, AUTH_HINT, 'error')

@@ -4988,6 +4988,22 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           pageUnloading ||
           error?.name === 'AbortError' ||
           /aborted|Failed to fetch|NetworkError|Load failed/i.test(String(error?.message || ''))
+        // 客户端这条连接报错，不代表服务端任务失败：长请求经路由器/代理时，
+        // 可能在图已经生成后被掐断。先问一次任务状态，避免「图已经好了，界面却报错」。
+        let job = null
+        try {
+          job = await fetchGenerationJob(jobId)
+        } catch {}
+        if (job?.status === 'done' && (job.results?.length || job.result)) {
+          pollPendingJob(jobId, 0)
+          return
+        }
+        if (job?.status === 'running') {
+          dom.freeProgressLabel.textContent = '正在后台生成'
+          dom.freeStatus.textContent = '连接中断，正在接回生成进度…'
+          window.setTimeout(() => resumePendingJobIfAny(), 1200)
+          return
+        }
         if (!interrupted) clearPendingJob()
         stopFreeProgress()
         stopFreeCanvasAnimation()

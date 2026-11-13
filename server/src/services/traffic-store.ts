@@ -5,7 +5,7 @@
  */
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { TRAFFIC_SCOPE_LABEL, TRAFFIC_SCOPE_NAME, TRAFFIC_SCOPE_NOTE, type TrafficScope } from '../lib/traffic-scope.js'
+import { TRAFFIC_SCOPE_LABEL, TRAFFIC_SCOPE_NAME, TRAFFIC_SCOPE_NOTE, type TrafficScope } from '../app/platform/traffic-scope.js'
 
 export interface ClientTraffic {
   /** 累计请求次数 */

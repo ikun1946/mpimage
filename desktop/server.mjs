@@ -6,7 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { app } from 'electron'
 
 /**
- * 主服务（server/dist/index.js）的生命周期归桌面端所有。
+ * 主服务（server/dist/main.js）的生命周期归桌面端所有。
  * 以前这段逻辑挂在控制台子进程上：桌面端起控制台 → 控制台起服务，
  * 多一层进程、多一个端口、也多一处失败点，现在由这里直管。
  */
@@ -38,7 +38,7 @@ export function initServer(options) {
 }
 
 function serverEntry() {
-  return join(paths.root, 'server', 'dist', 'index.js')
+  return join(paths.root, 'server', 'dist', 'main.js')
 }
 
 /** 与 config.env 的 PORT 保持一致：换个端口时更新检查、健康探活不能还指着 8787 */
@@ -60,6 +60,8 @@ function serverEnv() {
     USER_DATABASE_PATH: join(paths.data, 'users.json'),
     USAGE_DATABASE_PATH: join(paths.data, 'usage.json'),
     PROJECT_DATABASE_PATH: join(paths.data, 'projects.json'),
+    // GPT 账号池含 token，跟其它运行期数据一起放数据目录，绝不写安装目录
+    GPT_ACCOUNTS_FILE: join(paths.data, 'gpt-accounts.json'),
     DATA_DIR: join(paths.data, 'data'),
     LOG_DIR: paths.logDir,
     WEB_DIST_DIR: join(paths.root, 'web', 'dist'),

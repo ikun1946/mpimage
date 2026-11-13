@@ -8,41 +8,51 @@
 
 ```text
 mpimage/
-├── server/                    后端：只提供 API，不托管页面
+├── server/                    后端：Fastify API，按 api / app / services / utils 分层
 │   ├── src/
-│   │   ├── index.ts           启动、路由装配、CORS、错误处理
-│   │   ├── config.ts          环境变量与画面比例定义（唯一来源）
-│   │   ├── routes/
+│   │   ├── main.ts            入口：只负责启动
+│   │   ├── api/               HTTP 路由（每个文件一个业务域）
 │   │   │   ├── images.ts      POST /api/images
 │   │   │   ├── uploads.ts     POST /api/reference-images（角色面部参考图）
 │   │   │   ├── files.ts       GET  /api/files/*
 │   │   │   ├── meta.ts        GET  /api/config、/api/health
 │   │   │   ├── prompts.ts     POST /api/prompts/optimize（AI 优化提示词）
-│   │   │   ├── auth.ts        登录、登入、当前用户、首次引导
+│   │   │   ├── auth.ts        登录、当前用户、首次引导
 │   │   │   ├── admin.ts       账号管理、生成统计
 │   │   │   ├── projects.ts    项目增删改查（按账号隔离）
 │   │   │   ├── styles.ts      风格库读写（按账号隔离）
 │   │   │   ├── history.ts     当前账号的生成记录
 │   │   │   ├── update.ts      GET /api/update/status（本机请求免登录）
-│   │   │   └── upstream.ts    管理员读写上游地址、测试连通性
-│   │   ├── services/
-│   │   │   ├── magpie.ts      调上游 Magpie 生图接口
-│   │   │   ├── imaging.ts     图片格式探测、像素尺寸读取
-│   │   │   ├── storage.ts     存储抽象（本地盘，日后可换对象存储）
-│   │   │   ├── user-store.ts  账号库
-│   │   │   ├── usage-store.ts 生图统计与生成记录（含提示词、耗时、图片路径）
-│   │   │   ├── project-store.ts 项目库（项目归属 ownerId）
-│   │   │   ├── style-library.ts 风格库（每账号一份）
-│   │   │   ├── settings-store.ts 运行期设置（上游地址、对话模型）落盘 settings.json
-│   │   │   ├── prompt-optimizer.ts 调对话模型扩写提示词
-│   │   │   └── update-checker.ts 版本检查：GitHub Releases / 自定义 JSON，带缓存
-│   │   └── lib/
-│   │       ├── errors.ts      统一错误码
-│   │       ├── serial-gate.ts 生图闸门（并发数可配置）
-│   │       ├── session.ts     会话表
-│   │       ├── filename.ts    文件名合法性校验
-│   │       ├── url.ts         图片 URL 构建（按请求 Host 推断）
-│   │       └── password.ts    scrypt 密码哈希
+│   │   │   └── upstream.ts    上游、自定义供应商与模型改名（管理员）
+│   │   ├── app/
+│   │   │   ├── main.ts        应用装配：插件、依赖、钩子、错误处理、监听
+│   │   │   ├── platform/      基础设施
+│   │   │   │   ├── config.ts      环境变量与画面比例定义（唯一来源）
+│   │   │   │   ├── paths.ts       项目根与相对路径解析
+│   │   │   │   ├── logging.ts     按天落盘的日志流
+│   │   │   │   ├── static.ts      前端构建产物托管与老地址跳转
+│   │   │   │   ├── errors.ts      统一错误码
+│   │   │   │   ├── session.ts     会话表
+│   │   │   │   ├── audit.ts       审计日志
+│   │   │   │   ├── serial-gate.ts 生图闸门（并发数可配置）
+│   │   │   │   └── traffic-scope.ts 统计口径
+│   │   │   ├── control/       控制面
+│   │   │   │   ├── accounts/   GPT 账号池：账号库 / 导入解析 / 调度
+│   │   │   │   ├── settings-store.ts    运行期设置落盘 settings.json
+│   │   │   │   ├── model-catalog.ts     上游对话模型清单
+│   │   │   │   ├── image-model-catalog.ts 上游生图模型清单
+│   │   │   │   ├── client-models.ts     客户端可见模型 + 改名 + 自定义供应商
+│   │   │   │   ├── quota-store.ts       每日额度
+│   │   │   │   ├── concurrency-store.ts 生图并发上限
+│   │   │   │   └── rate-limiter.ts      请求限流
+│   │   │   └── products/      业务能力
+│   │   │       ├── openai/    GPT 账号生图：Codex 通道 / 令牌刷新 / 账号适配
+│   │   │       ├── images/    magpie / imaging / reference-images / image-title / face-design
+│   │   │       ├── prompts/   prompt-optimizer / rulebook / constraints / chat-completion / image-analysis
+│   │   │       ├── styles/    style-library
+│   │   │       └── projects/  project-store
+│   │   ├── services/          持久化与外部集成：user-store / usage-store / feedback-store / traffic-store / storage / update-checker
+│   │   └── utils/             filename / password / url
 │   ├── package.json
 │   └── .env.example
 ├── web/                       前端：只在浏览器里跑的客户端
@@ -64,7 +74,7 @@ mpimage/
 ├── desktop/                   Electron：服务控制台 + 主服务进程
 │   ├── main.mjs               窗口、菜单 / 托盘、控制台状态推送、优雅退出
 │   ├── panel.html / panel-preload.cjs    服务控制台（单页：服务状态与启停、账号、上游、限流、反馈、统计）
-│   ├── server.mjs             启停 server/dist/index.js（ELECTRON_RUN_AS_NODE=1），8787 探测与接管
+│   ├── server.mjs             启停 server/dist/main.js（ELECTRON_RUN_AS_NODE=1），8787 探测与接管
 │   ├── updater.mjs            检查更新、解析直链后按链路自适应单流/并发下载
 │   ├── logs.html / logs-preload.cjs    运行日志窗口（读本地 logs/*.log）
 │   ├── update.html / update-preload.cjs  下载进度窗口（进度 / 速度 / 取消 / 安装）
@@ -72,6 +82,7 @@ mpimage/
 │   └── paths.mjs              安装目录 / 数据目录 / 日志目录
 ├── scripts/dev.mjs            一条命令同时起前后端
 ├── users.json                 账号库
+├── gpt-accounts.json          GPT 账号池（含 token，已在 .gitignore；可通过 GPT_ACCOUNTS_FILE 改位置）
 ├── projects.json              项目库（每个项目带 ownerId，按账号隔离）
 ├── usage.json                 生图统计与生成记录
 ├── styles/                    风格库目录（每个账号一份 <userId>.json）
@@ -105,7 +116,7 @@ npm run desktop:build  # 出安装包 + 便携版，产物在 release/
   数据与日志目录、复制管理密钥。
   **生图客户端不在桌面端里跑**——一律在浏览器打开 `http://<本机或局域网IP>:8787/batch.html`
 - **启停不依赖网页登录**：主进程用 `desktop/server.mjs` 自己拉起
-  `server/dist/index.js`（`ELECTRON_RUN_AS_NODE=1`），控制台与菜单 / 托盘都能启停；
+  `server/dist/main.js`（`ELECTRON_RUN_AS_NODE=1`），控制台与菜单 / 托盘都能启停；
   菜单第一项只读显示「状态：运行中 / 已停止」，已在运行时「启动服务」自动置灰
 - **控制台调管理接口不需要登录**：主进程每次启动生成一个随机 `DESKTOP_TOKEN` 注入给本机服务，
   控制台的请求由主进程代发并带上它（服务端只认回环地址 + 这个令牌，令牌不出主进程），

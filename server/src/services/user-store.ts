@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { hashPassword, verifyPassword } from '../lib/password.js'
+import { hashPassword, verifyPassword } from '../utils/password.js'
 
 export interface UserRecord {
   id: string
