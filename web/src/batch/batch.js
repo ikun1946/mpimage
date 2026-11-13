@@ -4693,39 +4693,29 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     }
 
     /**
-     * 悬停抬起：鼠标停在参考图上时把它抬高放大，删除按钮落在图片右上角。
+     * 参考图交互（方案 A）：
+     *   · 鼠标在图片范围内 → 图片浮起放大；
+     *   · 鼠标移进图片右上角那一小块 → 删除按钮浮现，卡片保持当前状态；
+     *   · 按钮就长在浮起后的图片右上角，跟着卡片一起移动。
      *
-     * 判定用的是「卡片变换后的真实包围盒」而不是一圈笼统的热区：
-     * 之前只要指针落在卡片左右范围内、纵向又处在输入条附近就会抬起，
-     * 于是图片上方一大片空白也会把卡片顶起来，手感很飘。
-     *
-     * 现在按三步判定：
-     *   1. 指针正落在某张卡的删除按钮上 → 选它，并把这张卡冻住不动
-     *      （卡片一抬按钮就跟着上移跑出光标，点击会落空）；
-     *   2. 指针落在某张卡的可见范围内 → 选它。抬起的卡按放大后的盒子算，
-     *      没抬起的按静止盒子算；抬起的那张优先，因为它压在别人上面。
-     *   3. 都没落上，但指针还在某张已抬起卡片的「正下方立柱」里 → 保持它抬起，
-     *      避免鼠标从卡片往下走的途中卡片就塌回去。
+     * 浮起范围按卡片变换后的真实包围盒判定（含倾斜与 1.3 倍放大），
+     * 图片上方的空白不会触发浮起。之前是「一条竖直带」，上方一大片空白
+     * 也会把卡片顶起来，手感很飘。
      */
     function wireFreeRefHover(root) {
       const RAISE_Y = 84 // 与 free.css 里 .free-ref.is-raised 的 translateY 一致
       const RAISE_S = 1.3 // 与 free.css 里的 scale 一致
       const EDGE_GRACE = 6 // 判定边缘的宽容，避免刚好擦边就抖
-      const CORNER_SIZE = 46 // 右上角区大小：要盖住 26px 的按钮加它的透明扩圈
-      const CORNER_GRACE = 8 // 右上角区向外多留一点，鼠标稍微偏一点也算进来
+      const CORNER_GRACE = 10 // 按钮命中区向外多留一点，鼠标贴过去也算
 
       function resetCards(cards) {
         for (const card of cards) {
           if (card.classList.contains('is-raised')) card.classList.remove('is-raised')
-          if (card.classList.contains('is-delete-open')) card.classList.remove('is-delete-open')
+          if (card.classList.contains('is-corner')) card.classList.remove('is-corner')
         }
       }
 
-      /**
-       * 卡片几何：布局盒换算成视口坐标，再算两套包围盒——
-       * 静止时的（带倾斜）与抬起放大后的。倾斜会让角点外扩，
-       * 所以包围盒要按旋转后的半宽半高算，不能直接用 offsetWidth。
-       */
+      /** 卡片几何：布局盒换算成视口坐标，再算静止与抬起两套包围盒 */
       function measure(stack) {
         const stackRect = stack.getBoundingClientRect()
         return [...stack.querySelectorAll('.free-ref')].map(card => {
@@ -4733,6 +4723,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           const height = card.offsetHeight
           const cx = stackRect.left + card.offsetLeft + width / 2
           const cy = stackRect.top + card.offsetTop + height / 2
+          // 倾斜会让角点外扩，包围盒要按旋转后的半宽半高算
           const tilt = Number.parseFloat(
             getComputedStyle(card).getPropertyValue('--tilt'),
           ) || 0
@@ -4742,17 +4733,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           const halfW = (width / 2) * cos + (height / 2) * sin
           const halfH = (width / 2) * sin + (height / 2) * cos
           const raisedCy = cy - RAISE_Y
-          // 右上角区：删除按钮所在的那一块，单独划出来不触发浮起
-          const corner = {
-            left: cx + halfW - CORNER_SIZE,
-            right: cx + halfW + CORNER_GRACE,
-            top: cy - halfH - CORNER_GRACE,
-            bottom: cy - halfH + CORNER_SIZE,
-          }
           return {
             card,
             cx,
-            corner,
             raised: card.classList.contains('is-raised'),
             /** 静止时的包围盒 */
             rest: {
@@ -4781,14 +4764,21 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         )
       }
 
-      /** 指针是否正落在这张卡的删除按钮（含它的透明扩圈）上 */
-      function onDeleteButton(item, x, y) {
+      /**
+       * 右上角区判定：以删除按钮的实际矩形为准（外扩一点）。
+       * 之前用卡片外框算，但卡片有 3px 边框、按钮又内缩 5px，
+       * 两者的右上角并不重合，按钮中心反而落在角区之外。
+       * 直接用按钮的矩形，鼠标移到按钮上或贴到它旁边都能命中。
+       */
+      function inCorner(item, x, y) {
         const button = item.card.querySelector('.free-ref-delete')
         if (!button) return false
         const rect = button.getBoundingClientRect()
         return (
-          x >= rect.left - 8 && x <= rect.right + 8 &&
-          y >= rect.top - 8 && y <= rect.bottom + 8
+          x >= rect.left - CORNER_GRACE &&
+          x <= rect.right + CORNER_GRACE &&
+          y >= rect.top - CORNER_GRACE &&
+          y <= rect.bottom + CORNER_GRACE
         )
       }
 
@@ -4802,41 +4792,15 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         const x = event.clientX
         const y = event.clientY
 
-        // 第一步：指针正落在删除按钮上 → 冻住这张卡，按钮不动，光标一直压着它
-        const onButton = items.find(item => onDeleteButton(item, x, y))
-        if (onButton) {
-          for (const item of items) {
-            if (item.card === onButton.card) {
-              item.card.classList.add('is-delete-open')
-            } else {
-              if (item.card.classList.contains('is-raised')) item.card.classList.remove('is-raised')
-              if (item.card.classList.contains('is-delete-open')) item.card.classList.remove('is-delete-open')
-            }
-          }
-          return
+        // 第一步：命中右上角区 → 这张卡的删除按钮浮现
+        // 注意不能就此返回：鼠标从按钮往下走时仍在同一张卡的「正下方立柱」里，
+        // 这时卡片要保持浮起，否则一路往下走卡片就塌回去了。
+        const corner = items.find(item => inCorner(item, x, y))
+        for (const item of items) {
+          item.card.classList.toggle('is-corner', item === corner)
         }
 
-        // 第二步：指针进了某张卡的「右上角区」→ 这张卡不要浮起。
-        // 删除按钮就长在这个角上，卡片一浮按钮就跟着上移近百像素跑出光标，
-        // 用户的鼠标停在原地却已经不在按钮上了，点击落空变成打开大图。
-        // 所以右上角单独划成一块「不触发浮起」的区域，按钮原地可点。
-        const inCorner = items.find(item => inBox(item.corner, x, y))
-        if (inCorner) {
-          for (const item of items) {
-            const isTarget = item.card === inCorner.card
-            if (isTarget) {
-              // 已经浮起的先落回来，让按钮回到右上角、光标正下方
-              if (item.card.classList.contains('is-raised')) item.card.classList.remove('is-raised')
-              item.card.classList.add('is-delete-open')
-            } else {
-              if (item.card.classList.contains('is-raised')) item.card.classList.remove('is-raised')
-              if (item.card.classList.contains('is-delete-open')) item.card.classList.remove('is-delete-open')
-            }
-          }
-          return
-        }
-
-        // 第三步：落在某张卡的可见范围内 → 抬起它。抬起的优先，它压在别人上面。
+        // 第二步：落在某张卡的可见范围内 → 抬起它。抬起的优先，它压在别人上面。
         let picked = null
         const lifted = items.find(item => item.raised && inBox(item.lifted, x, y))
         if (lifted) {
@@ -4846,8 +4810,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           if (resting) picked = resting.card
         }
 
-        // 第四步：都没落上，但指针在已抬起卡片的正下方立柱里 → 保持它抬起，
-        // 免得鼠标从卡片往下走的途中卡片就塌回去。
+        // 第三步：都没落上，但指针在已抬起卡片的正下方立柱里 → 保持它抬起，
+        // 免得鼠标从图片往下走的途中卡片就塌回去。
         if (!picked) {
           const sticky = items.find(
             item =>
@@ -4869,9 +4833,6 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           const shouldRaise = item.card === picked
           if (item.card.classList.contains('is-raised') !== shouldRaise) {
             item.card.classList.toggle('is-raised', shouldRaise)
-          }
-          if (item.card.classList.contains('is-delete-open')) {
-            item.card.classList.remove('is-delete-open')
           }
         }
       })

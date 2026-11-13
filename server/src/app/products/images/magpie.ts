@@ -118,7 +118,18 @@ function isRetryableUpstreamError(error: unknown): boolean {
   return error.code === 'UPSTREAM_DISCONNECTED'
 }
 
-const RETRY_DELAY_MS = 1200
+/** 最多试 3 次：上游断开在实测里占比不低，多给一次机会明显能救回一部分 */
+const MAX_ATTEMPTS = 3
+/** 首次重试等多久；之后翻倍，末尾再加一点随机，避免和上游同步节奏撞车 */
+const RETRY_BASE_DELAY_MS = 1500
+/** 整条重试链的时间预算：超过就不再重试，把机会留给用户手动触发 */
+const RETRY_BUDGET_MS = 240_000
+
+function retryDelay(attempt: number): number {
+  const backoff = RETRY_BASE_DELAY_MS * 2 ** attempt
+  const jitter = Math.floor(Math.random() * 800)
+  return Math.min(backoff + jitter, 15_000)
+}
 
 async function callImageEndpoint(
   options: MagpieOptions,
@@ -127,18 +138,17 @@ async function callImageEndpoint(
   promptText: string,
 ): Promise<MagpieImageResult> {
   let lastError: unknown
-  // 最多试 3 次：上游断开在实测里占比不低，多给一次机会明显能救回一部分
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const startedAt = Date.now()
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
       return await callImageEndpointOnce(options, url, init, promptText)
     } catch (error) {
       lastError = error
-      if (isRetryableUpstreamError(error)) {
-        // 上游掐断了连接，等一下再试；这类失败重试成功率很高
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS))
-        continue
-      }
-      throw error
+      if (!isRetryableUpstreamError(error)) throw error
+      // 时间预算用完了就别再试了：单次失败本身就要跑 60-120 秒，
+      // 三次下来用户等太久，不如把选择权交回给用户。
+      if (Date.now() - startedAt >= RETRY_BUDGET_MS) throw error
+      await new Promise(resolve => setTimeout(resolve, retryDelay(attempt)))
     }
   }
   throw lastError

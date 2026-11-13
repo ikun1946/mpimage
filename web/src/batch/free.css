@@ -172,10 +172,10 @@
   box-shadow: 0 2px 8px rgba(20, 26, 22, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   color: #fdfdfb;
   cursor: pointer;
-  opacity: 0.82;
-  transform: scale(1);
-  pointer-events: auto;
-  transition: opacity 150ms var(--ease, ease), transform 150ms var(--ease, ease), background 150ms var(--ease, ease);
+  opacity: 0;
+  transform: scale(0.7);
+  pointer-events: none;
+  transition: opacity 140ms var(--ease, ease), transform 140ms var(--ease, ease), background 140ms var(--ease, ease);
 }
 
 .free-ref-delete svg {
@@ -194,28 +194,21 @@
 
 /* 悬停、抬起或键盘聚焦时按钮更醒目 */
 .free-ref-delete:hover {
-  background: rgba(178, 52, 40, 0.82);
+  background: rgba(178, 52, 40, 0.85);
+}
+
+/* 鼠标移进图片右上角（batch.js 打 .is-corner）时按钮浮现 */
+.free-ref.is-corner .free-ref-delete {
   opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
 }
 
-/* 指针停在删除按钮上时把卡片冻住（由 batch.js 加 .is-delete-open）：
-   卡片一抬起按钮就跟着上移近百像素跑出光标，点击会落空变成打开大图。
-   冻结期间这张卡片抬在别的卡片之上，按钮始终压在最上层。 */
-.free-ref.is-delete-open {
-  z-index: 6;
-}
-
-.free-ref.is-raised .free-ref-delete,
-.free-ref:hover .free-ref-delete,
+/* 键盘可达：聚焦时按钮照样显示 */
 .free-ref:focus-within .free-ref-delete {
   opacity: 1;
-}
-
-/* 指针停在删除按钮上时把卡片冻住（由 batch.js 加 .is-delete-open）：
-   卡片一抬起按钮就跟着上移近百像素跑出光标，点击会落空变成打开大图。
-   冻结期间这张卡片抬在别的卡片之上，按钮始终压在最上层。 */
-.free-ref.is-delete-open {
-  z-index: 6;
+  transform: scale(1);
+  pointer-events: auto;
 }
 
 .free-ref-delete:focus-visible {
