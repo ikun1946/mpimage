@@ -150,13 +150,14 @@
   object-fit: cover;
 }
 
-/* 删除按钮：贴在卡片右上角「图内」，不再伸到卡片外面。
-   伸出去会被相邻卡片与输入条压住，鼠标瞄准了却点不到——这正是之前难点到的原因。
-   现在常驻显示且始终可点，靠透明度区分常态与悬停；误删可以用提示条里的「撤销」找回。 */
+/* 删除按钮：落在参考图片的右上角，紧贴图片边缘。
+   之前它伸到卡片外面（top:-9px），既被相邻卡片与输入条压住，鼠标瞄准了也点不到；
+   挪到图片右上角内侧后始终可见可点，靠透明度区分常态与悬停。
+   误删可以用提示条里的「撤销」找回。 */
 .free-ref-delete {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 5px;
+  right: 5px;
   z-index: 3;
   display: grid;
   width: 26px;
@@ -197,10 +198,24 @@
   opacity: 1;
 }
 
+/* 指针停在删除按钮上时把卡片冻住（由 batch.js 加 .is-delete-open）：
+   卡片一抬起按钮就跟着上移近百像素跑出光标，点击会落空变成打开大图。
+   冻结期间这张卡片抬在别的卡片之上，按钮始终压在最上层。 */
+.free-ref.is-delete-open {
+  z-index: 6;
+}
+
 .free-ref.is-raised .free-ref-delete,
 .free-ref:hover .free-ref-delete,
 .free-ref:focus-within .free-ref-delete {
   opacity: 1;
+}
+
+/* 指针停在删除按钮上时把卡片冻住（由 batch.js 加 .is-delete-open）：
+   卡片一抬起按钮就跟着上移近百像素跑出光标，点击会落空变成打开大图。
+   冻结期间这张卡片抬在别的卡片之上，按钮始终压在最上层。 */
+.free-ref.is-delete-open {
+  z-index: 6;
 }
 
 .free-ref-delete:focus-visible {

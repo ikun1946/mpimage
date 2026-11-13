@@ -4517,7 +4517,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       // 服务端已翻译过的中文文案：原样保留，别再覆盖
       if (/[\u4e00-\u9fa5]/.test(raw)) {
         const plain = raw.replace(/^Post\s+"[^"]*"\s*[:：]?\s*/i, '').trim()
-        return plain
+        const chars = [...plain]
+        return chars.length > 80 ? `${chars.slice(0, 79).join('')}…` : plain
       }
       if (/\bEOF\b|connection reset|broken pipe/i.test(raw)) {
         return '上游在生成途中断开了连接（不是本机超时）。直接重试通常就能出图，也可以换用其它模型'
@@ -4660,10 +4661,10 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       showToast('参考图已移除', false, {
         label: '撤销',
         onClick: () => {
-          if (!state.freeReferences[index]) {
+          // 放回原来的位置：参考图的顺序会原样发给上游（referencePaths），
+          // 插到末尾会改变「图1、图2」的对应关系，所以这里必须按原索引插回。
+          if (!state.freeReferences.includes(removed)) {
             state.freeReferences.splice(index, 0, removed)
-          } else {
-            state.freeReferences.push(removed)
           }
           persistSoon()
           renderFreeReferences()
@@ -4692,50 +4693,92 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     }
 
     /**
-     * 悬停抬起：鼠标停在参考图上时把它抬高放大，删除按钮就在卡片右上角（图内）。
+     * 悬停抬起：鼠标停在参考图上时把它抬高放大，删除按钮落在图片右上角。
      *
-     * 归属规则刻意做得很简单：
-     *   1. 指针正落在某张卡的删除按钮上 → 就选那张（否则点按钮时会被邻居抢走）；
-     *   2. 指针在那张已抬起的卡的可见范围内 → 继续用它（迟滞，避免抖）；
-     *   3. 其余情况按「谁近」选。
-     * 之前那套「抬起后右上角几何角区」的判定是为了配合伸到卡片外的删除按钮，
-     * 按钮挪回图内后它不再需要，反而会在靠近按钮时选错卡片，所以一并去掉。
+     * 判定用的是「卡片变换后的真实包围盒」而不是一圈笼统的热区：
+     * 之前只要指针落在卡片左右范围内、纵向又处在输入条附近就会抬起，
+     * 于是图片上方一大片空白也会把卡片顶起来，手感很飘。
+     *
+     * 现在按三步判定：
+     *   1. 指针正落在某张卡的删除按钮上 → 选它，并把这张卡冻住不动
+     *      （卡片一抬按钮就跟着上移跑出光标，点击会落空）；
+     *   2. 指针落在某张卡的可见范围内 → 选它。抬起的卡按放大后的盒子算，
+     *      没抬起的按静止盒子算；抬起的那张优先，因为它压在别人上面。
+     *   3. 都没落上，但指针还在某张已抬起卡片的「正下方立柱」里 → 保持它抬起，
+     *      避免鼠标从卡片往下走的途中卡片就塌回去。
      */
     function wireFreeRefHover(root) {
       const RAISE_Y = 84 // 与 free.css 里 .free-ref.is-raised 的 translateY 一致
       const RAISE_S = 1.3 // 与 free.css 里的 scale 一致
-      const TILT_SKEW = 6 // 倾斜 ±7deg 时卡片角点横向外扩的上限
-      const EDGE_GRACE = 8 // 判定边缘的宽容，避免刚好擦边就抖
+      const EDGE_GRACE = 6 // 判定边缘的宽容，避免刚好擦边就抖
+      const CORNER_SIZE = 46 // 右上角区大小：要盖住 26px 的按钮加它的透明扩圈
+      const CORNER_GRACE = 8 // 右上角区向外多留一点，鼠标稍微偏一点也算进来
 
       function resetCards(cards) {
         for (const card of cards) {
           if (card.classList.contains('is-raised')) card.classList.remove('is-raised')
+          if (card.classList.contains('is-delete-open')) card.classList.remove('is-delete-open')
         }
       }
 
-      /** 卡片几何：布局盒换算成视口坐标，再附上倾斜与缩放后的可见范围 */
+      /**
+       * 卡片几何：布局盒换算成视口坐标，再算两套包围盒——
+       * 静止时的（带倾斜）与抬起放大后的。倾斜会让角点外扩，
+       * 所以包围盒要按旋转后的半宽半高算，不能直接用 offsetWidth。
+       */
       function measure(stack) {
         const stackRect = stack.getBoundingClientRect()
         return [...stack.querySelectorAll('.free-ref')].map(card => {
           const width = card.offsetWidth
           const height = card.offsetHeight
-          const left = stackRect.left + card.offsetLeft
-          const centerX = left + width / 2
-          // 全部用视口坐标：参考图现在是输入条的兄弟节点，不再相对输入条偏移
-          const centerY = stackRect.top + card.offsetTop + height / 2
-          const spare = (width * RAISE_S - width) / 2
-          const wide = spare + TILT_SKEW + EDGE_GRACE
+          const cx = stackRect.left + card.offsetLeft + width / 2
+          const cy = stackRect.top + card.offsetTop + height / 2
+          const tilt = Number.parseFloat(
+            getComputedStyle(card).getPropertyValue('--tilt'),
+          ) || 0
+          const radians = (tilt * Math.PI) / 180
+          const cos = Math.abs(Math.cos(radians))
+          const sin = Math.abs(Math.sin(radians))
+          const halfW = (width / 2) * cos + (height / 2) * sin
+          const halfH = (width / 2) * sin + (height / 2) * cos
+          const raisedCy = cy - RAISE_Y
+          // 右上角区：删除按钮所在的那一块，单独划出来不触发浮起
+          const corner = {
+            left: cx + halfW - CORNER_SIZE,
+            right: cx + halfW + CORNER_GRACE,
+            top: cy - halfH - CORNER_GRACE,
+            bottom: cy - halfH + CORNER_SIZE,
+          }
           return {
             card,
-            centerX,
+            cx,
+            corner,
             raised: card.classList.contains('is-raised'),
-            wideLeft: left - wide,
-            wideRight: left + width + wide,
-            // 已经抬起的那张只留倾斜余量，别把右邻居的一大截也扣在自己名下
-            stickyLeft: left - spare - TILT_SKEW,
-            stickyRight: left + width + spare + TILT_SKEW,
+            /** 静止时的包围盒 */
+            rest: {
+              left: cx - halfW,
+              right: cx + halfW,
+              top: cy - halfH,
+              bottom: cy + halfH,
+            },
+            /** 抬起放大后的包围盒 */
+            lifted: {
+              left: cx - halfW * RAISE_S,
+              right: cx + halfW * RAISE_S,
+              top: raisedCy - halfH * RAISE_S,
+              bottom: raisedCy + halfH * RAISE_S,
+            },
           }
         })
+      }
+
+      function inBox(box, x, y) {
+        return (
+          x >= box.left - EDGE_GRACE &&
+          x <= box.right + EDGE_GRACE &&
+          y >= box.top - EDGE_GRACE &&
+          y <= box.bottom + EDGE_GRACE
+        )
       }
 
       /** 指针是否正落在这张卡的删除按钮（含它的透明扩圈）上 */
@@ -4743,49 +4786,83 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         const button = item.card.querySelector('.free-ref-delete')
         if (!button) return false
         const rect = button.getBoundingClientRect()
-        return x >= rect.left - 8 && x <= rect.right + 8 && y >= rect.top - 8 && y <= rect.bottom + 8
+        return (
+          x >= rect.left - 8 && x <= rect.right + 8 &&
+          y >= rect.top - 8 && y <= rect.bottom + 8
+        )
       }
 
       root.addEventListener('mousemove', event => {
         const stack = root.querySelector('.free-ref-stack')
-        const bar = root.querySelector('#free-prompt-shell')
-        if (!stack || stack.hidden || !bar) return
+        if (!stack || stack.hidden) return
         const cards = [...stack.querySelectorAll('.free-ref')]
         if (!cards.length) return
 
-        const barRect = bar.getBoundingClientRect()
-        const stackRect = stack.getBoundingClientRect()
         const items = measure(stack)
         const x = event.clientX
         const y = event.clientY
-        const bandTop = stackRect.top - EDGE_GRACE
-        const bandBottom = barRect.top + EDGE_GRACE
 
-        if (y < bandTop || y > bandBottom) {
-          resetCards(cards)
+        // 第一步：指针正落在删除按钮上 → 冻住这张卡，按钮不动，光标一直压着它
+        const onButton = items.find(item => onDeleteButton(item, x, y))
+        if (onButton) {
+          for (const item of items) {
+            if (item.card === onButton.card) {
+              item.card.classList.add('is-delete-open')
+            } else {
+              if (item.card.classList.contains('is-raised')) item.card.classList.remove('is-raised')
+              if (item.card.classList.contains('is-delete-open')) item.card.classList.remove('is-delete-open')
+            }
+          }
           return
         }
 
-        // 归属三步：先按删除按钮，再按已抬起的那张（迟滞），最后按谁近
-        let picked = null
-        const onButton = items.find(item => onDeleteButton(item, x, y))
-        if (onButton) {
-          picked = onButton.card
-        } else {
-          const sticky = items.find(item => item.raised && x >= item.stickyLeft && x <= item.stickyRight)
-          if (sticky) {
-            picked = sticky.card
-          } else {
-            let best = Infinity
-            for (const item of items) {
-              if (x < item.wideLeft || x > item.wideRight) continue
-              const distance = Math.abs(item.centerX - x)
-              if (distance < best) {
-                best = distance
-                picked = item.card
-              }
+        // 第二步：指针进了某张卡的「右上角区」→ 这张卡不要浮起。
+        // 删除按钮就长在这个角上，卡片一浮按钮就跟着上移近百像素跑出光标，
+        // 用户的鼠标停在原地却已经不在按钮上了，点击落空变成打开大图。
+        // 所以右上角单独划成一块「不触发浮起」的区域，按钮原地可点。
+        const inCorner = items.find(item => inBox(item.corner, x, y))
+        if (inCorner) {
+          for (const item of items) {
+            const isTarget = item.card === inCorner.card
+            if (isTarget) {
+              // 已经浮起的先落回来，让按钮回到右上角、光标正下方
+              if (item.card.classList.contains('is-raised')) item.card.classList.remove('is-raised')
+              item.card.classList.add('is-delete-open')
+            } else {
+              if (item.card.classList.contains('is-raised')) item.card.classList.remove('is-raised')
+              if (item.card.classList.contains('is-delete-open')) item.card.classList.remove('is-delete-open')
             }
           }
+          return
+        }
+
+        // 第三步：落在某张卡的可见范围内 → 抬起它。抬起的优先，它压在别人上面。
+        let picked = null
+        const lifted = items.find(item => item.raised && inBox(item.lifted, x, y))
+        if (lifted) {
+          picked = lifted.card
+        } else {
+          const resting = items.find(item => !item.raised && inBox(item.rest, x, y))
+          if (resting) picked = resting.card
+        }
+
+        // 第四步：都没落上，但指针在已抬起卡片的正下方立柱里 → 保持它抬起，
+        // 免得鼠标从卡片往下走的途中卡片就塌回去。
+        if (!picked) {
+          const sticky = items.find(
+            item =>
+              item.raised &&
+              x >= item.rest.left - EDGE_GRACE &&
+              x <= item.rest.right + EDGE_GRACE &&
+              y >= item.lifted.bottom - EDGE_GRACE &&
+              y <= item.rest.bottom + EDGE_GRACE,
+          )
+          if (sticky) picked = sticky.card
+        }
+
+        if (!picked) {
+          resetCards(cards)
+          return
         }
 
         for (const item of items) {
@@ -4793,9 +4870,13 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           if (item.card.classList.contains('is-raised') !== shouldRaise) {
             item.card.classList.toggle('is-raised', shouldRaise)
           }
+          if (item.card.classList.contains('is-delete-open')) {
+            item.card.classList.remove('is-delete-open')
+          }
         }
       })
 
+      // 指针离开参考图区域后，把抬起的卡片放回去
       root.addEventListener('mouseleave', () => {
         resetCards([...root.querySelectorAll('.free-ref')])
       })
