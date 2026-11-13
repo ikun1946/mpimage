@@ -98,7 +98,53 @@ export async function requestImageEdit(
   )
 }
 
+/**
+ * 上游把长连接掐断时的重试。
+ *
+ * Magpie 的 codex 通道请求 chatgpt.com 出图时，上游会在生成途中主动断开
+ * （网关侧表现为 EOF / connection reset）。实测这类失败集中在 60/90/120 秒，
+ * 也就是上游的出图窗口本身，而不是本机的超时设置——同一条链路也跑出过
+ * 125 秒才成功的请求。
+ *
+ * 所以这类失败重试一次通常就能出图。安全策略拦截、内容审核不通过之类
+ * 属于「重试也没用」的错误，不在这里重试，直接抛给上层。
+ */
+const RETRYABLE_UPSTREAM = /EOF|connection reset|broken pipe|unexpected end of file|forcibly closed/i
+
+/** 判断错误是否值得重试一次：只对连接被掐断、网关无响应这类重试 */
+function isRetryableUpstreamError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false
+  if (error.code === 'UPSTREAM_TIMEOUT') return true
+  return error.code === 'UPSTREAM_DISCONNECTED'
+}
+
+const RETRY_DELAY_MS = 1200
+
 async function callImageEndpoint(
+  options: MagpieOptions,
+  url: string,
+  init: RequestInit,
+  promptText: string,
+): Promise<MagpieImageResult> {
+  let lastError: unknown
+  // 最多试 3 次：上游断开在实测里占比不低，多给一次机会明显能救回一部分
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await callImageEndpointOnce(options, url, init, promptText)
+    } catch (error) {
+      lastError = error
+      if (isRetryableUpstreamError(error)) {
+        // 上游掐断了连接，等一下再试；这类失败重试成功率很高
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS))
+        continue
+      }
+      throw error
+    }
+  }
+  throw lastError
+}
+
+async function callImageEndpointOnce(
   options: MagpieOptions,
   url: string,
   init: RequestInit,
@@ -135,6 +181,14 @@ async function callImageEndpoint(
 
   if (!upstream.ok) {
     const message = extractErrorMessage(payload) || '图片生成失败'
+    // 上游中途断开连接：单独一个错误码，方便上层识别并重试
+    if (RETRYABLE_UPSTREAM.test(message)) {
+      throw new ApiError(
+        'UPSTREAM_DISCONNECTED',
+        '上游在生成途中断开了连接（不是本机超时）。直接重试通常就能出图，也可以换用其它模型',
+        502,
+      )
+    }
     throw new ApiError('UPSTREAM_ERROR', translateUpstreamError(message), upstream.status)
   }
 
@@ -326,9 +380,12 @@ function extractErrorMessage(payload: unknown): string | undefined {
  * 这里翻译成用户能看懂的中文，同时保留原始 request id 方便排查。
  */
 function translateUpstreamError(message: string): string {
-  // 连接级错误先翻译成人话：Codex 生图在 60 秒左右被上游掐断是很常见的情况
-  if (/\bEOF\b|connection reset|broken pipe/i.test(message)) {
-    return '上游连接在约 60 秒时被中断，通常是出图超时。请精简提示词后重试，或改用 Nano Banana / Gemini 模型'
+  // 连接级错误先翻译成人话。
+  // 上游（chatgpt.com 的 codex 通道）在出图途中把连接掐断时回的就是 EOF，
+  // 失败耗时集中在 60 秒上下——这是上游主动断开，不是本服务超时，
+  // 所以措辞要说「连接被中断」而不是「超时」，否则用户只会一味地重试。
+  if (RETRYABLE_UPSTREAM.test(message)) {
+    return '上游在生成途中断开了连接（不是本机超时）。直接重试通常就能出图，也可以换用其它模型'
   }
   if (/dial tcp|i\/o timeout|connectex|Failed to connect/i.test(message)) {
     return '连接上游超时，请检查网络或代理后重试'

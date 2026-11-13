@@ -4503,23 +4503,32 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       }
     }
 
-    /** 把上游报错压成一句人话：去掉请求地址、英文栈和冗长细节 */
+    /**
+     * 把上游报错压成一句人话：去掉请求地址、英文栈和冗长细节。
+     *
+     * 服务端已经把上游的英文错误翻成中文了（例如「上游在生成途中断开了连接」），
+     * 这类消息要原样留着——之前先跑 /timeout|超时/ 的规则，结果把
+     * 「出图超时」这类服务端文案又盖成「生成超时，请稍后重试」，
+     * 用户只看到一句毫无信息量的重试提示。所以中文优先，直接放行。
+     */
     function friendlyGenerationError(message) {
       const raw = String(message || '').trim()
       if (!raw) return '生成失败，请稍后重试'
+      // 服务端已翻译过的中文文案：原样保留，别再覆盖
+      if (/[\u4e00-\u9fa5]/.test(raw)) {
+        const plain = raw.replace(/^Post\s+"[^"]*"\s*[:：]?\s*/i, '').trim()
+        return plain
+      }
       if (/\bEOF\b|connection reset|broken pipe/i.test(raw)) {
-        return '上游连接在约 60 秒时被中断，请精简提示词后重试，或换用 Nano Banana / Gemini 模型'
+        return '上游在生成途中断开了连接（不是本机超时）。直接重试通常就能出图，也可以换用其它模型'
       }
       if (/dial tcp|i\/o timeout|connectex/i.test(raw)) return '连接上游超时，请检查网络后重试'
-      if (/timeout|超时|ETIMEDOUT|aborted/i.test(raw)) return '生成超时，请稍后重试'
+      if (/timeout|ETIMEDOUT|aborted/i.test(raw)) return '生成超时，请稍后重试'
       if (/fetch failed|ECONN|ENOTFOUND|Failed to connect|network/i.test(raw)) {
         return '连接上游失败，请检查网络后重试'
       }
       const status = raw.match(/\b(4\d{2}|5\d{2})\b/)
       if (status) return `上游服务返回 ${status[1]}，请稍后重试`
-      // 已经是中文短句就保留，避免把正常提示也盖掉
-      const plain = raw.replace(/^Post\s+"[^"]*"\s*[:：]?\s*/i, '').trim()
-      if (/^[一-龥]/.test(plain) && [...plain].length <= 40) return plain
       return '生成失败，请稍后重试'
     }
 
@@ -4566,9 +4575,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           const url = freeReferenceUrl(ref)
           const label = escapeAttr(ref.name || `参考图 ${index + 1}`)
           return `<div class="free-ref" style="--tilt:${tilt}" data-ref-index="${index}">
-            <div class="free-ref-corner" aria-hidden="true"></div>
             <div class="free-ref-frame"><img src="${escapeAttr(url)}" alt="${label}" loading="lazy"></div>
-            <button class="free-ref-delete" type="button" data-ref-delete="${index}" aria-label="删除参考图 ${index + 1}">
+            <button class="free-ref-delete" type="button" data-ref-delete="${index}" title="移除这张参考图" aria-label="删除参考图 ${index + 1}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
             </button>
           </div>`
@@ -4644,10 +4652,23 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       if (!Number.isInteger(index) || !state.freeReferences[index]) return
       // 用户已经改了参考图集合，上一次上传失败不再挡后续优化
       freeRefUploadFailed = ''
+      const removed = state.freeReferences[index]
       state.freeReferences.splice(index, 1)
       persistSoon()
       renderFreeReferences()
-      showToast('参考图已移除')
+      // 删除按钮现在一直摆在图上，误删的概率变高，给一个撤销的退路
+      showToast('参考图已移除', false, {
+        label: '撤销',
+        onClick: () => {
+          if (!state.freeReferences[index]) {
+            state.freeReferences.splice(index, 0, removed)
+          } else {
+            state.freeReferences.push(removed)
+          }
+          persistSoon()
+          renderFreeReferences()
+        },
+      })
     }
 
     /** 粘贴 / 拖入里挑第一张图片 */
@@ -4671,37 +4692,24 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     }
 
     /**
-     * 悬停抬起：每张图有一根「竖直柱」热区，从抬起后的顶端一直到文本框边线往里 8px。
-     * 柱子把图片与文本框之间的空隙也包进来，鼠标停在那块空隙里图片不会缩回去。
+     * 悬停抬起：鼠标停在参考图上时把它抬高放大，删除按钮就在卡片右上角（图内）。
      *
-     * 归属按「看得见的范围」判定，而不是「布局盒中心谁近」：抬起的那张放大 1.3 后很宽，
-     * 它右上角的删除按钮已经越过与右邻居的中间线，按中心选就会把归属让给邻居，
-     * 表现为鼠标一凑近按钮，当前这张缩回、旁边那张放大，来回抖。所以：
-     * 已抬起的那张优先（迟滞），并且它的右边界要额外盖住删除按钮；
-     * 删除按钮的浮现也改由几何判定，不再依赖会跟着抬起跑掉的 CSS :hover。
+     * 归属规则刻意做得很简单：
+     *   1. 指针正落在某张卡的删除按钮上 → 就选那张（否则点按钮时会被邻居抢走）；
+     *   2. 指针在那张已抬起的卡的可见范围内 → 继续用它（迟滞，避免抖）；
+     *   3. 其余情况按「谁近」选。
+     * 之前那套「抬起后右上角几何角区」的判定是为了配合伸到卡片外的删除按钮，
+     * 按钮挪回图内后它不再需要，反而会在靠近按钮时选错卡片，所以一并去掉。
      */
     function wireFreeRefHover(root) {
       const RAISE_Y = 84 // 与 free.css 里 .free-ref.is-raised 的 translateY 一致
       const RAISE_S = 1.3 // 与 free.css 里的 scale 一致
       const TILT_SKEW = 6 // 倾斜 ±7deg 时卡片角点横向外扩的上限
       const EDGE_GRACE = 8 // 判定边缘的宽容，避免刚好擦边就抖
-      const BUTTON_REACH = 20 // 抬起后删除按钮伸出卡片右侧的距离（含倾斜带来的偏移）
-      const CORNER_SIZE = 54 // 右上角删除热区（按抬起后的目标位置算，不跟动画中间态）
-      const HIDE_DELAY = 160 // 删除按钮收回的延迟，划过时不会闪一下
-
-      let deleteTimer = 0
-
-      function clearDeleteTimer() {
-        if (!deleteTimer) return
-        clearTimeout(deleteTimer)
-        deleteTimer = 0
-      }
 
       function resetCards(cards) {
-        clearDeleteTimer()
         for (const card of cards) {
           if (card.classList.contains('is-raised')) card.classList.remove('is-raised')
-          if (card.classList.contains('is-delete-open')) card.classList.remove('is-delete-open')
         }
       }
 
@@ -4717,9 +4725,6 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           const centerY = stackRect.top + card.offsetTop + height / 2
           const spare = (width * RAISE_S - width) / 2
           const wide = spare + TILT_SKEW + EDGE_GRACE
-          // 抬起后的样子：顶边、右边界，以及长在右上角的删除热区
-          const raisedTop = centerY - RAISE_Y - (height * RAISE_S) / 2
-          const raisedRight = centerX + (width * RAISE_S) / 2
           return {
             card,
             centerX,
@@ -4729,22 +4734,16 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
             // 已经抬起的那张只留倾斜余量，别把右邻居的一大截也扣在自己名下
             stickyLeft: left - spare - TILT_SKEW,
             stickyRight: left + width + spare + TILT_SKEW,
-            cornerLeft: raisedRight + BUTTON_REACH - CORNER_SIZE,
-            cornerRight: raisedRight + BUTTON_REACH,
-            cornerTop: raisedTop - BUTTON_REACH,
-            cornerBottom: raisedTop - BUTTON_REACH + CORNER_SIZE
           }
         })
       }
 
-      /** 抬起后卡片右上角那一块：删除按钮就长在这里 */
-      function inCorner(item, x, y) {
-        return (
-          x >= item.cornerLeft - EDGE_GRACE &&
-          x <= item.cornerRight + EDGE_GRACE &&
-          y >= item.cornerTop - EDGE_GRACE &&
-          y <= item.cornerBottom + EDGE_GRACE
-        )
+      /** 指针是否正落在这张卡的删除按钮（含它的透明扩圈）上 */
+      function onDeleteButton(item, x, y) {
+        const button = item.card.querySelector('.free-ref-delete')
+        if (!button) return false
+        const rect = button.getBoundingClientRect()
+        return x >= rect.left - 8 && x <= rect.right + 8 && y >= rect.top - 8 && y <= rect.bottom + 8
       }
 
       root.addEventListener('mousemove', event => {
@@ -4759,7 +4758,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         const items = measure(stack)
         const x = event.clientX
         const y = event.clientY
-        const bandTop = Math.min(...items.map(item => item.cornerTop)) - EDGE_GRACE
+        const bandTop = stackRect.top - EDGE_GRACE
         const bandBottom = barRect.top + EDGE_GRACE
 
         if (y < bandTop || y > bandBottom) {
@@ -4767,31 +4766,24 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           return
         }
 
-        // 归属分四步，前几步都是迟滞，鼠标往按钮上走时不会被右邻居抢走：
-        //   1. 鼠标比所有卡片底座都高（图片与抬起位置之间那段空隙）→ 继续用已抬起的那张；
-        //   2. 还在已抬起那张的可见范围里 → 继续用它；
-        //   3. 停在它抬起后的右上角删除按钮那片 → 继续用它；
-        //   4. 以上都不成立才按「谁近」换人。
+        // 归属三步：先按删除按钮，再按已抬起的那张（迟滞），最后按谁近
         let picked = null
-        if (y < stackRect.top) {
-          const raised = items.find(
-            item => item.raised && x >= item.wideLeft && x <= item.cornerRight + EDGE_GRACE
-          )
-          picked = raised?.card || null
-        }
-        if (!picked) {
+        const onButton = items.find(item => onDeleteButton(item, x, y))
+        if (onButton) {
+          picked = onButton.card
+        } else {
           const sticky = items.find(item => item.raised && x >= item.stickyLeft && x <= item.stickyRight)
-          const cornerHold = sticky ? null : items.find(item => item.raised && inCorner(item, x, y))
-          picked = (sticky || cornerHold)?.card || null
-        }
-        if (!picked) {
-          let best = Infinity
-          for (const item of items) {
-            if (x < item.wideLeft || x > item.wideRight) continue
-            const distance = Math.abs(item.centerX - x)
-            if (distance < best) {
-              best = distance
-              picked = item.card
+          if (sticky) {
+            picked = sticky.card
+          } else {
+            let best = Infinity
+            for (const item of items) {
+              if (x < item.wideLeft || x > item.wideRight) continue
+              const distance = Math.abs(item.centerX - x)
+              if (distance < best) {
+                best = distance
+                picked = item.card
+              }
             }
           }
         }
@@ -4801,34 +4793,6 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           if (item.card.classList.contains('is-raised') !== shouldRaise) {
             item.card.classList.toggle('is-raised', shouldRaise)
           }
-        }
-
-        // 鼠标进了抬起后那张卡的右上角方块才浮现删除按钮
-        const focused = picked ? items.find(item => item.card === picked) : null
-        if (focused && inCorner(focused, x, y)) {
-          clearDeleteTimer()
-          for (const item of items) {
-            if (item.card !== picked && item.card.classList.contains('is-delete-open')) {
-              item.card.classList.remove('is-delete-open')
-            }
-          }
-          if (!picked.classList.contains('is-delete-open')) picked.classList.add('is-delete-open')
-          return
-        }
-
-        // 除此之外：其他卡片的按钮立刻收回，当前这张稍等一下再收，避免边角擦过就消失
-        const open = items.filter(item => item.card.classList.contains('is-delete-open'))
-        const keep = picked ? open.find(item => item.card === picked) : null
-        for (const item of open) {
-          if (!keep || item.card !== keep.card) item.card.classList.remove('is-delete-open')
-        }
-        if (!keep) {
-          clearDeleteTimer()
-        } else if (!deleteTimer) {
-          deleteTimer = setTimeout(() => {
-            deleteTimer = 0
-            keep.card.classList.remove('is-delete-open')
-          }, HIDE_DELAY)
         }
       })
 

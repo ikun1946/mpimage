@@ -128,11 +128,6 @@
   transform: rotate(var(--tilt, -7deg)) translateY(-84px) scale(1.3);
 }
 
-/* 删除按钮浮现时再抬一层，按钮始终压在两侧邻居之上 */
-.free-ref.is-delete-open {
-  z-index: 5;
-}
-
 .free-ref-frame {
   width: 100%;
   height: 100%;
@@ -155,69 +150,62 @@
   object-fit: cover;
 }
 
-/* 右上角热区：只有鼠标进到这一小块，删除按钮才浮现。
-   卡片抬起时整个热区会跟着上移放大，所以浮现与否主要由 batch.js 按抬起后的
-   位置打 .is-delete-open 决定；下面那条 :hover 规则保留作兜底与键盘可达 */
-.free-ref-corner {
-  position: absolute;
-  top: -16px;
-  right: -16px;
-  z-index: 1;
-  width: 44px;
-  height: 44px;
-  background: transparent;
-}
-
+/* 删除按钮：贴在卡片右上角「图内」，不再伸到卡片外面。
+   伸出去会被相邻卡片与输入条压住，鼠标瞄准了却点不到——这正是之前难点到的原因。
+   现在常驻显示且始终可点，靠透明度区分常态与悬停；误删可以用提示条里的「撤销」找回。 */
 .free-ref-delete {
   position: absolute;
-  top: -9px;
-  right: -9px;
-  z-index: 2;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
   display: grid;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.26);
-  -webkit-backdrop-filter: blur(10px) saturate(1.6);
-  backdrop-filter: blur(10px) saturate(1.6);
-  box-shadow: 0 2px 8px rgba(20, 26, 22, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  background: rgba(28, 34, 30, 0.42);
+  -webkit-backdrop-filter: blur(8px) saturate(1.4);
+  backdrop-filter: blur(8px) saturate(1.4);
+  box-shadow: 0 2px 8px rgba(20, 26, 22, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   color: #fdfdfb;
   cursor: pointer;
-  opacity: 0;
-  transform: scale(0.82);
-  pointer-events: none;
+  opacity: 0.82;
+  transform: scale(1);
+  pointer-events: auto;
   transition: opacity 150ms var(--ease, ease), transform 150ms var(--ease, ease), background 150ms var(--ease, ease);
 }
 
 .free-ref-delete svg {
-  width: 11px;
-  height: 11px;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+  width: 12px;
+  height: 12px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
 }
 
-/* 视觉仍是 24px 的小圆，外面加一圈透明区域把可点范围扩到 34px，
-   鼠标差几像素也能删掉，不用瞄准 */
+/* 视觉 26px，外面再圈一圈透明区域把可点范围扩到 40px，鼠标差几像素也能删掉 */
 .free-ref-delete::after {
   content: '';
   position: absolute;
-  inset: -5px;
+  inset: -7px;
   border-radius: 50%;
 }
 
-.free-ref.is-delete-open .free-ref-delete,
-.free-ref:has(.free-ref-corner:hover) .free-ref-delete,
-.free-ref:has(.free-ref-delete:hover) .free-ref-delete,
-.free-ref:has(.free-ref-delete:focus-visible) .free-ref-delete {
+/* 悬停、抬起或键盘聚焦时按钮更醒目 */
+.free-ref-delete:hover {
+  background: rgba(178, 52, 40, 0.82);
   opacity: 1;
-  transform: scale(1);
-  pointer-events: auto;
 }
 
-.free-ref-delete:hover {
-  background: rgba(255, 255, 255, 0.42);
+.free-ref.is-raised .free-ref-delete,
+.free-ref:hover .free-ref-delete,
+.free-ref:focus-within .free-ref-delete {
+  opacity: 1;
+}
+
+.free-ref-delete:focus-visible {
+  outline: 2px solid var(--moss);
+  outline-offset: 2px;
 }
 
 .free-ref-busy {

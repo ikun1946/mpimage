@@ -15,6 +15,7 @@ export type ApiErrorCode =
   | 'UPSTREAM_TIMEOUT'
   | 'UPSTREAM_ERROR'
   | 'UPSTREAM_BAD_RESPONSE'
+  | 'UPSTREAM_DISCONNECTED'
   | 'UPSTREAM_TRUNCATED'
   | 'UPSTREAM_INVALID'
   | 'CONTENT_POLICY'
@@ -56,6 +57,8 @@ function defaultStatusFor(code: ApiErrorCode): number {
       return 413
     case 'UPSTREAM_INVALID':
       return 400
+    case 'UPSTREAM_DISCONNECTED':
+      return 502
     default:
       return 400
   }
