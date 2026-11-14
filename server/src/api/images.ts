@@ -10,6 +10,7 @@ import { listClientImageModels, resolveCustomProviderModel } from '../app/contro
 import type { RealtimeMonitor } from '../services/realtime-monitor.js'
 import { detectImageType, readImageSize } from '../app/products/images/imaging.js'
 import { generateImageTitle, titleForImage } from '../app/products/images/image-title.js'
+import type { RequestLogStore } from '../services/request-log-store.js'
 import { MAX_REFERENCE_IMAGES, loadReferenceImages } from '../app/products/images/reference-images.js'
 import { REFERENCE_CATEGORY, type ImageStorage } from '../services/storage.js'
 import type { QuotaStore } from '../app/control/quota-store.js'
@@ -93,6 +94,8 @@ export function registerImageRoutes(
     settings: SettingsStore
     /** 实时监控（可选）：记录每个请求的阶段耗时 */
     monitor?: RealtimeMonitor
+    /** 请求日志：成功失败都留档，管理端可逐条查看 */
+    requestLog?: RequestLogStore
   },
 ): void {
   /**
@@ -577,6 +580,49 @@ export function registerImageRoutes(
     deps.monitor?.metric(callId, 'usage_write_ms', Date.now() - usageWriteStartedAt)
     deps.monitor?.finish(callId, { status: 'success' })
 
+    // 请求日志：成功也留档，管理端能逐条翻出提示词、参数和每张图
+    deps.requestLog?.append({
+      id: jobId,
+      kind: 'image',
+      status: 'success',
+      startedAt,
+      endedAt: Date.now(),
+      durationMs: Date.now() - startedAt,
+      user: { id: auth.userId, name: auth.displayName || auth.username },
+      model: generatedList[0]?.model || 'unknown',
+      source,
+      ratio: ratio.id,
+      prompt,
+      images: generatedList.map(item => ({
+        path: item.stored.relativePath,
+        width: item.size?.width ?? ratio.nativeWidth,
+        height: item.size?.height ?? ratio.nativeHeight,
+        bytes: item.stored.bytes,
+      })),
+      counts: {
+        requested: imageCount,
+        ok: generatedList.length,
+        failed: failedCount,
+        references: referencePaths.length,
+      },
+      params: {
+        ratio: ratio.id,
+        ratioLabel: ratio.label,
+        imageCount,
+        referenceCount: referencePaths.length,
+        outputName: displayName,
+      },
+      timings: {
+        total_ms: Date.now() - startedAt,
+        title_wait_ms: Date.now() - titleStartedAt,
+      },
+      tokens: {
+        input: generatedList.reduce((sum, item) => sum + (item.tokens.inputTokens ?? 0), 0),
+        output: generatedList.reduce((sum, item) => sum + (item.tokens.outputTokens ?? 0), 0),
+        total: generatedList.reduce((sum, item) => sum + (item.tokens.totalTokens ?? 0), 0),
+      },
+    })
+
     return reply.send({
       ...payloads[0],
       images: payloads,
@@ -585,6 +631,38 @@ export function registerImageRoutes(
       jobId,
     })
     } catch (error) {
+      // 失败同样留档：原因、错误码和堆栈都在里面，管理端能直接看到为什么没出图
+      deps.requestLog?.append({
+        id: jobId,
+        kind: 'image',
+        status: 'failed',
+        startedAt,
+        endedAt: Date.now(),
+        durationMs: Date.now() - startedAt,
+        user: { id: auth.userId, name: auth.displayName || auth.username },
+        model: selectedModel || 'unknown',
+        source,
+        ratio: ratio.id,
+        prompt,
+        counts: {
+          requested: imageCount,
+          ok: 0,
+          failed: imageCount,
+          references: referencePaths.length,
+        },
+        params: {
+          ratio: ratio.id,
+          ratioLabel: ratio.label,
+          imageCount,
+          referenceCount: referencePaths.length,
+        },
+        timings: { total_ms: Date.now() - startedAt },
+        error: {
+          code: error instanceof ApiError ? error.code : 'INTERNAL_ERROR',
+          message: error instanceof ApiError ? error.message : String((error as Error)?.message || error),
+          log: String((error as Error)?.stack || '').split(String.fromCharCode(10)).slice(0, 24),
+        },
+      })
       auditFailure(request.log, 'image.generate', auth, startedAt, error, '生图失败', {
         jobId,
         source,

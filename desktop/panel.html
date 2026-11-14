@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src * data:" />
 <title>画境 · 服务控制台</title>
 <style>
   :root {
@@ -2203,6 +2203,37 @@
   .rt-table-row .rt-cell small { display: block; margin-top: 1px; color: var(--ink-faint); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .rt-table-row .rt-call { color: var(--ink-soft); font-family: var(--font-mono); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; }
 
+  /* 请求记录：每条都能点开看详情 */
+  .rt-log-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); }
+  .rt-log-controls .input { flex: 1 1 180px; min-width: 160px; }
+  .rt-retention { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-soft); }
+  .rt-retention input { width: 64px; padding: 4px 6px; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+  .rt-log-table .rt-table-head,
+  .rt-log-table .rt-table-row { grid-template-columns: 96px minmax(0, 96px) 78px minmax(0, 1fr) 88px 56px 56px; }
+  .rt-log-table .rt-table-row { cursor: pointer; transition: background 120ms ease; }
+  .rt-log-table .rt-table-row:hover { background: color-mix(in srgb, var(--moss) 8%, transparent); }
+  .rt-log-table .rt-table-row.is-failed { background: color-mix(in srgb, var(--danger) 6%, transparent); }
+  .rt-log-table .rt-table-row.is-failed:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+
+  .rt-drawer { position: fixed; inset: 0; z-index: 60; }
+  .rt-drawer[hidden] { display: none; }
+  .rt-drawer-mask { position: absolute; inset: 0; background: rgba(20, 26, 22, 0.34); }
+  .rt-drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(600px, 94vw); display: flex; flex-direction: column; background: var(--surface-raised); box-shadow: -12px 0 44px rgba(20, 26, 22, 0.22); }
+  .rt-drawer-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line-soft); }
+  .rt-drawer-panel > header h3 { margin: 0; font-size: 14px; }
+  .rt-drawer-body { padding: 16px 18px 28px; overflow: auto; display: grid; gap: 18px; }
+  .rt-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px; }
+  .rt-detail-item { font-size: 11px; color: var(--ink-faint); }
+  .rt-detail-item b { display: block; margin-top: 2px; color: var(--ink); font-size: 12px; font-weight: 600; word-break: break-all; }
+  .rt-detail-block h4 { margin: 0 0 6px; font-size: 10.5px; letter-spacing: 0.08em; color: var(--ink-faint); }
+  .rt-detail-prompt { margin: 0; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--ink) 5%, transparent); font-size: 12px; line-height: 1.66; white-space: pre-wrap; word-break: break-word; color: var(--ink); max-height: 240px; overflow: auto; }
+  .rt-detail-prompt.rt-detail-error { color: var(--danger); }
+  .rt-detail-log { margin: 0; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--danger) 8%, transparent); font-family: var(--font-mono); font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; max-height: 260px; overflow: auto; }
+  .rt-detail-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .rt-detail-images figure { margin: 0; }
+  .rt-detail-images img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; border: 1px solid var(--line-soft); background: var(--surface); }
+  .rt-detail-images figcaption { margin-top: 4px; font-size: 10px; color: var(--ink-faint); word-break: break-all; }
+
   .rt-bottom {
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
@@ -2410,9 +2441,27 @@
       </section>
 
       <div class="rt-bottom">
-        <section class="rt-block">
-          <header>最近完成<span id="rt-recent-meta"></span></header>
-          <div class="rt-table" id="rt-recent"></div>
+        <section class="rt-block rt-log">
+          <header>请求记录<span id="rt-recent-meta"></span></header>
+          <div class="rt-log-controls">
+            <select id="rt-log-status" class="select" aria-label="按状态筛选">
+              <option value="all">全部状态</option>
+              <option value="success">成功</option>
+              <option value="failed">失败</option>
+            </select>
+            <select id="rt-log-kind" class="select" aria-label="按类型筛选">
+              <option value="all">全部类型</option>
+              <option value="image">生图</option>
+              <option value="prompt-optimize">提示词优化</option>
+              <option value="prompt-revise">提示词改写</option>
+            </select>
+            <input id="rt-log-search" class="input" type="search" placeholder="搜提示词 / 用户 / 模型 / 请求号" />
+            <label class="rt-retention">保留 <input id="rt-log-retention" type="number" min="1" max="365" /> 天</label>
+            <button class="button mini" type="button" id="rt-log-save">保存</button>
+            <button class="button mini" type="button" id="rt-log-clear">清空</button>
+            <button class="button mini" type="button" id="rt-log-refresh">刷新</button>
+          </div>
+          <div class="rt-table rt-log-table" id="rt-recent"></div>
         </section>
         <section class="rt-block">
           <header>慢请求<span id="rt-slow-meta"></span></header>
@@ -2701,6 +2750,17 @@
   </div>
 </main>
 
+<div class="rt-drawer" id="rt-drawer" hidden>
+  <div class="rt-drawer-mask" data-rt-drawer-close></div>
+  <aside class="rt-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="rt-drawer-title">
+    <header>
+      <h3 id="rt-drawer-title">请求详情</h3>
+      <button class="button mini" type="button" data-rt-drawer-close>关闭</button>
+    </header>
+    <div class="rt-drawer-body" id="rt-drawer-body"></div>
+  </aside>
+</div>
+
 <footer class="foot">
   <span class="version" id="app-version">画境</span>
   <span>·</span>
@@ -2829,6 +2889,16 @@
     rtRecentMeta: $('rt-recent-meta'),
     rtSlow: $('rt-slow'),
     rtSlowMeta: $('rt-slow-meta'),
+    rtLogStatus: $('rt-log-status'),
+    rtLogKind: $('rt-log-kind'),
+    rtLogSearch: $('rt-log-search'),
+    rtLogRetention: $('rt-log-retention'),
+    rtLogSave: $('rt-log-save'),
+    rtLogClear: $('rt-log-clear'),
+    rtLogRefresh: $('rt-log-refresh'),
+    rtDrawer: $('rt-drawer'),
+    rtDrawerBody: $('rt-drawer-body'),
+    rtDrawerTitle: $('rt-drawer-title'),
     panelPageSub: $('panel-page-sub'),
     panelThemeToggle: $('panel-theme-toggle'),
     sideVersion: $('side-version'),
@@ -5177,6 +5247,63 @@
         if (!rtPaused) void loadRealtimeMonitor()
       })
     }
+    if (dom.rtLogRefresh) {
+      dom.rtLogRefresh.addEventListener('click', () => void loadRequestLog())
+    }
+    if (dom.rtLogStatus) {
+      dom.rtLogStatus.addEventListener('change', () => void loadRequestLog())
+    }
+    if (dom.rtLogKind) {
+      dom.rtLogKind.addEventListener('change', () => void loadRequestLog())
+    }
+    if (dom.rtLogSearch) {
+      let searchTimer = 0
+      dom.rtLogSearch.addEventListener('input', () => {
+        window.clearTimeout(searchTimer)
+        searchTimer = window.setTimeout(() => void loadRequestLog(), 320)
+      })
+    }
+    if (dom.rtLogSave) {
+      dom.rtLogSave.addEventListener('click', async () => {
+        const days = Number(dom.rtLogRetention && dom.rtLogRetention.value)
+        if (!Number.isFinite(days) || days < 1 || days > 365) {
+          flash('保留天数需要在 1 到 365 之间', 'error')
+          return
+        }
+        const result = await api('/api/admin/monitor/requests/retention', { method: 'POST', body: { days } })
+        if (!result.ok) {
+          flash(`保存失败：${result.error || `HTTP ${result.status || 0}`}`, 'error')
+          return
+        }
+        flash(`已设为保留 ${days} 天，更早的记录已清理`)
+        void loadRequestLog()
+      })
+    }
+    if (dom.rtLogClear) {
+      dom.rtLogClear.addEventListener('click', async () => {
+        if (!window.confirm('清空全部请求记录？清空后无法恢复。')) return
+        const result = await api('/api/admin/monitor/requests', { method: 'DELETE' })
+        if (!result.ok) {
+          flash(`清空失败：${result.error || `HTTP ${result.status || 0}`}`, 'error')
+          return
+        }
+        const removed = result.data && result.data.removed
+        flash(`已清空 ${removed || 0} 条请求记录`)
+        void loadRequestLog()
+      })
+    }
+    if (dom.rtRecent) {
+      dom.rtRecent.addEventListener('click', event => {
+        const row = event.target.closest('[data-request-id]')
+        if (row) void openRequestDetail(row.dataset.requestId)
+      })
+    }
+    for (const closer of document.querySelectorAll('[data-rt-drawer-close]')) {
+      closer.addEventListener('click', rtDrawerHide)
+    }
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') rtDrawerHide()
+    })
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return
       if (activePanelPage === 'monitor' && rtAuto && !rtPaused) {
@@ -5429,6 +5556,15 @@
         rtTile('P95 耗时', rtMs(summary.p95_duration_ms), '窗口 95 分位'),
         rtTile('当前瓶颈', bottleneck ? bottleneck.label || '—' : '—', bottleneck ? rtMs(bottleneck.value_ms) : '暂无样本', bottleneck ? 'hot' : ''),
         rtTile('上游超 60s', String(slow.upstream_over_60s || 0), `总耗时超 120s ${slow.total_over_120s || 0}`),
+        rtLogStatsCache
+          ? rtTile('24h 请求', String(rtLogStatsCache.images.total), `成功 ${rtLogStatsCache.images.success} · 失败 ${rtLogStatsCache.images.failed}`, rtLogStatsCache.images.failed > 0 ? 'hot' : '')
+          : rtTile('24h 请求', '—', '读取中'),
+        rtLogStatsCache
+          ? rtTile('24h 成功率', `${rtLogStatsCache.images.successRate}%`, `出图 ${rtLogStatsCache.images.imagesProduced} 张`)
+          : rtTile('24h 成功率', '—', '读取中'),
+        rtLogStatsCache
+          ? rtTile('提示词模型', `${rtLogStatsCache.prompts.total} 次`, `token ${rtLogStatsCache.prompts.tokens} · 平均 ${rtMs(rtLogStatsCache.prompts.avgDurationMs)}`)
+          : rtTile('提示词模型', '—', '读取中'),
       ].join('')
     }
 
@@ -5490,31 +5626,8 @@
         : '<p class="rt-empty">暂无活跃请求，发起图片请求后这里会实时显示</p>'
     }
 
-    const recent = Array.isArray(data.recent) ? data.recent : []
-    if (dom.rtRecentMeta) dom.rtRecentMeta.textContent = recent.length ? `最近 ${recent.length} 条` : ''
-    if (dom.rtRecent) {
-      const head = `<div class="rt-table-head"><span>请求</span><span>状态</span><span>模型</span>` +
-        `<span>耗时</span><span>图片</span></div>`
-      const rows = recent.slice(0, 12).map(item => {
-        const tone = item.status === 'success' ? 'ok' : item.status === 'failed' ? 'err' : 'warn'
-        const status = RT_STATUS_LABELS[item.status] || item.status
-        const images = item.image_count
-          ? `${item.images_done || 0}/${item.image_count}`
-          : '—'
-        return `<div class="rt-table-row">` +
-          `<span class="rt-cell"><span class="rt-call" title="${escapeHtml(item.call_id)}">${escapeHtml(String(item.call_id || '').slice(0, 8))}</span>` +
-          `<small>${escapeHtml(rtClock(item.started_at))}</small></span>` +
-          `<span>${rtBadge(status, tone)}</span>` +
-          `<span class="rt-model" title="${escapeHtml(item.model)}">${escapeHtml(item.model || '—')}</span>` +
-          `<span class="rt-cell"><span class="num">${escapeHtml(rtMs(item.duration_ms))}</span>` +
-          `<small>排 ${escapeHtml(rtMs(item.metrics && item.metrics.queue_wait_ms))} · 上 ${escapeHtml(rtMs(item.metrics && item.metrics.upstream_ms))}</small></span>` +
-          `<span class="num">${escapeHtml(images)}</span>` +
-          `</div>`
-      }).join('')
-      dom.rtRecent.innerHTML = recent.length
-        ? head + rows
-        : '<p class="rt-empty">暂无已完成请求</p>'
-    }
+    // 最近完成改由落盘的「请求记录」渲染（loadRequestLog），这里不再覆盖
+
 
     const slowList = Array.isArray(data.slow) ? data.slow : []
     if (dom.rtSlowMeta) dom.rtSlowMeta.textContent = slowList.length ? `最慢 ${slowList.length} 条` : ''
@@ -5543,6 +5656,188 @@
     rtWriteMeta()
   }
 
+  /* ---------- 请求记录（落盘）：列表、详情、保留天数 ---------- */
+
+  const RT_KIND_LABELS = {
+    image: '生图',
+    'prompt-optimize': '提示词优化',
+    'prompt-revise': '提示词改写',
+  }
+  let rtLogLoading = false
+  let rtLogStatsCache = null
+
+  function rtTimeText(ms) {
+    if (!ms) return '—'
+    const d = new Date(Number(ms))
+    if (Number.isNaN(d.getTime())) return '—'
+    const pad = n => String(n).padStart(2, '0')
+    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  }
+
+  function rtFileUrl(path) {
+    const base = String(state.clientUrl || '').replace(/\/+$/, '')
+    const encoded = String(path || '').split('/').map(encodeURIComponent).join('/')
+    return `${base}/api/files/${encoded}`
+  }
+
+  function rtSizeText(bytes) {
+    const n = Number(bytes) || 0
+    if (!n) return ''
+    if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
+    return `${Math.round(n / 1024)} KB`
+  }
+
+  async function loadRequestLog() {
+    if (rtLogLoading) return
+    rtLogLoading = true
+    try {
+      const params = []
+      const status = dom.rtLogStatus ? dom.rtLogStatus.value : 'all'
+      const kind = dom.rtLogKind ? dom.rtLogKind.value : 'all'
+      const query = dom.rtLogSearch ? dom.rtLogSearch.value.trim() : ''
+      params.push('limit=40')
+      if (status && status !== 'all') params.push(`status=${encodeURIComponent(status)}`)
+      if (kind && kind !== 'all') params.push(`kind=${encodeURIComponent(kind)}`)
+      if (query) params.push(`q=${encodeURIComponent(query)}`)
+      const result = await api(`/api/admin/monitor/requests?${params.join('&')}`)
+      if (isAuthFailure(result)) {
+        if (dom.rtRecentMeta) dom.rtRecentMeta.textContent = AUTH_HINT
+        return
+      }
+      if (!result.ok) {
+        if (dom.rtRecentMeta) dom.rtRecentMeta.textContent = `请求记录读取失败：${result.error || `HTTP ${result.status || 0}`}`
+        return
+      }
+      rtLogRender(result.data || {})
+      const stats = await api('/api/admin/monitor/requests/stats')
+      if (stats && stats.ok && stats.data) {
+        rtLogStatsCache = stats.data
+        if (rtLastData) rtRender(rtLastData)
+      }
+    } finally {
+      rtLogLoading = false
+    }
+  }
+
+  function rtLogRender(data) {
+    const entries = Array.isArray(data.entries) ? data.entries : []
+    if (dom.rtLogRetention && document.activeElement !== dom.rtLogRetention) {
+      dom.rtLogRetention.value = String(data.retentionDays || 30)
+    }
+    if (dom.rtRecentMeta) {
+      dom.rtRecentMeta.textContent = data.total
+        ? `共 ${data.total} 条 · 本地保存 ${data.stored || 0} 条 · 保留 ${data.retentionDays || 30} 天`
+        : `本地保存 ${data.stored || 0} 条 · 保留 ${data.retentionDays || 30} 天`
+    }
+    if (!dom.rtRecent) return
+    const head = `<div class="rt-table-head"><span>时间</span><span>用户</span><span>类型</span>` +
+      `<span>模型</span><span>耗时</span><span>图片</span><span>状态</span></div>`
+    const rows = entries.map(item => {
+      const failed = item.status === 'failed'
+      const kindLabel = RT_KIND_LABELS[item.kind] || item.kind
+      const images = item.kind === 'image'
+        ? `${(item.counts && item.counts.ok) || 0}/${(item.counts && item.counts.requested) || 0}`
+        : '—'
+      const userName = (item.user && item.user.name) || '—'
+      const tip = failed
+        ? (item.error && item.error.message) || item.promptPreview || ''
+        : item.promptPreview || ''
+      return `<div class="rt-table-row${failed ? ' is-failed' : ''}" data-request-id="${escapeHtml(item.id)}" title="${escapeHtml(tip)}">` +
+        `<span class="rt-cell"><span class="num">${escapeHtml(rtTimeText(item.startedAt))}</span>` +
+        `<small>${escapeHtml(String(item.id).slice(0, 12))}</small></span>` +
+        `<span class="rt-cell" title="${escapeHtml(userName)}">${escapeHtml(userName)}</span>` +
+        `<span>${escapeHtml(kindLabel)}</span>` +
+        `<span class="rt-model" title="${escapeHtml(item.model || '')}">${escapeHtml(item.model || '—')}</span>` +
+        `<span class="num">${escapeHtml(rtMs(item.durationMs))}</span>` +
+        `<span class="num">${escapeHtml(images)}</span>` +
+        `<span>${rtBadge(failed ? '失败' : '成功', failed ? 'err' : 'ok')}</span>` +
+        `</div>`
+    }).join('')
+    dom.rtRecent.innerHTML = entries.length
+      ? head + rows
+      : '<p class="rt-empty">还没有请求记录，生成图片或优化提示词后这里会出现</p>'
+  }
+
+  function rtDrawerHide() {
+    if (dom.rtDrawer) dom.rtDrawer.hidden = true
+  }
+
+  function rtDetailGrid(pairs) {
+    return `<div class="rt-detail-grid">` + pairs
+      .map(([label, value]) => `<div class="rt-detail-item">${escapeHtml(label)}<b>${escapeHtml(value)}</b></div>`)
+      .join('') + `</div>`
+  }
+
+  function rtDrawerShow(entry) {
+    if (!dom.rtDrawer || !dom.rtDrawerBody) return
+    const kindLabel = RT_KIND_LABELS[entry.kind] || entry.kind
+    const failed = entry.status === 'failed'
+    const counts = entry.counts || {}
+    const pairs = [
+      ['请求号', entry.id],
+      ['时间', rtTimeText(entry.startedAt)],
+      ['用户', (entry.user && entry.user.name) || '—'],
+      ['模型', entry.model || '—'],
+      ['来源', entry.source || '—'],
+      ['比例', entry.ratio || '—'],
+      ['耗时', rtMs(entry.durationMs)],
+      ['结束', rtTimeText(entry.endedAt)],
+    ]
+    if (entry.kind === 'image') {
+      pairs.push(['图片', `${counts.ok || 0}/${counts.requested || 0}`])
+      pairs.push(['参考图', String(counts.references || 0)])
+    }
+    if (entry.tokens && (entry.tokens.total || entry.tokens.input || entry.tokens.output)) {
+      pairs.push(['Token', `${entry.tokens.input || 0} 入 / ${entry.tokens.output || 0} 出 / 共 ${entry.tokens.total || 0}`])
+    }
+
+    const parts = [rtDetailGrid(pairs)]
+    parts.push(`<div class="rt-detail-block"><h4>提示词</h4><pre class="rt-detail-prompt">${escapeHtml(entry.prompt || '')}</pre></div>`)
+    if (entry.output) {
+      parts.push(`<div class="rt-detail-block"><h4>${entry.kind === 'image' ? '输出名字' : '改写结果'}</h4><pre class="rt-detail-prompt">${escapeHtml(entry.output)}</pre></div>`)
+    }
+    if (entry.params && Object.keys(entry.params).length) {
+      parts.push(`<div class="rt-detail-block"><h4>参数</h4>${rtDetailGrid(Object.entries(entry.params).map(([k, v]) => [k, String(v)]))}</div>`)
+    }
+    if (entry.timings && Object.keys(entry.timings).length) {
+      parts.push(`<div class="rt-detail-block"><h4>阶段耗时</h4>${rtDetailGrid(Object.entries(entry.timings).map(([k, v]) => [k, rtMs(v)]))}</div>`)
+    }
+    const images = Array.isArray(entry.images) ? entry.images : []
+    if (images.length) {
+      const figures = images.map(img => {
+        const href = rtFileUrl(img.path)
+        const meta = [img.width && img.height ? `${img.width}×${img.height}` : '', rtSizeText(img.bytes)].filter(Boolean).join(' · ')
+        return `<figure><a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">` +
+          `<img src="${escapeHtml(href)}" alt="${escapeHtml(img.path)}" loading="lazy" /></a>` +
+          `<figcaption>${escapeHtml(meta || img.path)}</figcaption></figure>`
+      }).join('')
+      parts.push(`<div class="rt-detail-block"><h4>生成结果</h4><div class="rt-detail-images">${figures}</div></div>`)
+    }
+    if (entry.error) {
+      const head = entry.error.code ? `${entry.error.code} · ${entry.error.message}` : entry.error.message
+      parts.push(`<div class="rt-detail-block"><h4>失败原因</h4><pre class="rt-detail-prompt rt-detail-error">${escapeHtml(head || '未知错误')}</pre></div>`)
+      const logLines = Array.isArray(entry.error.log) ? entry.error.log : []
+      if (logLines.length) {
+        parts.push(`<div class="rt-detail-block"><h4>失败日志</h4><pre class="rt-detail-log">${escapeHtml(logLines.join(String.fromCharCode(10)))}</pre></div>`)
+      }
+    }
+
+    dom.rtDrawerBody.innerHTML = parts.join('')
+    if (dom.rtDrawerTitle) dom.rtDrawerTitle.textContent = `${kindLabel} · ${failed ? '失败' : '成功'}`
+    dom.rtDrawer.hidden = false
+  }
+
+  async function openRequestDetail(id) {
+    if (!id) return
+    const result = await api(`/api/admin/monitor/requests/${encodeURIComponent(id)}`)
+    if (!result.ok) {
+      flash(`详情读取失败：${result.error || `HTTP ${result.status || 0}`}`, 'error')
+      return
+    }
+    const entry = result.data && result.data.entry
+    if (entry) rtDrawerShow(entry)
+  }
+
   async function loadRealtimeMonitor() {
     if (rtLoading) return
     rtLoading = true
@@ -5557,6 +5852,7 @@
         return
       }
       rtRender(result.data || {})
+      void loadRequestLog()
     } finally {
       rtLoading = false
     }

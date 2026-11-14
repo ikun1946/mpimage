@@ -7,6 +7,8 @@ export type ApiErrorCode =
   | 'INVALID_STYLES'
   | 'FEEDBACK_INVALID'
   | 'PROJECT_NOT_FOUND'
+  | 'REQUEST_NOT_FOUND'
+  | 'RETENTION_INVALID'
   | 'AUTH_REQUIRED'
   | 'AUTH_INVALID'
   | 'AUTH_FORBIDDEN'
@@ -59,6 +61,8 @@ function defaultStatusFor(code: ApiErrorCode): number {
       return 400
     case 'UPSTREAM_DISCONNECTED':
       return 502
+    case 'REQUEST_NOT_FOUND':
+      return 404
     default:
       return 400
   }

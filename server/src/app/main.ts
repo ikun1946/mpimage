@@ -26,6 +26,7 @@ import { FeedbackStore } from '../services/feedback-store.js'
 import { QuotaStore } from './control/quota-store.js'
 import { RateLimiter } from './control/rate-limiter.js'
 import { TrafficStore } from '../services/traffic-store.js'
+import { RequestLogStore } from '../services/request-log-store.js'
 import { registerMetaRoutes } from '../api/meta.js'
 import { registerProjectRoutes } from '../api/projects.js'
 import { registerStyleRoutes } from '../api/styles.js'
@@ -178,10 +179,13 @@ const rateLimiter = new RateLimiter(dataDir)
 const quotas = new QuotaStore(dataDir)
 // 意见反馈：客户端提交落 data/feedback.json，管理员在后台页查看并标记处理
 const feedback = new FeedbackStore(dataDir)
+// 请求日志：生图/提示词优化/改写都留档，管理端按条查看，按保留天数自动清理
+const requestLog = new RequestLogStore(join(dataDir, 'request-log.json'))
 await traffic.init()
 await rateLimiter.init()
 await quotas.init()
 await feedback.init()
+await requestLog.init()
 
 const processStartedAt = Date.now()
 const realtimeMonitor = new RealtimeMonitor()
@@ -226,6 +230,8 @@ async function shutdown(reason: string): Promise<void> {
   } catch {}
   try {
     await traffic.flushIfDirty()
+    // 请求日志是防抖写盘，退出前补一次，别丢掉最后几条
+    await requestLog.flush()
   } catch {}
   try {
     await app.close()
@@ -256,8 +262,9 @@ registerImageRoutes(app, {
   quotas,
   settings,
   monitor: realtimeMonitor,
+  requestLog,
 })
-registerPromptRoutes(app, { settings })
+registerPromptRoutes(app, { settings, requestLog })
 registerFileRoutes(app, { storage })
 registerUploadRoutes(app, { storage })
 registerStyleRoutes(app, { library: styleLibrary })
@@ -270,6 +277,7 @@ registerMonitorRoutes(app, {
   gate,
   concurrency,
   monitor: realtimeMonitor,
+  requestLog,
 })
 registerFeedbackRoutes(app, { feedback })
 registerUpstreamRoutes(app, { settings })

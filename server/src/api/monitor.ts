@@ -7,6 +7,7 @@ import type { RateLimiter } from '../app/control/rate-limiter.js'
 import type { TrafficStore } from '../services/traffic-store.js'
 import type { SerialGate } from '../app/platform/serial-gate.js'
 import type { RealtimeMonitor } from '../services/realtime-monitor.js'
+import type { RequestLogStore } from '../services/request-log-store.js'
 
 export function registerMonitorRoutes(
   app: FastifyInstance,
@@ -17,6 +18,8 @@ export function registerMonitorRoutes(
     gate: SerialGate
     concurrency: ConcurrencyStore
     monitor?: RealtimeMonitor
+    /** 请求日志（落盘）：逐条查看提示词、参数、耗时与失败原因 */
+    requestLog?: RequestLogStore
   },
 ): void {
   // 管理端监控总览：流量、运行时间、限流状态
@@ -118,6 +121,67 @@ export function registerMonitorRoutes(
     deps.gate.setLimit(saved)
     request.log.info({ limit: saved }, '生图并发上限已调整')
     return reply.send(concurrencyStatus(deps))
+  })
+
+  /* ---------- 请求日志：落盘的生图 / 提示词优化 / 改写记录 ---------- */
+
+  // 列表：分页 + 状态/类型/关键词过滤，返回摘要
+  app.get('/api/admin/monitor/requests', async request => {
+    requireAdmin(request)
+    const query = (request.query ?? {}) as Record<string, unknown>
+    const toNumber = (value: unknown, fallback: number) => {
+      const n = Number(value)
+      return Number.isFinite(n) ? n : fallback
+    }
+    const status = typeof query.status === 'string' ? query.status : 'all'
+    const kind = typeof query.kind === 'string' ? query.kind : 'all'
+    if (!deps.requestLog) return { total: 0, entries: [], retentionDays: 0, stored: 0 }
+    const result = deps.requestLog.list({
+      limit: toNumber(query.limit, 50),
+      offset: toNumber(query.offset, 0),
+      status: status === 'success' || status === 'failed' ? status : 'all',
+      kind:
+        kind === 'image' || kind === 'prompt-optimize' || kind === 'prompt-revise'
+          ? kind
+          : 'all',
+      query: typeof query.q === 'string' ? query.q : '',
+    })
+    return { ...result, retentionDays: deps.requestLog.getRetention(), stored: deps.requestLog.stats().stored }
+  })
+
+  // 最近 24 小时的概览：条数、成功率、平均耗时、提示词优化的消耗
+  app.get('/api/admin/monitor/requests/stats', async request => {
+    requireAdmin(request)
+    return deps.requestLog ? deps.requestLog.stats() : null
+  })
+
+  // 单条详情：提示词全文、参数、每张图、失败堆栈
+  app.get('/api/admin/monitor/requests/:id', async request => {
+    requireAdmin(request)
+    const params = request.params as { id?: string }
+    const entry = params.id ? deps.requestLog?.get(params.id) : null
+    if (!entry) throw new ApiError('REQUEST_NOT_FOUND', '这条请求记录不存在，可能已经按保留天数清理', 404)
+    return { entry }
+  })
+
+  // 保留天数：1–365 天，改完立即清理旧记录
+  app.post('/api/admin/monitor/requests/retention', async request => {
+    requireAdmin(request)
+    const body = (request.body ?? {}) as { days?: unknown }
+    const days = Number(body.days)
+    if (!Number.isFinite(days) || days < 1 || days > 365) {
+      throw new ApiError('RETENTION_INVALID', '保留天数需在 1 到 365 之间', 400)
+    }
+    if (!deps.requestLog) throw new ApiError('INTERNAL_ERROR', '请求日志未启用', 500)
+    const next = deps.requestLog.setRetention(days)
+    return { retentionDays: next, stats: deps.requestLog.stats() }
+  })
+
+  // 清空全部记录（保留设置里的保留天数）
+  app.delete('/api/admin/monitor/requests', async request => {
+    requireAdmin(request)
+    const removed = deps.requestLog?.clear() ?? 0
+    return { removed }
   })
 }
 

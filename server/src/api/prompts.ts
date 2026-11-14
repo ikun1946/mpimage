@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify'
+import { randomBytes } from 'node:crypto'
 import { config, findRatio } from '../app/platform/config.js'
 import { auditFailure, auditLog } from '../app/platform/audit.js'
 import { ApiError } from '../app/platform/errors.js'
 import { designFace, refineFaceField } from '../app/products/images/face-design.js'
 import { optimizePrompt, revisePrompt } from '../app/products/prompts/prompt-optimizer.js'
+import type { RequestLogStore } from '../services/request-log-store.js'
 import {
   MAX_REFERENCE_IMAGES,
   loadReferenceImages,
@@ -23,7 +25,11 @@ interface OptimizeBody {
 
 export function registerPromptRoutes(
   app: FastifyInstance,
-  deps: { settings: SettingsStore },
+  deps: {
+    settings: SettingsStore
+    /** 请求日志：优化/改写的模型消耗和用时也留档 */
+    requestLog?: RequestLogStore
+  },
 ): void {
   app.post('/api/prompts/optimize', async request => {
     const auth = requireAuth(request)
@@ -103,8 +109,37 @@ export function registerPromptRoutes(
         tokens: result.tokens,
         durationMs: Date.now() - startedAt,
       })
+      deps.requestLog?.append({
+        id: newLogId('opt'),
+        kind: 'prompt-optimize',
+        status: 'success',
+        startedAt,
+        endedAt: Date.now(),
+        durationMs: Date.now() - startedAt,
+        user: { id: auth.userId, name: auth.displayName || auth.username },
+        model: result.model || 'unknown',
+        ratio: ratioLabel,
+        prompt,
+        output: result.prompt,
+        counts: { references: images?.length ?? referenceCount ?? 0 },
+        tokens: result.tokens,
+      })
       return result
     } catch (error) {
+      deps.requestLog?.append({
+        id: newLogId('opt'),
+        kind: 'prompt-optimize',
+        status: 'failed',
+        startedAt,
+        endedAt: Date.now(),
+        durationMs: Date.now() - startedAt,
+        user: { id: auth.userId, name: auth.displayName || auth.username },
+        model: 'unknown',
+        ratio: ratioLabel,
+        prompt,
+        counts: { references: images?.length ?? referenceCount ?? 0 },
+        error: errorInfo(error),
+      })
       auditFailure(request.log, 'prompt.optimize', auth, startedAt, error, '提示词优化失败', {
         inputLength: prompt.length,
         references: images?.length ?? referenceCount ?? 0,
@@ -180,8 +215,39 @@ export function registerPromptRoutes(
         tokens: result.tokens,
         durationMs: Date.now() - startedAt,
       })
+      deps.requestLog?.append({
+        id: newLogId('rev'),
+        kind: 'prompt-revise',
+        status: 'success',
+        startedAt,
+        endedAt: Date.now(),
+        durationMs: Date.now() - startedAt,
+        user: { id: auth.userId, name: auth.displayName || auth.username },
+        model: result.model || 'unknown',
+        ratio: ratioLabel,
+        prompt,
+        output: result.prompt,
+        counts: { references: images.length },
+        params: { instruction: instruction.slice(0, 200) },
+        tokens: result.tokens,
+      })
       return { ...result, imageCount: images.length }
     } catch (error) {
+      deps.requestLog?.append({
+        id: newLogId('rev'),
+        kind: 'prompt-revise',
+        status: 'failed',
+        startedAt,
+        endedAt: Date.now(),
+        durationMs: Date.now() - startedAt,
+        user: { id: auth.userId, name: auth.displayName || auth.username },
+        model: 'unknown',
+        ratio: ratioLabel,
+        prompt,
+        counts: { references: images.length },
+        params: { instruction: instruction.slice(0, 200) },
+        error: errorInfo(error),
+      })
       auditFailure(request.log, 'prompt.revise', auth, startedAt, error, '提示词改写失败', {
         inputLength: prompt.length,
         instructionLength: instruction.length,
@@ -370,4 +436,19 @@ function readPathList(value: unknown, noun: string): string[] {
     if (trimmed) paths.push(trimmed)
   }
   return paths
+}
+
+/** 请求日志的 id：带上时间与随机后缀，管理端按条打开时能直接定位 */
+function newLogId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`
+}
+
+/** 失败条目统一带上错误码、消息和堆栈前几行 */
+function errorInfo(error: unknown) {
+  const err = error as Error & { code?: string }
+  return {
+    code: typeof err?.code === 'string' ? err.code : 'INTERNAL_ERROR',
+    message: String(err?.message || error || '未知错误'),
+    log: String(err?.stack || '').split(String.fromCharCode(10)).slice(0, 24),
+  }
 }
