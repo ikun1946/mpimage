@@ -9,7 +9,7 @@ import { requestImage, requestImageEdit } from '../app/products/images/magpie.js
 import { listClientImageModels, resolveCustomProviderModel } from '../app/control/client-models.js'
 import type { RealtimeMonitor } from '../services/realtime-monitor.js'
 import { detectImageType, readImageSize } from '../app/products/images/imaging.js'
-import { generateImageTitle } from '../app/products/images/image-title.js'
+import { generateImageTitle, titleForImage } from '../app/products/images/image-title.js'
 import { MAX_REFERENCE_IMAGES, loadReferenceImages } from '../app/products/images/reference-images.js'
 import { REFERENCE_CATEGORY, type ImageStorage } from '../services/storage.js'
 import type { QuotaStore } from '../app/control/quota-store.js'
@@ -489,7 +489,12 @@ export function registerImageRoutes(
 
     const payloads: GeneratedImageInfo[] = []
     const usageWriteStartedAt = Date.now()
+    let imageIndex = 0
     for (const generated of generatedList) {
+      // 同一次请求出多张时名字后面带序号，拼图墙上一摞卡片才分得清
+      const imageName =
+        source === 'free' ? titleForImage(displayName, imageIndex, imageCount) : displayName
+      imageIndex += 1
       const width = generated.size?.width ?? ratio.nativeWidth
       const height = generated.size?.height ?? ratio.nativeHeight
 
@@ -500,7 +505,7 @@ export function registerImageRoutes(
         displayName: auth.displayName,
         source,
         category,
-        name: displayName,
+        name: imageName,
         ratio: ratio.id,
         model: generated.model,
         width,
@@ -521,7 +526,7 @@ export function registerImageRoutes(
         jobId,
         source,
         category,
-        name: displayName,
+        name: imageName,
         ratio: ratio.id,
         model: generated.model,
         references: referencePaths.length,
@@ -545,7 +550,7 @@ export function registerImageRoutes(
       payloads.push({
         id: generated.stored.id,
         imageUrl: buildFileUrl(request, generated.stored.relativePath),
-        name: displayName,
+        name: imageName,
         model: generated.model,
         mimeType: generated.mimeType,
         bytes: generated.stored.bytes,
