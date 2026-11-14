@@ -4829,28 +4829,32 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         const x = event.clientX
         const y = event.clientY
 
-        // 第一步：命中右上角区 → 这张卡的删除按钮浮现
-        // 注意不能就此返回：鼠标从按钮往下走时仍在同一张卡的「正下方立柱」里，
-        // 这时卡片要保持浮起，否则一路往下走卡片就塌回去了。
-        const corner = items.find(item => inCorner(item, x, y))
-        for (const item of items) {
-          item.card.classList.toggle('is-corner', item === corner)
-        }
+        // 指针底下压着的是哪张卡：交给浏览器按真实形状和层级算。
+        // 自己用包围盒判会把相邻卡片「抢」过来——抬起的那张放大了 1.3 倍，
+        // 包围盒伸进旁边一张的左半边，于是鼠标停在隔壁卡片的删除按钮上，
+        // 浮起的却是这一张，红叉和浮起的图对不上。
+        const hit = document.elementFromPoint(x, y)
+        const under = hit && hit.closest ? hit.closest('.free-ref') : null
 
-        // 第二步：落在某张卡的可见范围内 → 抬起它。抬起的优先，它压在别人上面。
+        // 第二步：落在某张卡的可见范围内 → 抬起它。
         let picked = null
-        const lifted = items.find(item => item.raised && inLiftedBox(item.lifted, x, y))
-        if (lifted) {
-          picked = lifted.card
-        } else {
+        if (under && items.some(item => item.card === under)) {
+          picked = under
+        }
+        if (!picked) {
+          const lifted = items.find(item => item.raised && inLiftedBox(item.lifted, x, y))
+          if (lifted) picked = lifted.card
+        }
+        if (!picked) {
           const resting = items.find(item => !item.raised && inBox(item.rest, x, y))
           if (resting) picked = resting.card
         }
 
         // 按钮的可点范围比卡片本身大一圈（贴边时那一圈探到卡片外），
         // 指针停在那儿也算停在这张卡上，不然瞄准删除按钮时卡片会先掉下去
-        if (!picked && corner && (corner.raised || inBox(corner.rest, x, y))) {
-          picked = corner.card
+        if (!picked) {
+          const cornerHit = items.find(item => inCorner(item, x, y))
+          if (cornerHit) picked = cornerHit.card
         }
 
         // 第三步：都没落上，但指针在已抬起卡片的正下方立柱里 → 保持它抬起，
@@ -4879,6 +4883,13 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         if (!picked) {
           resetCards(cards)
           return
+        }
+
+        // 删除按钮只挂在真正接手的那张卡上：浮着 A 的时候鼠标蹭到 B 的角，
+        // 不该让 B 的红叉冒出来——那样红叉和浮起的图对不上，很容易删错
+        const cornerItem = items.find(item => item.card === picked && inCorner(item, x, y))
+        for (const item of items) {
+          item.card.classList.toggle('is-corner', item === cornerItem)
         }
 
         if (picked.classList.contains('is-raised')) {
