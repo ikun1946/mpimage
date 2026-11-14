@@ -359,7 +359,10 @@ export class UpdateChecker {
       }
     }
 
-    const ttl = this.cached?.error ? FAILURE_TTL_MS : SUCCESS_TTL_MS
+    // 发布刚创建时资产可能还没挂上，这时拿到的是「有新版但没有下载地址」；
+    // 这种结果只缓存 1 分钟，等资产就位后能很快自动纠正，不会锁死 10 分钟。
+    const missingAsset = Boolean(this.cached?.hasUpdate && !this.cached?.downloadUrl)
+    const ttl = this.cached?.error || missingAsset ? FAILURE_TTL_MS : SUCCESS_TTL_MS
     if (!force && this.cached && Date.now() - this.cachedAt < ttl) return this.cached
     if (this.inflight) return this.inflight
 
