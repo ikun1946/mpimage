@@ -4707,10 +4707,22 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       const RAISE_S = 1.3 // 与 free.css 里的 scale 一致
       const EDGE_GRACE = 6 // 判定边缘的宽容，避免刚好擦边就抖
       const CORNER_GRACE = 8 // 按钮命中区向外多留一点，鼠标贴过去也算
+      const LEAVE_TOP = 24 // 抬起后顶边再往上多认这么多，别让鼠标刚过顶卡片就掉下去
+      const LEAVE_SIDE = 4 // 左右只放一点点，免得挡住旁边的卡片
+      const REVIVE_MS = 1200 // 掉下去后指针又回到原处，这么长时间内还认它
+
+      // 上一张抬起的卡片：抬起后上半截悬在半空，一旦掉下去就落进「死区」，
+      // 记一下刚才是谁，指针回到原位还能把它叫起来。
+      let lastRaisedCard = null
+      let lastRaisedAt = 0
 
       function resetCards(cards) {
         for (const card of cards) {
-          if (card.classList.contains('is-raised')) card.classList.remove('is-raised')
+          if (card.classList.contains('is-raised')) {
+            lastRaisedCard = card
+            lastRaisedAt = performance.now()
+            card.classList.remove('is-raised')
+          }
           if (card.classList.contains('is-corner')) card.classList.remove('is-corner')
         }
       }
@@ -4770,6 +4782,22 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       }
 
       /**
+       * 抬起后的宽松范围：顶部多留一大截。
+       * 卡片是往上抬 84px 放大的，抬起后几乎整个人悬在静止位置上方，
+       * 鼠标顺着卡片往上走、刚过顶边一两像素，卡片就被放下去了——
+       * 而那个位置之后既不在静止框里也不在抬起框里，是块「死区」，
+       * 再退回卡片上也抬不起来。顶部放宽容差把这个断口补上。
+       */
+      function inLiftedBox(box, x, y) {
+        return (
+          x >= box.left - LEAVE_SIDE &&
+          x <= box.right + LEAVE_SIDE &&
+          y >= box.top - LEAVE_TOP &&
+          y <= box.bottom + LEAVE_SIDE
+        )
+      }
+
+      /**
        * 右上角区判定：以删除按钮的实际矩形为准（外扩一点）。
        * 之前用卡片外框算，但卡片有 3px 边框、按钮又内缩 5px，
        * 两者的右上角并不重合，按钮中心反而落在角区之外。
@@ -4811,12 +4839,18 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
         // 第二步：落在某张卡的可见范围内 → 抬起它。抬起的优先，它压在别人上面。
         let picked = null
-        const lifted = items.find(item => item.raised && inBox(item.lifted, x, y))
+        const lifted = items.find(item => item.raised && inLiftedBox(item.lifted, x, y))
         if (lifted) {
           picked = lifted.card
         } else {
           const resting = items.find(item => !item.raised && inBox(item.rest, x, y))
           if (resting) picked = resting.card
+        }
+
+        // 按钮的可点范围比卡片本身大一圈（贴边时那一圈探到卡片外），
+        // 指针停在那儿也算停在这张卡上，不然瞄准删除按钮时卡片会先掉下去
+        if (!picked && corner && (corner.raised || inBox(corner.rest, x, y))) {
+          picked = corner.card
         }
 
         // 第三步：都没落上，但指针在已抬起卡片的正下方立柱里 → 保持它抬起，
@@ -4833,9 +4867,23 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           if (sticky) picked = sticky.card
         }
 
+        // 第四步：刚掉下去的卡片，指针又回到它抬起时的那片范围里 → 再叫起来。
+        // 抬起的卡片上半截悬在半空，掉下去以后那片位置谁也不属于，是块死区。
+        if (!picked && lastRaisedCard) {
+          const back = items.find(
+            item => item.card === lastRaisedCard && inLiftedBox(item.lifted, x, y),
+          )
+          if (back && performance.now() - lastRaisedAt <= REVIVE_MS) picked = back.card
+        }
+
         if (!picked) {
           resetCards(cards)
           return
+        }
+
+        if (picked.classList.contains('is-raised')) {
+          lastRaisedCard = picked
+          lastRaisedAt = performance.now()
         }
 
         for (const item of items) {
