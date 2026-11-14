@@ -473,6 +473,89 @@
                 </div>
                 <input id="free-ref-file" type="file" accept="image/png,image/jpeg,image/webp" hidden />
               </div>
+
+              <section class="revise-inline" id="free-revise" aria-label="改写提示词" hidden>
+                <header class="revise-inline-head">
+                  <span class="revise-inline-badge">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17z"></path>
+                      <path d="M13.5 6.5l4 4"></path>
+                    </svg>
+                    AI 改写
+                  </span>
+                  <span class="revise-inline-count">
+                    改的是当前这条 <b id="free-revise-len">0</b> 字提示词
+                  </span>
+                  <button
+                    class="revise-inline-peek"
+                    id="free-revise-peek"
+                    type="button"
+                    aria-expanded="false"
+                  >
+                    查看
+                  </button>
+                  <button
+                    class="revise-inline-close"
+                    id="free-revise-close"
+                    type="button"
+                    title="收起改写面板"
+                    aria-label="收起改写面板"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M6 6l12 12"></path>
+                      <path d="M18 6L6 18"></path>
+                    </svg>
+                  </button>
+                </header>
+
+                <div class="revise-inline-origin" id="free-revise-origin" hidden></div>
+
+                <div class="revise-inline-body">
+                  <div class="revise-inline-field">
+                    <textarea
+                      id="free-revise-instruction"
+                      rows="2"
+                      maxlength="2000"
+                      placeholder="说一句怎么改，例如：把夜景改成清晨，雾气再淡一点"
+                    ></textarea>
+                    <div class="revise-inline-presets" id="free-revise-presets">
+                      <button type="button" data-preset="改成清晨，去掉黑红烟雾">改成清晨</button>
+                      <button type="button" data-preset="换成雪景，其余不变">换成雪景</button>
+                      <button type="button" data-preset="质感再写实一些">更写实</button>
+                      <button type="button" data-preset="构图改成正面平视">换机位</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="revise-inline-result" id="free-revise-result" hidden>
+                  <div class="revise-inline-result-head">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M5 12.5l4.5 4.5L19 7"></path>
+                    </svg>
+                    已改好
+                    <em id="free-revise-note"></em>
+                  </div>
+                  <div class="revise-inline-result-body" id="free-revise-result-body"></div>
+                </div>
+
+                <footer class="revise-inline-foot">
+                  <button class="revise-inline-chip is-on" id="free-revise-use-refs" type="button">
+                    <i aria-hidden="true"></i><span id="free-revise-use-refs-text">参考图</span>
+                  </button>
+                  <button class="revise-inline-chip" id="free-revise-use-result" type="button">
+                    <span class="revise-inline-dot" aria-hidden="true"></span>上次结果
+                  </button>
+                  <span class="revise-inline-status" id="free-revise-status"></span>
+                  <button class="revise-inline-btn" id="free-revise-again" type="button" hidden>
+                    重新改写
+                  </button>
+                  <button class="revise-inline-btn" id="free-revise-cancel" type="button">取消</button>
+                  <button class="revise-inline-btn is-primary" id="free-revise-run" type="button">
+                    <span id="free-revise-run-text">开始改写</span>
+                  </button>
+                </footer>
+              </section>
+
               <div class="input-toolbar">
                 <button class="input-add" id="free-add-ref" type="button" title="添加参考图" aria-label="添加参考图">
                   <svg viewBox="0 0 24 24" aria-hidden="true">

@@ -1147,3 +1147,459 @@
 .revise-result .textarea {
   min-height: 150px;
 }
+
+/* ---------- 改写提示词：输入框内联面板 ----------
+   自由创作的改写不再是居中弹窗，而是把输入条里写提示词的那块位置换成面板：
+   上方是徽标与原文入口，中间一句指令，底部素材开关与操作。
+   资产弹窗里的改写仍然走上面的 .revise-* 弹窗样式，两套互不影响。 */
+
+/* 面板生效期间，原来那块提示词输入区让位（原文可在面板里展开） */
+#panel-free .free-form .input-bar.is-revising .input-main {
+  display: none;
+}
+
+/* 整条输入框换成苔绿细环：一眼看出这是改写模式，而不是普通的输入框 */
+#panel-free .free-form .input-bar.is-revising {
+  box-shadow:
+    0 6px 24px rgba(54, 84, 69, 0.1),
+    inset 0 0 0 1.5px rgba(54, 84, 69, 0.34);
+}
+
+.revise-inline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 2px 4px 1px;
+  padding: 7px 4px 5px;
+  animation: revise-inline-in 220ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.revise-inline[hidden] {
+  display: none;
+}
+
+@keyframes revise-inline-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.revise-inline-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 3px;
+}
+
+.revise-inline-badge {
+  display: inline-flex;
+  height: 21px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px 0 7px;
+  color: var(--on-moss);
+  border-radius: var(--radius-pill);
+  background: var(--moss);
+  box-shadow: 0 1px 2px rgba(20, 30, 24, 0.2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.revise-inline-badge svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.revise-inline-count {
+  color: var(--ink-faint);
+  font-size: 11.5px;
+}
+
+.revise-inline-count b {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.revise-inline-peek {
+  padding: 0;
+  color: var(--moss-light);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.revise-inline-peek:hover {
+  color: var(--moss);
+  text-decoration: underline;
+}
+
+.revise-inline-close {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--ink-faint);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.revise-inline-close:hover {
+  color: var(--ink);
+  background: rgba(29, 36, 32, 0.07);
+}
+
+.revise-inline-close svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2.1;
+}
+
+/* 原文预览：长提示词打开面板时自动摊开，短提示词点「查看」才出现 */
+.revise-inline-origin {
+  max-height: 88px;
+  overflow: auto;
+  padding: 9px 11px;
+  color: var(--ink-soft);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(29, 36, 32, 0.2) transparent;
+}
+
+.revise-inline-origin[hidden] {
+  display: none;
+}
+
+.revise-inline-field {
+  display: flex;
+  min-height: 78px;
+  flex-direction: column;
+  padding: 8px 11px 6px;
+  border-radius: 11px;
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: box-shadow 160ms cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.revise-inline-field:focus-within {
+  box-shadow:
+    inset 0 0 0 1.5px var(--moss),
+    0 0 0 3px var(--moss-tint);
+}
+
+.revise-inline-field textarea {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  flex: 1 1 auto;
+  padding: 0;
+  color: var(--ink);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.7;
+  resize: none;
+}
+
+.revise-inline-field textarea::placeholder {
+  color: var(--ink-faint);
+}
+
+.revise-inline-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 0 1px;
+}
+
+.revise-inline-presets button {
+  height: 22px;
+  padding: 0 10px;
+  color: var(--ink-soft);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-subtle);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition:
+    background 130ms ease,
+    color 130ms ease;
+}
+
+.revise-inline-presets button:hover {
+  color: var(--moss);
+  background: var(--moss-tint);
+}
+
+.revise-inline-foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 3px;
+}
+
+.revise-inline-chip {
+  display: inline-flex;
+  height: 25px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 4px;
+  color: var(--ink-faint);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition:
+    background 130ms ease,
+    box-shadow 130ms ease,
+    color 130ms ease;
+}
+
+.revise-inline-chip:hover {
+  color: var(--ink);
+}
+
+.revise-inline-chip.is-on {
+  color: var(--moss);
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px rgba(54, 84, 69, 0.34);
+}
+
+.revise-inline-chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.revise-inline-chip i {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(60% 55% at 46% 40%, #7a7266 0%, #3b3a34 70%);
+}
+
+.revise-inline-dot {
+  width: 6px;
+  height: 6px;
+  margin: 0 2px 0 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--line);
+  box-shadow: inset 0 0 0 1px rgba(32, 39, 34, 0.18);
+}
+
+.revise-inline-chip.is-on .revise-inline-dot {
+  background: var(--moss);
+  box-shadow: none;
+}
+
+/* 状态文案占住中间的空位，按钮始终贴右 */
+.revise-inline-status {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 结果态只留结果与操作：指令框、原文预览、素材开关都收起来 */
+.revise-inline.has-result .revise-inline-chip,
+.revise-inline.has-result .revise-inline-body,
+.revise-inline.has-result .revise-inline-origin {
+  display: none;
+}
+
+.revise-inline-btn {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 13px;
+  color: var(--ink-soft);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    opacity 140ms ease;
+}
+
+.revise-inline-btn:hover {
+  color: var(--ink);
+  background: rgba(29, 36, 32, 0.07);
+}
+
+.revise-inline-btn.is-primary {
+  padding: 0 16px;
+  color: var(--on-moss);
+  background: var(--moss);
+  box-shadow: 0 1px 2px rgba(20, 30, 24, 0.26);
+}
+
+.revise-inline-btn.is-primary:hover {
+  color: var(--on-moss);
+  background: var(--moss-dark);
+}
+
+.revise-inline-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.revise-inline-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.revise-inline-spin {
+  width: 11px;
+  height: 11px;
+  border: 1.6px solid rgba(255, 255, 255, 0.42);
+  border-top-color: var(--on-moss);
+  border-radius: 50%;
+  animation: revise-inline-spin 700ms linear infinite;
+}
+
+@keyframes revise-inline-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 改写中：内容压暗，顶部一条进度扫光 */
+.revise-inline.is-loading .revise-inline-body,
+.revise-inline.is-loading .revise-inline-chip {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.revise-inline::before {
+  position: absolute;
+  top: 0;
+  right: 18px;
+  left: 18px;
+  height: 2px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, transparent, var(--moss), transparent);
+  content: "";
+  opacity: 0;
+  transform: translateX(-120%);
+  transition: opacity 160ms ease;
+}
+
+.revise-inline.is-loading::before {
+  opacity: 1;
+  animation: revise-inline-sweep 1.1s linear infinite;
+}
+
+@keyframes revise-inline-sweep {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(320%);
+  }
+}
+
+.revise-inline-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.revise-inline-result[hidden] {
+  display: none;
+}
+
+.revise-inline-result-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 3px;
+  color: var(--moss);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.revise-inline-result-head svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+}
+
+.revise-inline-result-head em {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-style: normal;
+  font-weight: 400;
+}
+
+.revise-inline-result-body {
+  max-height: 190px;
+  overflow: auto;
+  padding: 10px 12px;
+  color: var(--ink);
+  border-radius: 11px;
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px rgba(54, 84, 69, 0.22);
+  font-size: 13px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(29, 36, 32, 0.2) transparent;
+}
+
+/* 结果里的改动处：苔绿底色 + 下划线，扫一眼就知道动了哪 */
+.revise-inline-result-body mark {
+  padding: 0 2px;
+  color: var(--moss-dark);
+  border-radius: 3px;
+  background: rgba(54, 84, 69, 0.22);
+  box-shadow: inset 0 -1px 0 rgba(54, 84, 69, 0.4);
+}

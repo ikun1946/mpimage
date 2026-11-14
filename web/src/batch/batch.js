@@ -348,6 +348,24 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       freePromptRevise: document.querySelector('#free-prompt-revise'),
       freePromptCopy: document.querySelector('#free-prompt-copy'),
       freePromptShell: document.querySelector('#free-prompt-shell'),
+      freeRevise: document.querySelector('#free-revise'),
+      freeReviseLen: document.querySelector('#free-revise-len'),
+      freeRevisePeek: document.querySelector('#free-revise-peek'),
+      freeReviseClose: document.querySelector('#free-revise-close'),
+      freeReviseOrigin: document.querySelector('#free-revise-origin'),
+      freeReviseInstruction: document.querySelector('#free-revise-instruction'),
+      freeRevisePresets: document.querySelector('#free-revise-presets'),
+      freeReviseResult: document.querySelector('#free-revise-result'),
+      freeReviseResultBody: document.querySelector('#free-revise-result-body'),
+      freeReviseNote: document.querySelector('#free-revise-note'),
+      freeReviseUseRefs: document.querySelector('#free-revise-use-refs'),
+      freeReviseUseRefsText: document.querySelector('#free-revise-use-refs-text'),
+      freeReviseUseResult: document.querySelector('#free-revise-use-result'),
+      freeReviseStatus: document.querySelector('#free-revise-status'),
+      freeReviseAgain: document.querySelector('#free-revise-again'),
+      freeReviseCancel: document.querySelector('#free-revise-cancel'),
+      freeReviseRun: document.querySelector('#free-revise-run'),
+      freeReviseRunText: document.querySelector('#free-revise-run-text'),
       freeRefStack: document.querySelector('#free-ref-stack'),
       freeRefFile: document.querySelector('#free-ref-file'),
       freeRefBusy: document.querySelector('#free-ref-busy'),
@@ -3732,16 +3750,18 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
      * 这次实际会送哪几张图：合计最多 6 张，勾了结果图就只带前 5 张参考图。
      * 服务端也是 6 张上限、参考图排在前面，客户端先把预算算好，别让结果图被静默丢掉。
      */
-    function reviseImageSelection() {
-      if (!reviseTarget) return { references: [], contextPath: '' }
-      const refs =
-        dom.reviseUseRefs.checked && !dom.reviseUseRefs.disabled
-          ? reviseTarget.references || []
-          : []
-      const contextPath =
-        dom.reviseUseResult.checked && !dom.reviseUseResult.disabled
-          ? storagePathFromUrl(reviseTarget.resultUrl)
-          : ''
+    function reviseImageSelection(target = reviseTarget) {
+      if (!target) return { references: [], contextPath: '' }
+      // 内联面板用自己的两个胶囊开关，资产弹窗仍然读勾选框
+      const inline = target.inline === true
+      const wantRefs = inline
+        ? target.useRefs !== false
+        : dom.reviseUseRefs.checked && !dom.reviseUseRefs.disabled
+      const wantResult = inline
+        ? target.useResult === true
+        : dom.reviseUseResult.checked && !dom.reviseUseResult.disabled
+      const refs = wantRefs ? target.references || [] : []
+      const contextPath = wantResult ? storagePathFromUrl(target.resultUrl) : ''
       const refBudget = contextPath ? REVISE_MAX_IMAGES - 1 : REVISE_MAX_IMAGES
       return { references: refs.slice(0, refBudget), contextPath }
     }
@@ -3867,17 +3887,205 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       showToast('提示词已改写')
     }
 
-    /** 自由创作的入口：带当前提示词、画幅、参考图与最近一次的结果图 */
+    /* ===== 自由创作的改写：输入条内联面板 =====
+       和资产弹窗共用 /api/prompts/revise，只是把入口和结果都收进输入条里：
+       不遮画面、不打断输入，收起就回到原提示词。 */
+    let reviseInlineTarget = null
+    /* 请求代次：收起面板或再发一次都会 +1，迟到的响应据此丢弃 */
+    let reviseInlineSeq = 0
+    let reviseInlineBusy = false
+    let reviseInlineBusyHandle = null
+
+    /** 面板里的原文预览：长提示词打开时自动摊开，短提示词点「查看」才出现 */
+    function setReviseInlineOrigin(open) {
+      const origin = dom.freeReviseOrigin
+      if (!origin) return
+      const text = reviseInlineTarget?.prompt || ''
+      origin.hidden = !(open && text)
+      dom.freeRevisePeek.setAttribute('aria-expanded', origin.hidden ? 'false' : 'true')
+      if (!origin.hidden) origin.textContent = text
+    }
+
+    function resetReviseInlineActions() {
+      dom.freeRevise.classList.remove('has-result', 'is-loading')
+      dom.freeReviseResult.hidden = true
+      dom.freeReviseResultBody.textContent = ''
+      dom.freeReviseResultBody.dataset.text = ''
+      dom.freeReviseAgain.hidden = true
+      dom.freeReviseRun.disabled = false
+      dom.freeReviseRunText.textContent = '开始改写'
+      dom.freeReviseStatus.textContent = ''
+    }
+
+    /** 打开内联面板：入口是输入条右下角那个铅笔按钮 */
     function openReviseForFree() {
-      openReviseDialog({
-        prompt: dom.freePrompt.value,
+      const prompt = dom.freePrompt.value.trim()
+      if (!prompt) {
+        showToast('先写一条提示词，才能改写')
+        return
+      }
+      // 已经展开了：再点一次等于收起
+      if (!dom.freeRevise.hidden) {
+        closeReviseInline()
+        return
+      }
+
+      const refs = state.freeReferences.slice(0, FREE_REF_LIMIT)
+      const resultUrl = state.freeImageUrl || ''
+      reviseInlineTarget = {
+        prompt,
         ratio: dom.freeRatio.value,
-        references: state.freeReferences.slice(0, FREE_REF_LIMIT),
-        resultUrl: state.freeImageUrl,
-        apply: value => applyFreePrompt(value),
-        busyTarget: dom.freePromptShell,
-        // 浮动按钮只在 hover 时可见，焦点归不回去时落回输入框
-        focusAfterClose: dom.freePrompt,
+        references: refs,
+        resultUrl,
+        inline: true,
+        useRefs: refs.length > 0,
+        useResult: Boolean(resultUrl),
+        previousPrompt: dom.freePrompt.value,
+      }
+      // 超过两行说明本来就是长提示词，打开时把原文摊开，面板高度和收起时差不多
+      const tall = dom.freePrompt.getBoundingClientRect().height > 92
+
+      dom.freeReviseLen.textContent = String(prompt.length)
+      dom.freeReviseInstruction.value = ''
+      dom.freeReviseInstruction.style.height = ''
+      dom.freeReviseUseRefs.disabled = refs.length === 0
+      dom.freeReviseUseRefs.classList.toggle('is-on', refs.length > 0)
+      dom.freeReviseUseRefsText.textContent = refs.length ? `参考图 ${refs.length} 张` : '无参考图'
+      dom.freeReviseUseResult.disabled = !resultUrl
+      dom.freeReviseUseResult.classList.toggle('is-on', Boolean(resultUrl))
+      resetReviseInlineActions()
+      setReviseInlineOrigin(tall)
+
+      dom.freeRevise.hidden = false
+      dom.freePromptShell.classList.add('is-revising')
+      requestAnimationFrame(() => dom.freeReviseInstruction.focus())
+    }
+
+    function closeReviseInline() {
+      if (dom.freeRevise.hidden) return
+      // 收起就作废这次请求，免得结果回来时面板已经关了还往里写
+      reviseInlineSeq += 1
+      reviseInlineBusyHandle?.stop()
+      reviseInlineBusyHandle = null
+      reviseInlineBusy = false
+      resetReviseInlineActions()
+      dom.freeRevise.hidden = true
+      dom.freePromptShell.classList.remove('is-revising')
+      dom.freePrompt.focus()
+    }
+
+    /**
+     * 结果里的改动标绿：按分句比对，改过的分句才上色。
+     * 模型偶尔会把整条重写（石印全换成青石台面），那时一半以上都是新的，
+     * 满屏标绿反而看不清，这种情况直接给纯文本。
+     */
+    function markReviseDiff(before, after) {
+      const next = String(after)
+      const split = text =>
+        (String(text).match(/[^，。；：、,!?！？\n]+[，。；：、,!?！？\n]?/g) || [])
+          .map(part => part.trim())
+          .filter(Boolean)
+      const known = new Set(split(before))
+      const parts = split(next)
+      if (!parts.length) return escapeHtml(next)
+      const total = parts.reduce((sum, part) => sum + part.length, 0) || 1
+      const changed = parts
+        .filter(part => !known.has(part))
+        .reduce((sum, part) => sum + part.length, 0)
+      if (changed / total > 0.5) return escapeHtml(next)
+      return parts
+        .map(part => (known.has(part) ? escapeHtml(part) : `<mark>${escapeHtml(part)}</mark>`))
+        .join('')
+    }
+
+    /** 改写完成：结果直接铺在面板里，点「应用」才写回输入框 */
+    function showReviseInlineResult(next, result) {
+      const note = optimizeKeptNote(result).replace(/^[，,]\s*/, '')
+      dom.freeRevise.classList.remove('is-loading')
+      dom.freeRevise.classList.add('has-result')
+      dom.freeReviseResult.hidden = false
+      dom.freeReviseResultBody.innerHTML = markReviseDiff(reviseInlineTarget?.prompt || '', next)
+      dom.freeReviseResultBody.dataset.text = next
+      dom.freeReviseNote.textContent = note
+      dom.freeReviseAgain.hidden = false
+      dom.freeReviseRunText.textContent = '应用'
+      dom.freeReviseStatus.textContent = result?.imageCount
+        ? `已参考 ${result.imageCount} 张图片`
+        : ''
+    }
+
+    async function runReviseInline() {
+      if (reviseInlineBusy) {
+        showToast('上一次改写还在进行，完成后再试')
+        return
+      }
+      const target = reviseInlineTarget
+      if (!target) return
+      const instruction = dom.freeReviseInstruction.value.trim()
+      if (!instruction) {
+        showToast('先说说你想怎么改')
+        dom.freeReviseInstruction.focus()
+        return
+      }
+
+      const { references, contextPath } = reviseImageSelection(target)
+      const referencePaths = references.map(ref => ref.path)
+      const contextPaths = contextPath ? [contextPath] : []
+      const seq = ++reviseInlineSeq
+
+      reviseInlineBusy = true
+      dom.freeRevise.classList.add('is-loading')
+      dom.freeRevise.classList.remove('has-result')
+      dom.freeReviseResult.hidden = true
+      dom.freeReviseAgain.hidden = true
+      dom.freeReviseRun.disabled = true
+      dom.freeReviseRunText.innerHTML =
+        '<span class="revise-inline-spin" aria-hidden="true"></span>改写中'
+      dom.freeReviseStatus.textContent =
+        referencePaths.length || contextPaths.length ? '正在看图并改写…' : '正在改写…'
+      reviseInlineBusyHandle = startAiBusy(dom.freePromptShell, { pool: 'optimize', action: '改写' })
+
+      try {
+        const result = await revisePrompt({
+          prompt: target.prompt,
+          instruction,
+          ratio: target.ratio,
+          referencePaths,
+          contextPaths,
+        })
+        if (seq !== reviseInlineSeq) return
+        const next = (result?.prompt || '').trim()
+        if (!next) throw new Error('模型没有返回改写结果')
+        showReviseInlineResult(next, result)
+      } catch (error) {
+        if (seq !== reviseInlineSeq) return
+        dom.freeRevise.classList.remove('is-loading')
+        dom.freeReviseStatus.textContent = error.message || '改写失败，请稍后重试'
+        showToast(error.message || '改写失败，请稍后重试', true)
+      } finally {
+        if (seq === reviseInlineSeq) {
+          reviseInlineBusy = false
+          reviseInlineBusyHandle?.stop()
+          reviseInlineBusyHandle = null
+          dom.freeReviseRun.disabled = false
+          // 有结果时按钮是「应用」，没结果回到「开始改写」
+          dom.freeReviseRunText.textContent = dom.freeRevise.classList.contains('has-result')
+            ? '应用'
+            : '开始改写'
+        }
+      }
+    }
+
+    /** 应用：先收起面板再写回，输入框这时才可见，高度才算得对 */
+    function applyReviseInline() {
+      const next = dom.freeReviseResultBody.dataset.text || ''
+      if (!next) return
+      const previous = reviseInlineTarget?.previousPrompt ?? dom.freePrompt.value
+      closeReviseInline()
+      applyFreePrompt(next)
+      showToast('提示词已改写', false, {
+        label: '撤销',
+        onClick: () => applyFreePrompt(previous),
       })
     }
 
@@ -6196,6 +6404,54 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       dom.freePromptMaximize.addEventListener('click', () => openFreePromptEditor())
       dom.freePromptOptimize.addEventListener('click', optimizeFreePrompt)
       if (dom.freePromptRevise) dom.freePromptRevise.addEventListener('click', openReviseForFree)
+      if (dom.freeRevise) {
+        dom.freeReviseClose.addEventListener('click', closeReviseInline)
+        dom.freeReviseCancel.addEventListener('click', closeReviseInline)
+        dom.freeRevisePeek.addEventListener('click', () => {
+          setReviseInlineOrigin(dom.freeReviseOrigin.hidden)
+        })
+        dom.freeReviseRun.addEventListener('click', () => {
+          if (dom.freeRevise.classList.contains('has-result')) applyReviseInline()
+          else void runReviseInline()
+        })
+        dom.freeReviseAgain.addEventListener('click', () => {
+          dom.freeRevise.classList.remove('has-result')
+          dom.freeReviseResult.hidden = true
+          dom.freeReviseAgain.hidden = true
+          dom.freeReviseRunText.textContent = '开始改写'
+          dom.freeReviseStatus.textContent = ''
+          dom.freeReviseInstruction.focus()
+        })
+        dom.freeReviseUseRefs.addEventListener('click', () => {
+          if (!reviseInlineTarget) return
+          reviseInlineTarget.useRefs = !reviseInlineTarget.useRefs
+          dom.freeReviseUseRefs.classList.toggle('is-on', reviseInlineTarget.useRefs)
+        })
+        dom.freeReviseUseResult.addEventListener('click', () => {
+          if (!reviseInlineTarget) return
+          reviseInlineTarget.useResult = !reviseInlineTarget.useResult
+          dom.freeReviseUseResult.classList.toggle('is-on', reviseInlineTarget.useResult)
+        })
+        dom.freeRevisePresets.addEventListener('click', event => {
+          const preset = event.target.closest('[data-preset]')
+          if (!preset) return
+          dom.freeReviseInstruction.value = preset.dataset.preset
+          dom.freeReviseInstruction.focus()
+        })
+        // Ctrl / Cmd + Enter 直接开始改写；Esc 收起面板
+        dom.freeReviseInstruction.addEventListener('keydown', event => {
+          if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault()
+            void runReviseInline()
+          }
+        })
+        dom.freeRevise.addEventListener('keydown', event => {
+          if (event.key === 'Escape') {
+            event.stopPropagation()
+            closeReviseInline()
+          }
+        })
+      }
 
       /* ===== 自由创作参考图：粘贴 / 拖入追加（可多张），点图看大图，右上角删除 ===== */
       const freeShell = dom.freePromptShell
