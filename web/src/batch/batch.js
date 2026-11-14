@@ -4835,17 +4835,21 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         // 浮起的却是这一张，红叉和浮起的图对不上。
         const hit = document.elementFromPoint(x, y)
         const under = hit && hit.closest ? hit.closest('.free-ref') : null
+        // 指针落在输入框、工具条这些「在 composer 里但不在卡片上」的地方：
+        // 参考图下半截本来就藏在输入条后面，那块位置不该算停在这张图上，
+        // 否则鼠标只是在读提示词，参考图就浮起来了。
+        const overComposer = Boolean(hit && !under && root.contains(hit))
 
         // 第二步：落在某张卡的可见范围内 → 抬起它。
         let picked = null
         if (under && items.some(item => item.card === under)) {
           picked = under
         }
-        if (!picked) {
+        if (!picked && !overComposer) {
           const lifted = items.find(item => item.raised && inLiftedBox(item.lifted, x, y))
           if (lifted) picked = lifted.card
         }
-        if (!picked) {
+        if (!picked && !overComposer) {
           const resting = items.find(item => !item.raised && inBox(item.rest, x, y))
           if (resting) picked = resting.card
         }
@@ -4858,8 +4862,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         }
 
         // 第三步：都没落上，但指针在已抬起卡片的正下方立柱里 → 保持它抬起，
-        // 免得鼠标从图片往下走的途中卡片就塌回去。
-        if (!picked) {
+        // 免得鼠标从图片往下走的途中卡片就塌回去。落到输入框上就不算。
+        if (!picked && !overComposer) {
           const sticky = items.find(
             item =>
               item.raised &&
@@ -4873,7 +4877,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
         // 第四步：刚掉下去的卡片，指针又回到它抬起时的那片范围里 → 再叫起来。
         // 抬起的卡片上半截悬在半空，掉下去以后那片位置谁也不属于，是块死区。
-        if (!picked && lastRaisedCard) {
+        if (!picked && !overComposer && lastRaisedCard) {
           const back = items.find(
             item => item.card === lastRaisedCard && inLiftedBox(item.lifted, x, y),
           )
