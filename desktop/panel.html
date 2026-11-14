@@ -2205,9 +2205,44 @@
 
   /* 请求记录：每条都能点开看详情 */
   .rt-log-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); }
-  .rt-log-controls .input { flex: 1 1 180px; min-width: 160px; }
-  .rt-retention { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-soft); }
-  .rt-retention input { width: 64px; padding: 4px 6px; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+  .rt-log-controls .select { height: 30px; border-radius: 999px; }
+  /* 搜索框：圆角、内嵌放大镜、聚焦时描边发亮 */
+  .rt-search { position: relative; display: flex; align-items: center; flex: 1 1 220px; min-width: 170px; }
+  .rt-search svg { position: absolute; left: 11px; width: 14px; height: 14px; color: var(--ink-faint); pointer-events: none; }
+  .rt-search input {
+    width: 100%;
+    height: 30px;
+    padding: 0 12px 0 31px;
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 3%, transparent);
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+  }
+  .rt-search input::placeholder { color: var(--ink-faint); }
+  .rt-search input:hover { border-color: color-mix(in srgb, var(--ink) 20%, transparent); }
+  .rt-search input:focus {
+    outline: none;
+    border-color: var(--moss);
+    background: var(--surface-raised);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--moss) 16%, transparent);
+  }
+  .rt-search input::-webkit-search-cancel-button { cursor: pointer; }
+  .rt-retention { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--line-soft); border-radius: 999px; font-size: 11.5px; color: var(--ink-soft); }
+  .rt-retention input {
+    width: 42px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+  .rt-retention input:focus { outline: none; }
+  .rt-retention:focus-within { border-color: var(--moss); box-shadow: 0 0 0 3px color-mix(in srgb, var(--moss) 16%, transparent); }
   .rt-log-table .rt-table-head,
   .rt-log-table .rt-table-row { grid-template-columns: 96px minmax(0, 96px) 78px minmax(0, 1fr) 88px 56px 56px; }
   .rt-log-table .rt-table-row { cursor: pointer; transition: background 120ms ease; }
@@ -2221,7 +2256,10 @@
   .rt-drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(600px, 94vw); display: flex; flex-direction: column; background: var(--surface-raised); box-shadow: -12px 0 44px rgba(20, 26, 22, 0.22); }
   .rt-drawer-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line-soft); }
   .rt-drawer-panel > header h3 { margin: 0; font-size: 14px; }
-  .rt-drawer-body { padding: 16px 18px 28px; overflow: auto; display: grid; gap: 18px; }
+  .rt-drawer-body { padding: 16px 18px 28px; overflow: auto; display: grid; gap: 18px; overscroll-behavior: contain; }
+  /* 抽屉打开时页面本身不滚：否则滚轮在抽屉里滚动，背后的监控页跟着动 */
+  html.rt-drawer-open,
+  html.rt-drawer-open body { overflow: hidden; }
   .rt-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px; }
   .rt-detail-item { font-size: 11px; color: var(--ink-faint); }
   .rt-detail-item b { display: block; margin-top: 2px; color: var(--ink); font-size: 12px; font-weight: 600; word-break: break-all; }
@@ -2455,9 +2493,13 @@
               <option value="prompt-optimize">提示词优化</option>
               <option value="prompt-revise">提示词改写</option>
             </select>
-            <input id="rt-log-search" class="input" type="search" placeholder="搜提示词 / 用户 / 模型 / 请求号" />
+            <label class="rt-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5" /><path d="M20 20l-3.6-3.6" />
+              </svg>
+              <input id="rt-log-search" type="search" placeholder="搜提示词 / 用户 / 模型 / 请求号" autocomplete="off" spellcheck="false" />
+            </label>
             <label class="rt-retention">保留 <input id="rt-log-retention" type="number" min="1" max="365" /> 天</label>
-            <button class="button mini" type="button" id="rt-log-save">保存</button>
             <button class="button mini" type="button" id="rt-log-clear">清空</button>
             <button class="button mini" type="button" id="rt-log-refresh">刷新</button>
           </div>
@@ -2893,7 +2935,6 @@
     rtLogKind: $('rt-log-kind'),
     rtLogSearch: $('rt-log-search'),
     rtLogRetention: $('rt-log-retention'),
-    rtLogSave: $('rt-log-save'),
     rtLogClear: $('rt-log-clear'),
     rtLogRefresh: $('rt-log-refresh'),
     rtDrawer: $('rt-drawer'),
@@ -5263,9 +5304,11 @@
         searchTimer = window.setTimeout(() => void loadRequestLog(), 320)
       })
     }
-    if (dom.rtLogSave) {
-      dom.rtLogSave.addEventListener('click', async () => {
-        const days = Number(dom.rtLogRetention && dom.rtLogRetention.value)
+    if (dom.rtLogRetention) {
+      // 没有保存按钮：改完天数（失焦或回车）自动存
+      let retentionTimer = 0
+      const saveRetention = async () => {
+        const days = Number(dom.rtLogRetention.value)
         if (!Number.isFinite(days) || days < 1 || days > 365) {
           flash('保留天数需要在 1 到 365 之间', 'error')
           return
@@ -5277,6 +5320,18 @@
         }
         flash(`已设为保留 ${days} 天，更早的记录已清理`)
         void loadRequestLog()
+      }
+      const scheduleRetentionSave = () => {
+        window.clearTimeout(retentionTimer)
+        retentionTimer = window.setTimeout(() => void saveRetention(), 420)
+      }
+      dom.rtLogRetention.addEventListener('change', scheduleRetentionSave)
+      dom.rtLogRetention.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          window.clearTimeout(retentionTimer)
+          void saveRetention()
+        }
       })
     }
     if (dom.rtLogClear) {
@@ -5675,7 +5730,16 @@
   }
 
   function rtFileUrl(path) {
-    const base = String(state.clientUrl || '').replace(/\/+$/, '')
+    // clientUrl 是 http://127.0.0.1:8787/batch.html 这种完整页面地址，
+    // 只能取 origin，否则拼出来是 …/batch.html/api/files/… 打不开图片
+    const raw = String(state.clientUrl || state.lanUrl || '')
+    let base = ''
+    try {
+      base = new URL(raw).origin
+    } catch {
+      base = ''
+    }
+    if (!base && state.port) base = `http://127.0.0.1:${state.port}`
     const encoded = String(path || '').split('/').map(encodeURIComponent).join('/')
     return `${base}/api/files/${encoded}`
   }
@@ -5760,6 +5824,7 @@
 
   function rtDrawerHide() {
     if (dom.rtDrawer) dom.rtDrawer.hidden = true
+    document.documentElement.classList.remove('rt-drawer-open')
   }
 
   function rtDetailGrid(pairs) {
@@ -5825,6 +5890,7 @@
     dom.rtDrawerBody.innerHTML = parts.join('')
     if (dom.rtDrawerTitle) dom.rtDrawerTitle.textContent = `${kindLabel} · ${failed ? '失败' : '成功'}`
     dom.rtDrawer.hidden = false
+    document.documentElement.classList.add('rt-drawer-open')
   }
 
   async function openRequestDetail(id) {
