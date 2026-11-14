@@ -10,6 +10,7 @@ import { appRoot, dataRoot } from './paths.mjs'
 import { loadConfig, saveConfig } from './config.mjs'
 import { desktopToken, initServer, restartServer, serverState, startServer, stopServer, waitForServer } from './server.mjs'
 import { checkForUpdate, downloadInstaller, findReadyInstaller, launchInstaller } from './updater.mjs'
+import { runHousekeeping } from './housekeeping.mjs'
 
 /* ===== 基础路径：数据一律写在数据根，绝不碰安装目录 ===== */
 const ROOT = appRoot()
@@ -43,6 +44,9 @@ function log(message) {
   try { appendFileSync(MAIN_LOG, line) } catch {}
   if (!app.isPackaged) process.stdout.write(line)
 }
+
+// 版本变化后的第一次启动：清掉上一版安装包、下载缓存与 Chromium 缓存
+runHousekeeping(DATA, log)
 
 initServer({ root: ROOT, data: DATA, logDir: LOG_DIR, config, log })
 

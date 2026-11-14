@@ -1,6 +1,6 @@
 {
   "name": "mpimage",
-  "version": "1.0.59",
+  "version": "1.0.60",
   "private": true,
   "type": "module",
   "description": "画境生图：前后端分离的单张工作台与资产批量工作台",
@@ -15,7 +15,7 @@
     "start": "npm --prefix server run start",
     "desktop:dev": "electron .",
     "desktop:prepare": "npm run build && npm run build:server",
-    "desktop:build": "npm run desktop:prepare && electron-builder --win nsis portable",
+    "desktop:build": "npm run desktop:prepare && electron-builder --win nsis portable && node scripts/prune-release.mjs",
     "desktop:pack": "npm run desktop:prepare && electron-builder --win --dir"
   },
   "devDependencies": {
@@ -80,7 +80,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "画境",
-      "artifactName": "huajing-setup-${version}.exe"
+      "artifactName": "huajing-setup-${version}.exe",
+      "include": "build/installer.nsh"
     },
     "portable": {
       "artifactName": "huajing-portable-${version}.exe"
