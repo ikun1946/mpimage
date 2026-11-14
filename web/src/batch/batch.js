@@ -4706,7 +4706,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       const RAISE_Y = 84 // 与 free.css 里 .free-ref.is-raised 的 translateY 一致
       const RAISE_S = 1.3 // 与 free.css 里的 scale 一致
       const EDGE_GRACE = 6 // 判定边缘的宽容，避免刚好擦边就抖
-      const CORNER_GRACE = 10 // 按钮命中区向外多留一点，鼠标贴过去也算
+      const CORNER_GRACE = 8 // 按钮命中区向外多留一点，鼠标贴过去也算
 
       function resetCards(cards) {
         for (const card of cards) {
@@ -4732,7 +4732,12 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           const sin = Math.abs(Math.sin(radians))
           const halfW = (width / 2) * cos + (height / 2) * sin
           const halfH = (width / 2) * sin + (height / 2) * cos
-          const raisedCy = cy - RAISE_Y
+          // .is-raised 的 transform 是 rotate(θ) translateY(-84px) scale(1.3)：
+          // 先缩放、再平移、最后旋转，于是 -84px 的位移会被旋转带偏 84·sinθ。
+          // 之前只算了竖直位移，正倾斜的卡片抬起后右边缘会漏判 5~10px，
+          // 鼠标一贴到右上角，卡片就判定不中自己、塌回去了。
+          const raisedCx = cx + RAISE_Y * Math.sin(radians)
+          const raisedCy = cy - RAISE_Y * Math.abs(Math.cos(radians))
           return {
             card,
             cx,
@@ -4746,8 +4751,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
             },
             /** 抬起放大后的包围盒 */
             lifted: {
-              left: cx - halfW * RAISE_S,
-              right: cx + halfW * RAISE_S,
+              left: raisedCx - halfW * RAISE_S,
+              right: raisedCx + halfW * RAISE_S,
               top: raisedCy - halfH * RAISE_S,
               bottom: raisedCy + halfH * RAISE_S,
             },
@@ -4782,7 +4787,11 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         )
       }
 
-      root.addEventListener('mousemove', event => {
+      // 监听挂在 document 上而不是 root 上：抬起的卡片会伸到输入框上方，
+      // 那块常常压着别的元素，事件落在它们身上就到不了 root，
+      // 鼠标明明还在图片里，卡片却塌回去了。改成全局监听 + 纯几何判定，
+      // 谁画在最上面都不影响。
+      document.addEventListener('mousemove', event => {
         const stack = root.querySelector('.free-ref-stack')
         if (!stack || stack.hidden) return
         const cards = [...stack.querySelectorAll('.free-ref')]
@@ -4837,8 +4846,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         }
       })
 
-      // 指针离开参考图区域后，把抬起的卡片放回去
-      root.addEventListener('mouseleave', () => {
+      // 指针离开窗口后，把抬起的卡片放回去（mouseleave 不冒泡，直接挂在 document 上）
+      document.addEventListener('mouseleave', () => {
         resetCards([...root.querySelectorAll('.free-ref')])
       })
     }

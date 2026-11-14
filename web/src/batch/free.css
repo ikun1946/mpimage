@@ -150,18 +150,17 @@
   object-fit: cover;
 }
 
-/* 删除按钮：落在参考图片的右上角，紧贴图片边缘。
-   之前它伸到卡片外面（top:-9px），既被相邻卡片与输入条压住，鼠标瞄准了也点不到；
-   挪到图片右上角内侧后始终可见可点，靠透明度区分常态与悬停。
+/* 删除按钮：压在参考图片的右上角尖上，18px，够小不挡画面。
+   之前 26px 又内缩 5px，看着像浮在图片中间；现在贴边，鼠标推到右上角才浮现。
    误删可以用提示条里的「撤销」找回。 */
 .free-ref-delete {
   position: absolute;
-  top: 5px;
-  right: 5px;
+  top: 2px;
+  right: 2px;
   z-index: 3;
   display: grid;
-  width: 26px;
-  height: 26px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.6);
@@ -179,16 +178,16 @@
 }
 
 .free-ref-delete svg {
-  width: 12px;
-  height: 12px;
+  width: 9px;
+  height: 9px;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
 }
 
-/* 视觉 26px，外面再圈一圈透明区域把可点范围扩到 40px，鼠标差几像素也能删掉 */
+/* 视觉 18px，外面再圈一圈透明区域把可点范围扩到 34px，鼠标差几像素也能删掉 */
 .free-ref-delete::after {
   content: '';
   position: absolute;
-  inset: -7px;
+  inset: -8px;
   border-radius: 50%;
 }
 
