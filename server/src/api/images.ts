@@ -1,12 +1,23 @@
 import type { FastifyInstance } from 'fastify'
 import { randomUUID } from 'node:crypto'
-import { config, findImageModel, findRatio } from '../app/platform/config.js'
+import {
+  config,
+  findImageModel,
+  findImageResolution,
+  findRatio,
+  resolutionTargetSize,
+} from '../app/platform/config.js'
 import { ApiError } from '../app/platform/errors.js'
 import type { SerialGate } from '../app/platform/serial-gate.js'
 import { auditFailure, auditLog } from '../app/platform/audit.js'
 import { buildFileUrl } from '../utils/url.js'
-import { requestImage, requestImageEdit } from '../app/products/images/magpie.js'
-import { listClientImageModels, resolveCustomProviderModel } from '../app/control/client-models.js'
+import { requestImage, requestImageEdit, type MagpieOptions } from '../app/products/images/magpie.js'
+import {
+  listClientImageModels,
+  resolveComfyWorkflow,
+  resolveCustomProviderModel,
+} from '../app/control/client-models.js'
+import { comfyGate, requestComfyImage } from '../app/products/images/comfyui.js'
 import type { RealtimeMonitor } from '../services/realtime-monitor.js'
 import { detectImageType, readImageSize } from '../app/products/images/imaging.js'
 import { generateImageTitle, titleForImage } from '../app/products/images/image-title.js'
@@ -72,6 +83,8 @@ interface GenerateBody {
   titlePrompt?: unknown
   /** 一次生成的张数，1-4，默认 1 */
   count?: unknown
+  /** 清晰度档位：auto / 1K / 2K / 4K；不传按服务端默认（auto） */
+  resolution?: unknown
 }
 
 /** 自由创作一次最多生成的张数 */
@@ -192,6 +205,15 @@ export function registerImageRoutes(
     const ratio = findRatio(body.ratio)
     if (!ratio) {
       throw new ApiError('RATIO_INVALID', '请选择有效的图片比例')
+    }
+
+    // 清晰度只认 1K/2K/4K/auto；auto 或留空都不改变上游默认尺寸
+    const resolution =
+      body.resolution === undefined || body.resolution === null || body.resolution === ''
+        ? config.defaultImageResolution
+        : findImageResolution(body.resolution)?.id
+    if (!resolution) {
+      throw new ApiError('RESOLUTION_INVALID', '请选择有效的图片分辨率（自动 / 1K / 2K / 4K）')
     }
 
     // 客户端只能选服务端开启的模型（含自定义供应商）；不传就跟随服务端当前配置
@@ -324,6 +346,7 @@ export function registerImageRoutes(
       category,
       name: assetName,
       ratio: ratio.id,
+      resolution,
       references: referencePaths.length,
       promptLength: prompt.length,
       promptPreview: prompt.slice(0, 160),
@@ -360,20 +383,25 @@ export function registerImageRoutes(
     const references = await loadReferenceImages(referencePaths)
     deps.monitor?.metric(callId, 'reference_load_ms', Date.now() - referenceLoadStartedAt)
     // 每次生图都重读上游地址：后台改完立即生效，无需重启服务
-    // 自定义供应商：换成它自己的地址、密钥与上游模型名；否则走 Magpie
+    // ComfyUI 工作流 / 自定义供应商 / 内置 Magpie 走三条独立分支
     const customModel = resolveCustomProviderModel(deps.settings, selectedModel)
+    const comfyModel = resolveComfyWorkflow(deps.settings, selectedModel)
     deps.monitor?.annotate(callId, {
-      branch: customModel ? 'custom' : 'magpie',
+      branch: comfyModel ? 'comfyui' : customModel ? 'custom' : 'magpie',
     })
-    let upstreamOptions
-    if (customModel) {
+    // ComfyUI 由我们把档位换算成宽高写进工作流；Magpie 直接把档位交给上游。
+    // 自定义供应商的接口能力未知，不额外塞 resolution，避免打断原有调用。
+    const comfySize = resolutionTargetSize(ratio, resolution)
+    const magpieResolution = !customModel && resolution !== 'auto' ? resolution : undefined
+    let upstreamOptions: MagpieOptions | undefined
+    if (!comfyModel && customModel) {
       upstreamOptions = {
         baseUrl: customModel.provider.baseUrl,
         model: customModel.model.id,
         apiKey: customModel.provider.apiKey || undefined,
         timeoutMs: promptTimeoutMs,
       }
-    } else {
+    } else if (!comfyModel) {
       const configReadStartedAt = Date.now()
       const baseUrl = await deps.settings.getBaseUrl()
       deps.monitor?.metric(callId, 'config_read_ms', Date.now() - configReadStartedAt)
@@ -395,19 +423,42 @@ export function registerImageRoutes(
         const index = imageIndex + 1
         const imageStartedAt = Date.now()
         try {
-          const upstream = await deps.gate.run(async () => {
+          // ComfyUI 本机显存有限，使用独立 1 并发闸门；Magpie 仍走可调并发闸门
+          const activeGate = comfyModel ? comfyGate : deps.gate
+          const upstream = await activeGate.run(async () => {
             deps.monitor?.imageStart(callId, index)
             deps.monitor?.imageMetric(callId, index, 'queue_wait_ms', Date.now() - queuedAt)
             deps.monitor?.stage(callId, 'generating')
 
+            if (comfyModel) {
+              return await requestComfyImage(
+                {
+                  baseUrl: comfyModel.baseUrl,
+                  model: selectedModel,
+                  workflow: comfyModel.workflow,
+                  // ComfyUI 首次加载模型、低显存交换都比文本网关慢，用总的生图超时
+                  timeoutMs: Math.max(promptTimeoutMs, config.comfyTimeoutMs),
+                },
+                {
+                  prompt,
+                  ratioHint: ratio.promptHint,
+                  width: comfySize.width,
+                  height: comfySize.height,
+                  references,
+                },
+              )
+            }
+
+            if (!upstreamOptions) throw new Error('上游配置缺失')
+            const resolutionParams = { ratio: ratio.id, resolution: magpieResolution }
             return references.length
               ? await requestImageEdit(
                 upstreamOptions,
-                { prompt, ratioHint: ratio.promptHint, images: references },
+                { prompt, ratioHint: ratio.promptHint, images: references, ...resolutionParams },
               )
               : await requestImage(
                 upstreamOptions,
-                { prompt, ratioHint: ratio.promptHint },
+                { prompt, ratioHint: ratio.promptHint, ...resolutionParams },
               )
           })
 
@@ -608,9 +659,13 @@ export function registerImageRoutes(
       params: {
         ratio: ratio.id,
         ratioLabel: ratio.label,
+        resolution,
         imageCount,
         referenceCount: referencePaths.length,
         outputName: displayName,
+        ...(comfyModel
+          ? { workflowId: comfyModel.workflow.id, workflowLabel: comfyModel.workflow.label }
+          : {}),
       },
       timings: {
         total_ms: Date.now() - startedAt,
@@ -653,6 +708,7 @@ export function registerImageRoutes(
         params: {
           ratio: ratio.id,
           ratioLabel: ratio.label,
+          resolution,
           imageCount,
           referenceCount: referencePaths.length,
         },
@@ -669,6 +725,7 @@ export function registerImageRoutes(
         category,
         name: assetName,
         ratio: ratio.id,
+        resolution,
         references: referencePaths.length,
         promptLength: prompt.length,
         promptPreview: prompt.slice(0, 160),

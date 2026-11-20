@@ -168,8 +168,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       freeBusy: false,
       freeImageUrl: '',
       freeImageExtension: 'png',
-      // 自由创作的画面比例、生图模型与提示词草稿，刷新后保持
+      // 自由创作的画面比例、分辨率、生图模型与提示词草稿，刷新后保持
       freeRatio: '1:1',
+      freeResolution: 'auto',
       freeLayout: 'stack',
       freeResultView: 'collage',
       freeModel: '',
@@ -306,6 +307,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       freePrompt: document.querySelector('#free-prompt'),
       freeCount: document.querySelector('#free-count'),
       freeRatio: document.querySelector('#free-ratio'),
+      freeResolution: document.querySelector('#free-resolution'),
       freeLayout: document.querySelector('.free-layout'),
       freeLayoutSwitch: document.querySelector('#free-layout-switch'),
       settingsMenuButton: document.querySelector('#settings-menu-button'),
@@ -447,6 +449,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         // 恢复自由创作的画面比例选择（配合服务端配置渲染后回填）
         if (typeof saved.freeRatio === 'string' && saved.freeRatio) {
           state.freeRatio = saved.freeRatio
+        }
+        if (typeof saved.freeResolution === 'string') {
+          state.freeResolution = normalizeResolution(saved.freeResolution)
         }
         if (saved.freeLayout === 'split' || saved.freeLayout === 'stack') {
           state.freeLayout = saved.freeLayout
@@ -627,6 +632,13 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       return result
     }
 
+    const RESOLUTION_VALUES = ['auto', '1K', '2K', '4K']
+
+    function normalizeResolution(value) {
+      const key = typeof value === 'string' ? value.trim().toUpperCase() : ''
+      return RESOLUTION_VALUES.includes(key) ? key : 'auto'
+    }
+
     function normalizeBulkParams(saved) {
       const result = { role: {}, scene: {}, prop: {} }
       if (!saved || typeof saved !== 'object') return result
@@ -635,6 +647,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         if (item && typeof item === 'object') {
           result[type] = {
             ratio: typeof item.ratio === 'string' ? item.ratio : '',
+            resolution: normalizeResolution(item.resolution),
             styleId: typeof item.styleId === 'string' ? item.styleId : '',
             model: typeof item.model === 'string' ? item.model : '',
           }
@@ -716,6 +729,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           concurrency: state.concurrency,
           concurrencyCustom: state.concurrencyCustom,
           freeRatio: state.freeRatio,
+          freeResolution: state.freeResolution,
           freeLayout: state.freeLayout,
           freeResultView: state.freeResultView,
           freeModel: state.freeModel,
@@ -1851,24 +1865,91 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       saveButton.textContent = state.styleDirty ? '保存风格（有未保存修改）' : '保存风格'
     }
 
-    /** 批量工具栏的生图模型下拉；选中的一定是具体模型，空值时自动落到默认模型 */
+    /** 服务端下发的全局档位标签；具体模型能显示哪些由 resolutionTiers 决定 */
+    function allResolutionChoices() {
+      const list = Array.isArray(serverConfig?.resolutions) ? serverConfig.resolutions : []
+      const options = list
+        .filter(item => item && typeof item.id === 'string')
+        .map(item => ({ id: normalizeResolution(item.id), label: String(item.label || item.id) }))
+      return options.length
+        ? options
+        : [
+          { id: 'auto', label: '自动' },
+          { id: '1K', label: '1K' },
+          { id: '2K', label: '2K' },
+          { id: '4K', label: '4K' },
+        ]
+    }
+
+    /** 某个模型可用的档位；服务端还没下发该字段时退回全部，兼容旧后端 */
+    function resolutionChoices(modelId) {
+      const { options, defaultId } = imageModelChoices()
+      const id = options.some(option => option.id === modelId) ? modelId : defaultId
+      const model = options.find(option => option.id === id)
+      const tiers = Array.isArray(model?.resolutionTiers) && model.resolutionTiers.length
+        ? model.resolutionTiers.map(normalizeResolution)
+        : RESOLUTION_VALUES
+      const allowed = new Set(tiers)
+      return allResolutionChoices().filter(item => allowed.has(item.id))
+    }
+
+    function resolutionOptions(selected, modelId) {
+      const choices = resolutionChoices(modelId)
+      const wanted = normalizeResolution(selected)
+      const current = choices.some(item => item.id === wanted) ? wanted : (choices[0]?.id || 'auto')
+      return choices
+        .map(item => `<option value="${escapeAttr(item.id)}" ${item.id === current ? 'selected' : ''}>${escapeHtml(item.label)}</option>`)
+        .join('')
+    }
+
+    /** 分辨率控件只在该模型有多个档位时显示；只有 auto 的模型不摆一个无效下拉 */
+    function setResolutionFieldVisible(select, visible) {
+      if (!select) return
+      const field = select.closest('.meta-field, .toolbar-field')
+      if (!field) return
+      field.hidden = !visible
+      const dot = field.previousElementSibling
+      if (dot?.classList.contains('meta-dot')) dot.hidden = !visible
+    }
+
+    /** 自由创作的分辨率下拉：随当前模型收敛，原生 select 仍是状态源 */
+    function renderResolutionSelects() {
+      document.querySelectorAll('[data-resolution-select]').forEach(select => {
+        const modelId = select === dom.freeResolution ? state.freeModel : ''
+        const current = select === dom.freeResolution ? state.freeResolution : select.value
+        const choices = resolutionChoices(modelId)
+        const wanted = normalizeResolution(current)
+        const next = choices.some(item => item.id === wanted) ? wanted : (choices[0]?.id || 'auto')
+        select.innerHTML = resolutionOptions(next, modelId)
+        select.value = next
+        if (select === dom.freeResolution) state.freeResolution = next
+        setResolutionFieldVisible(select, choices.length > 1)
+        refreshMenuSelect(select)
+      })
+    }
+
     function imageModelOptions(selected) {
       const { options, defaultId } = imageModelChoices()
       if (!options.length) return '<option value="">没有可用的生图模型</option>'
       const next = options.some(option => option.id === selected) ? selected : defaultId
       return options
-        .map(option => `<option value="${escapeAttr(option.id)}" ${option.id === next ? 'selected' : ''}>${escapeHtml(option.label)}</option>`)
+        .map(option => {
+          const description = option.description || ''
+          return `<option value="${escapeAttr(option.id)}" ${option.id === next ? 'selected' : ''} data-description="${escapeAttr(description)}" title="${escapeAttr(description)}">${escapeHtml(option.label)}</option>`
+        })
         .join('')
     }
 
     function renderAssetPage(type) {
       const meta = TYPE_META[type]
       const panel = dom.panels[type]
+      const bulkModel = state.bulkParams[type]?.model || ''
+      const showResolution = resolutionChoices(bulkModel).length > 1
       panel.innerHTML = `
         <div class="workspace-head">
           <div>
             <h2>${meta.label}</h2>
-            <p><span data-page-count="${type}"></span> 项资产 · 当前批量比例 ${state.bulkParams[type]?.ratio || meta.defaultRatio}，每行可单独调整</p>
+            <p><span data-page-count="${type}"></span> 项资产 · 当前批量比例 ${state.bulkParams[type]?.ratio || meta.defaultRatio}${normalizeResolution(state.bulkParams[type]?.resolution) !== 'auto' ? ` · ${normalizeResolution(state.bulkParams[type]?.resolution)}` : ''}，每行可单独调整</p>
           </div>
           <div class="legend">
             <span class="badge queued">排队中</span>
@@ -1905,6 +1986,12 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
                 <span>模型</span>
                 <select class="select" id="bulk-model-${type}" aria-label="批量生图模型">
                   ${imageModelOptions(state.bulkParams[type]?.model || '')}
+                </select>
+              </label>
+              <label class="toolbar-field toolbar-field-resolution" ${showResolution ? '' : 'hidden'}>
+                <span>分辨率</span>
+                <select class="select" id="bulk-resolution-${type}" aria-label="批量分辨率">
+                  ${resolutionOptions(state.bulkParams[type]?.resolution || 'auto', bulkModel)}
                 </select>
               </label>
               <label class="toolbar-field toolbar-field-style">
@@ -1950,6 +2037,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           <div class="table-footer" id="asset-pagination-${type}"></div>
         </div>
       `
+
+      const bulkModelSelect = panel.querySelector(`#bulk-model-${type}`)
+      if (bulkModelSelect) enhanceMenuSelect(bulkModelSelect)
 
       const pageCheck = panel.querySelector(`[data-page-check="${type}"]`)
       pageCheck?.addEventListener('change', () => {
@@ -2362,10 +2452,17 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       const ratio = document.querySelector(`#bulk-ratio-${type}`)?.value
       const styleId = document.querySelector(`#bulk-style-${type}`)?.value
       const model = document.querySelector(`#bulk-model-${type}`)?.value
+      const resolution = normalizeResolution(document.querySelector(`#bulk-resolution-${type}`)?.value)
       if (!ratio) return
 
       // 记住工具栏当前选择，刷新后仍然生效
-      state.bulkParams[type] = { ...state.bulkParams[type], ratio, styleId: styleId || '', model: model || '' }
+      state.bulkParams[type] = {
+        ...state.bulkParams[type],
+        ratio,
+        resolution,
+        styleId: styleId || '',
+        model: model || '',
+      }
 
       let changed = 0
       state.assets.forEach(asset => {
@@ -2376,7 +2473,22 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       })
       persistSoon()
       renderTable(type)
-      showToast(`已为 ${changed} 项资产应用 ${ratio}${styleId ? ' 与所选风格' : ''}`)
+      showToast(`已为 ${changed} 项资产应用 ${ratio}${resolution !== 'auto' ? ` · ${resolution}` : ''}${styleId ? ' 与所选风格' : ''}`)
+    }
+
+    /** 批量模型切换后，把分辨率下拉收敛到该模型支持的档位 */
+    function syncBulkResolution(type, modelId) {
+      const choices = resolutionChoices(modelId)
+      const current = normalizeResolution(state.bulkParams[type]?.resolution)
+      const next = choices.some(item => item.id === current) ? current : (choices[0]?.id || 'auto')
+      state.bulkParams[type] = { ...state.bulkParams[type], resolution: next }
+      const select = document.querySelector(`#bulk-resolution-${type}`)
+      if (select) {
+        select.innerHTML = resolutionOptions(next, modelId)
+        select.value = next
+        setResolutionFieldVisible(select, choices.length > 1)
+      }
+      return next
     }
 
     /** 更新工具栏上方的「当前批量比例」说明。 */
@@ -2387,7 +2499,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       if (!summary) return
       const count = panel.querySelector('[data-page-count]')
       const ratio = state.bulkParams[type]?.ratio || TYPE_META[type].defaultRatio
-      summary.textContent = `${count ? count.textContent : countType(type)} 项资产 · 当前批量比例 ${ratio}，每行可单独调整`
+      const resolution = normalizeResolution(state.bulkParams[type]?.resolution)
+      summary.textContent = `${count ? count.textContent : countType(type)} 项资产 · 当前批量比例 ${ratio}${resolution !== 'auto' ? ` · ${resolution}` : ''}，每行可单独调整`
     }
 
     function generateWholeType(type) {
@@ -2545,8 +2658,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         const current = select === dom.freeRatio ? state.freeRatio : select.value
         select.innerHTML = ratioOptions(current, serverConfig?.ratios)
       })
-      // 模型和比例总是跟着服务端配置一起刷新
+      // 模型、比例与分辨率总是跟着服务端配置一起刷新
       renderModelSelects()
+      renderResolutionSelects()
       refreshMenuSelect(dom.freeRatio)
     }
 
@@ -2558,6 +2672,10 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       const options = models.map(model => ({
         id: model.id,
         label: model.label || model.id,
+        description: typeof model.description === 'string' ? model.description : '',
+        resolutionTiers: Array.isArray(model.resolutionTiers)
+          ? model.resolutionTiers.map(normalizeResolution)
+          : [],
       }))
       // 默认模型直接选中它本身，不再额外造一条「跟随服务端默认」，
       // 否则同一个模型会在下拉里出现两次
@@ -2576,7 +2694,10 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       document.querySelectorAll('[data-model-select]').forEach(select => {
         const current = select === dom.freeModel ? state.freeModel : select.value
         select.innerHTML = options
-          .map(option => `<option value="${escapeAttr(option.id)}">${escapeHtml(option.label)}</option>`)
+          .map(option => {
+            const description = option.description || ''
+            return `<option value="${escapeAttr(option.id)}" data-description="${escapeAttr(description)}" title="${escapeAttr(description)}">${escapeHtml(option.label)}</option>`
+          })
           .join('') || '<option value="">没有可用的生图模型</option>'
         const valid = options.some(option => option.id === current)
         const next = valid ? current : defaultId
@@ -2906,6 +3027,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
             const result = await generateImage({
               prompt: composeGenerationPrompt(asset),
               ratio: asset.ratio,
+              resolution: normalizeResolution(state.bulkParams[asset.type]?.resolution),
               model: state.bulkParams[asset.type]?.model || undefined,
               category: TYPE_META[asset.type].singular,
               name: asset.name,
@@ -5232,6 +5354,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           // 起名只看用户写的画面描述；风格前缀是给生图模型的指令，不该混进标题
           titlePrompt: typedPrompt,
           ratio: dom.freeRatio.value,
+          resolution: normalizeResolution(dom.freeResolution?.value || state.freeResolution),
           model: dom.freeModel?.value || undefined,
           category: '自由创作',
           name: `自由创作-${timestamp()}`,
@@ -6531,7 +6654,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
         // 参数下拉包成 Claude 风格圆角菜单，原生 select 仍是状态源
         if (dom.freeImageCount) dom.freeImageCount.value = String(state.freeImageCount)
-        ;[dom.freeModel, dom.freeRatio, dom.freeStyle, dom.freeImageCount].forEach(enhanceMenuSelect)
+        ;[dom.freeModel, dom.freeRatio, dom.freeResolution, dom.freeStyle, dom.freeImageCount].forEach(enhanceMenuSelect)
 
         // 窗口变宽/变窄会改变换行，输入条高度跟着重算
         window.addEventListener('pagehide', () => {
@@ -6752,8 +6875,17 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         return
       }
 
+      // 自由创作分辨率：记住选择，刷新后保持
+      if (event.target === dom.freeResolution) {
+        state.freeResolution = normalizeResolution(dom.freeResolution.value)
+        persistSoon()
+        return
+      }
+
       if (event.target === dom.freeModel) {
         state.freeModel = dom.freeModel.value
+        // 换了模型就只保留该模型支持的档位；原档位不支持时自动落到 auto
+        renderResolutionSelects()
         persistSoon()
         return
       }
@@ -6795,6 +6927,19 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       if (bulkModel) {
         const type = bulkModel.id.replace('bulk-model-', '')
         state.bulkParams[type] = { ...state.bulkParams[type], model: bulkModel.value }
+        syncBulkResolution(type, bulkModel.value)
+        refreshBulkSummary(type)
+        persistSoon()
+        return
+      }
+
+      const bulkResolution = event.target.closest('[id^="bulk-resolution-"]')
+      if (bulkResolution) {
+        const type = bulkResolution.id.replace('bulk-resolution-', '')
+        state.bulkParams[type] = {
+          ...state.bulkParams[type],
+          resolution: normalizeResolution(bulkResolution.value),
+        }
         refreshBulkSummary(type)
         persistSoon()
         return

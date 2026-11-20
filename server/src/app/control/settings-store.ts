@@ -7,6 +7,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { config } from '../platform/config.js'
+import { normalizeComfyConfig, type ComfyConfig } from './comfy-config.js'
 
 export interface ProviderModelConfig {
   id: string
@@ -39,12 +40,16 @@ interface SettingsFile {
   modelAliases?: unknown
   /** 非内置模型的客户端可见性：{ [公开模型 id]: false } 表示隐藏 */
   clientModelVisibility?: unknown
+  /** ComfyUI 工作流注册表：地址 + 一组可当生图模型使用的工作流 */
+  comfy?: unknown
 }
 
 export class SettingsStore {
   private readonly file: string
   private cache: SettingsFile = {}
   private pending: Promise<unknown> = Promise.resolve()
+  /** ComfyUI 工作流 JSON 可能很大，读配置时按原始对象缓存归一化结果 */
+  private comfyCache: { raw: unknown; value: ComfyConfig } | null = null
 
   constructor(dataDir: string) {
     this.file = join(dataDir, 'settings.json')
@@ -240,6 +245,19 @@ export class SettingsStore {
 
   async setProviders(providers: ProviderConfig[]): Promise<void> {
     await this.write({ providers })
+  }
+
+  /** ComfyUI 工作流注册表；读盘时逐项容错，坏工作流不会拖垮整个控制台 */
+  getComfyConfig(): ComfyConfig {
+    const raw = this.cache.comfy
+    if (this.comfyCache && this.comfyCache.raw === raw) return this.comfyCache.value
+    const value = normalizeComfyConfig(raw)
+    this.comfyCache = { raw, value }
+    return value
+  }
+
+  async setComfyConfig(value: ComfyConfig): Promise<void> {
+    await this.write({ comfy: value })
   }
 
   /** 服务端可以改客户端看到的模型名；键是模型 id，值是显示名 */

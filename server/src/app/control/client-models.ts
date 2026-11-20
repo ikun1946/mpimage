@@ -10,6 +10,15 @@
  */
 import type { ProviderConfig, ProviderModelConfig, SettingsStore } from './settings-store.js'
 import { ImageModelCatalog } from './image-model-catalog.js'
+import { resolutionTiersForModel } from './image-resolution-capabilities.js'
+import { modelDescription } from './image-model-descriptions.js'
+import type { ImageResolution } from '../platform/config.js'
+import {
+  comfyModelId,
+  findComfyWorkflow,
+  parseComfyModelId,
+  type ComfyWorkflowConfig,
+} from './comfy-config.js'
 
 const imageModelCatalog = new ImageModelCatalog()
 
@@ -18,6 +27,10 @@ export interface ClientImageModel {
   label: string
   /** magpie 或自定义供应商 id */
   provider: string
+  /** 该模型实际可用的清晰度档位；客户端据此过滤下拉 */
+  resolutionTiers: ImageResolution[]
+  /** 模型选择菜单里的悬停介绍 */
+  description: string
 }
 
 const CUSTOM_PREFIX = 'p:'
@@ -56,11 +69,16 @@ export async function listClientImageModels(
 
   const models: ClientImageModel[] = catalog
     .filter(model => enabled.has(model.id))
-    .map(model => ({
-      id: model.id,
-      label: aliases[model.id] || model.label,
-      provider: 'magpie',
-    }))
+    .map(model => {
+      const label = aliases[model.id] || model.label
+      return {
+        id: model.id,
+        label,
+        provider: 'magpie',
+        resolutionTiers: resolutionTiersForModel(model.id),
+        description: modelDescription(model.id, label),
+      }
+    })
 
   for (const provider of settings.getProviders()) {
     if (provider.enabled === false) continue
@@ -68,15 +86,45 @@ export async function listClientImageModels(
       if (model.enabled === false) continue
       const publicId = customModelId(provider.id, model.id)
       if (visibility[publicId] === false) continue
+      const label = aliases[publicId] || model.label || model.id
       models.push({
         id: publicId,
-        label: aliases[publicId] || model.label || model.id,
+        label,
         provider: provider.id,
+        resolutionTiers: resolutionTiersForModel(publicId),
+        description: modelDescription(publicId, label),
       })
     }
   }
 
+  for (const workflow of settings.getComfyConfig().workflows) {
+    if (!workflow.enabled) continue
+    const publicId = comfyModelId(workflow.id)
+    if (visibility[publicId] === false) continue
+    const label = aliases[publicId] || workflow.label || workflow.id
+    models.push({
+      id: publicId,
+      label,
+      provider: 'comfyui',
+      resolutionTiers: resolutionTiersForModel(publicId),
+      description: modelDescription(publicId, label),
+    })
+  }
+
   return { models, magpieCatalogIds, aliases }
+}
+
+/** 客户端传了 comfy:<id> 时，找回 ComfyUI 地址与工作流；找不到返回 null */
+export function resolveComfyWorkflow(
+  settings: SettingsStore,
+  publicId: string,
+): { baseUrl: string; workflow: ComfyWorkflowConfig } | null {
+  const workflowId = parseComfyModelId(publicId)
+  if (!workflowId) return null
+  const config = settings.getComfyConfig()
+  const workflow = findComfyWorkflow(config, publicId)
+  if (!workflow) return null
+  return { baseUrl: config.baseUrl, workflow }
 }
 
 /** 客户端传了自定义模型 ID 时，找回供应商与上游模型；找不到返回 null */

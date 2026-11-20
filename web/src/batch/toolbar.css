@@ -58,6 +58,41 @@
   width: min(190px, 18vw);
 }
 
+.toolbar-field-resolution .select {
+  width: 92px;
+}
+
+/* 批量工具栏的模型下拉也用自定义菜单，才能显示悬停介绍 */
+.toolbar-field-model .menu-select {
+  width: min(190px, 20vw);
+}
+
+.toolbar-field-model .menu-select-trigger {
+  height: 40px;
+  padding: 0 10px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+  background: var(--surface-raised);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.toolbar-field-model .menu-select-trigger:hover {
+  border-color: rgba(54, 84, 69, 0.55);
+  background: var(--surface-raised);
+}
+
+.toolbar-field-model .menu-select-trigger::after {
+  width: 6px;
+  height: 6px;
+  margin-left: 8px;
+  border-right: 1.5px solid var(--ink-faint);
+  border-bottom: 1.5px solid var(--ink-faint);
+  content: "";
+  transform: translateY(-2px) rotate(45deg);
+}
+
 .toolbar-field .select {
   height: 40px;
   background: var(--surface-raised);

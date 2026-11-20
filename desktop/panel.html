@@ -987,6 +987,83 @@
     margin-top: 10px;
   }
 
+  /* ComfyUI 工作流：沿用供应商卡片，工作流 JSON 默认折叠 */
+  .comfy-card .comfy-label {
+    flex: 1;
+    min-width: 0;
+    height: 30px;
+    font-weight: 600;
+  }
+
+  .comfy-card .comfy-stage {
+    margin-top: 8px;
+    border-top: 1px dashed var(--line-soft);
+    padding-top: 8px;
+  }
+
+  .comfy-card summary {
+    color: var(--ink-soft);
+    cursor: pointer;
+    font-size: 12px;
+    user-select: none;
+  }
+
+  .comfy-map-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .comfy-map-grid label {
+    min-width: 0;
+    color: var(--ink-soft);
+    font-size: 12px;
+  }
+
+  .comfy-map-grid input {
+    width: 100%;
+    height: 29px;
+    margin-top: 3px;
+    font-family: Consolas, "SFMono-Regular", monospace;
+    font-size: 11px;
+  }
+
+  .comfy-card .comfy-json {
+    width: 100%;
+    min-height: 110px;
+    max-height: 260px;
+    margin-top: 7px;
+    padding: 8px 9px;
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    background: var(--surface-subtle);
+    color: var(--ink-soft);
+    font-family: Consolas, "SFMono-Regular", monospace;
+    font-size: 10.5px;
+    line-height: 1.55;
+    resize: vertical;
+  }
+
+  .comfy-card .comfy-empty {
+    padding: 14px;
+    color: var(--ink-faint);
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .comfy-run-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .comfy-run-row select {
+    flex: 1;
+    min-width: 180px;
+  }
+
   /* ---------- 徽标 ---------- */
 
   .chip {
@@ -2347,6 +2424,10 @@
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.2 9.8l3.6-3.6"/><path d="M7 4.4l1.1-1.1a2.5 2.5 0 0 1 3.6 3.6L10.6 8"/><path d="M9 11.6l-1.1 1.1a2.5 2.5 0 0 1-3.6-3.6L5.4 8"/></svg>
       <span>上游与模型</span>
     </button>
+    <button class="side-link" type="button" data-page="comfy">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="4" height="4" rx="1"/><rect x="10" y="2.5" width="4" height="4" rx="1"/><rect x="6" y="9.5" width="4" height="4" rx="1"/><path d="M4 6.5v1.2h8V6.5M8 7.7v1.8"/></svg>
+      <span>ComfyUI 工作流</span>
+    </button>
     <button class="side-link" type="button" data-page="limits">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5a5.5 5.5 0 1 1 11 0"/><path d="M8 12.5L10.6 7"/><circle cx="8" cy="12.5" r="1.1"/></svg>
       <span>限流与并发</span>
@@ -2641,6 +2722,51 @@
       </fieldset>
       <p class="current" id="upstream-meta">读取中…</p>
       <p class="current" id="upstream-result"></p>
+    </div>
+  </section>
+
+  <section data-page-panel="comfy" class="card page span-6" aria-labelledby="comfy-title">
+    <div class="card-head">
+      <h2 id="comfy-title">ComfyUI 工作流</h2>
+      <span class="card-note">把本机 ComfyUI 的工作流当作普通生图模型</span>
+      <div class="head-actions">
+        <button class="button mini" type="button" id="comfy-refresh">刷新</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="notice" id="comfy-notice" hidden></div>
+      <div class="form-row">
+        <label class="grow">ComfyUI 地址
+          <input type="url" id="comfy-url" placeholder="http://127.0.0.1:8188" spellcheck="false" autocomplete="off" />
+        </label>
+        <button class="button" type="button" id="comfy-test">测试连接</button>
+        <button class="button primary" type="button" id="comfy-save">保存工作流</button>
+      </div>
+      <p class="current" id="comfy-status" role="status" aria-live="polite">读取中…</p>
+      <p class="hint">ComfyUI 地址由服务端访问；桌面端与本机 ComfyUI 同机时使用 127.0.0.1 即可。工作流里的自定义节点会在保存前读取 /object_info 校验。</p>
+
+      <fieldset class="providers">
+        <legend>导入工作流</legend>
+        <div class="form-row comfy-run-row">
+          <label class="grow">ComfyUI 已保存工作流
+            <select id="comfy-remote-select" aria-label="ComfyUI 已保存工作流">
+              <option value="">先点「读取列表」</option>
+            </select>
+          </label>
+          <button class="button mini" type="button" id="comfy-discover">读取列表</button>
+          <button class="button mini" type="button" id="comfy-import-remote">导入所选</button>
+        </div>
+        <div class="form-row comfy-run-row">
+          <label class="grow">本地 JSON 文件
+            <input type="file" id="comfy-file" accept=".json,application/json" />
+          </label>
+          <button class="button mini" type="button" id="comfy-import-file">导入文件</button>
+        </div>
+        <p class="hint">支持 ComfyUI 画布保存的 UI 格式，也支持「保存（API 格式）」导出的 JSON。导入后请确认提示词、宽高、输出节点；默认只执行你选中的输出分支。</p>
+      </fieldset>
+
+      <div class="provider-list" id="comfy-workflow-list"></div>
+      <p class="current" id="comfy-result"></p>
     </div>
   </section>
 
@@ -2947,6 +3073,19 @@
     upstreamSave: $('upstream-save'),
     upstreamMeta: $('upstream-meta'),
     upstreamResult: $('upstream-result'),
+    comfyNotice: $('comfy-notice'),
+    comfyUrl: $('comfy-url'),
+    comfyStatus: $('comfy-status'),
+    comfyResult: $('comfy-result'),
+    comfyRefresh: $('comfy-refresh'),
+    comfyTest: $('comfy-test'),
+    comfySave: $('comfy-save'),
+    comfyDiscover: $('comfy-discover'),
+    comfyImportRemote: $('comfy-import-remote'),
+    comfyImportFile: $('comfy-import-file'),
+    comfyRemoteSelect: $('comfy-remote-select'),
+    comfyFile: $('comfy-file'),
+    comfyWorkflowList: $('comfy-workflow-list'),
     feedbackNotice: $('feedback-notice'),
     feedbackList: $('feedback-list'),
     feedbackEmpty: $('feedback-empty'),
@@ -3109,6 +3248,11 @@
   let upstreamProviders = []
   let upstreamModelAliases = {}
   let upstreamModelVisibility = {}
+  let upstreamComfyWorkflows = []
+
+  // ComfyUI 工作流注册表（独立保存，不跟上游客串）
+  let comfyWorkflows = []
+  let comfyRemoteWorkflows = []
 
   // 实时监控：默认 5 秒轮询，页面不可见或不在监控页时跳过
   let rtAuto = true
@@ -3442,6 +3586,7 @@
       loadRegistrations(),
       loadLimits(),
       loadUpstream(),
+      loadComfy(),
       loadFeedback(feedbackFilter),
       loadStats(),
     ])
@@ -4044,6 +4189,7 @@
     upstreamImageModels = Array.isArray(data.imageModels) ? data.imageModels : []
     upstreamEnabledImageModels = Array.isArray(data.enabledImageModels) ? data.enabledImageModels : []
     upstreamProviders = Array.isArray(data.providers) ? data.providers : []
+    upstreamComfyWorkflows = Array.isArray(data.comfyWorkflows) ? data.comfyWorkflows : []
     upstreamModelAliases =
       data.modelAliases && typeof data.modelAliases === 'object' ? data.modelAliases : {}
     upstreamModelVisibility =
@@ -4191,7 +4337,16 @@
       }
     }
 
-    if (upstreamSavedImageModel && !IMAGE_MODEL_PRESETS.some(preset => preset.id === upstreamSavedImageModel)) {
+    // ComfyUI 工作流也能作为默认生图模型
+    for (const workflow of upstreamComfyWorkflows) {
+      if (workflow.enabled === false) continue
+      options.push({
+        value: workflow.id,
+        label: `${workflow.label || workflow.id} · ComfyUI`,
+      })
+    }
+
+    if (upstreamSavedImageModel && !options.some(option => option.value === upstreamSavedImageModel)) {
       options.push({ value: upstreamSavedImageModel, label: `${upstreamSavedImageModel} · 已保存` })
     }
     options.push({ value: CUSTOM_MODEL_VALUE, label: '自定义模型 ID…' })
@@ -4226,9 +4381,10 @@
     if (!dom.upstreamImageModelStatus) return
     const effective = upstreamEffectiveImageModel || '未设置'
     const source = upstreamSavedImageModel ? '后台设置' : '环境变量 MAGPIE_IMAGE_MODEL'
-    const clientCount = upstreamEnabledImageModels.length
+    const comfyCount = upstreamComfyWorkflows.filter(workflow => workflow.enabled !== false).length
+    const clientCount = upstreamEnabledImageModels.length + comfyCount
     dom.upstreamImageModelStatus.textContent =
-      `当前生效：${effective}（${source}）· 客户端可选 ${clientCount} 个 · 改动会在下一次生图时生效`
+      `当前生效：${effective}（${source}）· 客户端可选 ${clientCount} 个${comfyCount ? `（ComfyUI ${comfyCount}）` : ''} · 改动会在下一次生图时生效`
   }
 
   /** 客户端可见模型：勾选框 + 显示名输入，按服务端白名单渲染 */
@@ -4276,6 +4432,18 @@
           alias: upstreamModelAliases[id] || '',
         }))
       }
+    }
+
+    for (const workflow of upstreamComfyWorkflows) {
+      if (workflow.enabled === false) continue
+      rows.push(clientModelRowHtml({
+        id: workflow.id,
+        label: workflow.label || workflow.id,
+        source: 'ComfyUI',
+        kind: 'extra',
+        checked: visibility[workflow.id] !== false,
+        alias: upstreamModelAliases[workflow.id] || '',
+      }))
     }
 
     dom.upstreamClientModelList.innerHTML =
@@ -4454,6 +4622,304 @@
       event.preventDefault()
       const card = input.closest('.provider-card')
       if (card && appendModelRow(card, input.value, '', true)) input.value = ''
+    })
+  }
+
+  // ---------- ComfyUI 工作流 ----------
+
+  function comfyRefsText(refs) {
+    return (Array.isArray(refs) ? refs : [])
+      .map(ref => `${ref.node || ''}:${ref.input || ''}`)
+      .filter(Boolean)
+      .join(', ')
+  }
+
+  function comfyRefsFromText(value, label) {
+    const text = String(value || '').trim()
+    if (!text) return []
+    return text.split(/[,，\n]/).map(item => item.trim()).filter(Boolean).map(item => {
+      const index = item.indexOf(':')
+      if (index <= 0 || index === item.length - 1) {
+        throw new Error(`${label}格式应为「节点ID:输入名」，例如 29:text`)
+      }
+      return { node: item.slice(0, index).trim(), input: item.slice(index + 1).trim() }
+    })
+  }
+
+  function comfyIdsFromText(value, label) {
+    return String(value || '').split(/[,，\n]/).map(item => item.trim()).filter(Boolean)
+  }
+
+  function comfyOutputCandidates(workflow) {
+    if (!workflow || typeof workflow !== 'object') return []
+    return Object.entries(workflow)
+      .filter(([, node]) => node && /SaveImage|PreviewImage|SaveImageKJ|CR Image Output/i.test(String(node.class_type || '')))
+      .map(([id, node]) => `${id}:${node.class_type}`)
+  }
+
+  function comfyMapField(label, className, value, placeholder) {
+    return `<label>${escapeHtml(label)}
+      <input type="text" class="${className}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" spellcheck="false" autocomplete="off">
+    </label>`
+  }
+
+  function comfyWorkflowCardHtml(workflow, index) {
+    const mapping = workflow.mapping || {}
+    const workflowJson = JSON.stringify(workflow.workflow || {}, null, 2)
+    const outputs = comfyOutputCandidates(workflow.workflow)
+    const warnings = Array.isArray(workflow.warnings) ? workflow.warnings.join(' · ') : ''
+    return `<div class="provider-card comfy-card" data-comfy-index="${index}">
+      <div class="provider-head">
+        <label class="check"><input type="checkbox" class="comfy-enabled"${workflow.enabled === false ? '' : ' checked'}> 启用</label>
+        <input type="text" class="comfy-label" value="${escapeHtml(workflow.label || '')}" placeholder="客户端显示名" autocomplete="off">
+        <button type="button" class="button mini comfy-remove">删除</button>
+      </div>
+      <div class="form-row">
+        <label>工作流 ID
+          <input type="text" class="comfy-id" value="${escapeHtml(workflow.id || '')}" placeholder="wf-1" spellcheck="false" autocomplete="off">
+        </label>
+        <label class="grow">来源
+          <input type="text" class="comfy-source" value="${escapeHtml(workflow.sourceName || '')}" placeholder="ComfyUI 工作流名称" readonly>
+        </label>
+        <label>节点数
+          <input type="text" class="comfy-count" value="${Object.keys(workflow.workflow || {}).length}" readonly>
+        </label>
+      </div>
+      <p class="hint">客户端模型：comfy:${escapeHtml(workflow.id || '')}${warnings ? ` · ${escapeHtml(warnings)}` : ''}</p>
+      <details class="comfy-stage">
+        <summary>节点映射与 API 工作流</summary>
+        <div class="comfy-map-grid">
+          ${comfyMapField('提示词节点', 'comfy-map-prompt', comfyRefsText(mapping.prompt), '29:text')}
+          ${comfyMapField('负面提示词（可选）', 'comfy-map-negative', comfyRefsText(mapping.negative), '36:text')}
+          ${comfyMapField('宽度节点', 'comfy-map-width', comfyRefsText(mapping.width), '35:width')}
+          ${comfyMapField('高度节点', 'comfy-map-height', comfyRefsText(mapping.height), '35:height')}
+          ${comfyMapField('种子节点（可选）', 'comfy-map-seed', comfyRefsText(mapping.seed), '31:seed')}
+          ${comfyMapField('单图批大小（可选）', 'comfy-map-batch', comfyRefsText(mapping.batch), '35:batch_size')}
+          ${comfyMapField('参考图节点（按顺序）', 'comfy-map-references', comfyRefsText(mapping.references), 'LoadImage 节点:image')}
+          ${comfyMapField('输出节点', 'comfy-map-output', (mapping.output || []).join(', '), '9')}
+        </div>
+        <label class="check" style="margin-top:8px"><input type="checkbox" class="comfy-append-hint"${mapping.appendRatioHint ? ' checked' : ''}> 在提示词后追加比例描述</label>
+        <p class="hint">映射格式：节点ID:输入名，多个用逗号分隔。${outputs.length ? `候选输出：${escapeHtml(outputs.join('、'))}` : '没有识别到 SaveImage 输出节点，请检查 JSON。'}</p>
+        <textarea class="comfy-json" spellcheck="false" aria-label="ComfyUI API 工作流 JSON">${escapeHtml(workflowJson)}</textarea>
+      </details>
+    </div>`
+  }
+
+  function renderComfyWorkflows(value) {
+    if (Array.isArray(value)) comfyWorkflows = value
+    if (!dom.comfyWorkflowList) return
+    dom.comfyWorkflowList.innerHTML = comfyWorkflows.length
+      ? comfyWorkflows.map((workflow, index) => comfyWorkflowCardHtml(workflow, index)).join('')
+      : '<div class="comfy-empty">还没有导入工作流。可以从上方读取 ComfyUI 已保存的工作流，或导入本地 JSON。</div>'
+  }
+
+  function collectComfyWorkflows() {
+    if (!dom.comfyWorkflowList) return []
+    return [...dom.comfyWorkflowList.querySelectorAll('.comfy-card')].map(card => {
+      const label = (card.querySelector('.comfy-label')?.value || '').trim()
+      const id = (card.querySelector('.comfy-id')?.value || '').trim()
+      let workflow
+      try {
+        workflow = JSON.parse(card.querySelector('.comfy-json')?.value || '{}')
+      } catch {
+        throw new Error(`工作流「${label || id || '未命名'}」的 JSON 无法解析`)
+      }
+      return {
+        id,
+        label,
+        enabled: Boolean(card.querySelector('.comfy-enabled')?.checked),
+        sourceName: (card.querySelector('.comfy-source')?.value || '').trim(),
+        workflow,
+        mapping: {
+          prompt: comfyRefsFromText(card.querySelector('.comfy-map-prompt')?.value, '提示词映射'),
+          negative: comfyRefsFromText(card.querySelector('.comfy-map-negative')?.value, '负面提示词映射'),
+          width: comfyRefsFromText(card.querySelector('.comfy-map-width')?.value, '宽度映射'),
+          height: comfyRefsFromText(card.querySelector('.comfy-map-height')?.value, '高度映射'),
+          seed: comfyRefsFromText(card.querySelector('.comfy-map-seed')?.value, '种子映射'),
+          batch: comfyRefsFromText(card.querySelector('.comfy-map-batch')?.value, '批大小映射'),
+          references: comfyRefsFromText(card.querySelector('.comfy-map-references')?.value, '参考图映射'),
+          output: comfyIdsFromText(card.querySelector('.comfy-map-output')?.value, '输出节点'),
+          appendRatioHint: Boolean(card.querySelector('.comfy-append-hint')?.checked),
+        },
+      }
+    })
+  }
+
+  function nextComfyWorkflowId(workflows) {
+    const used = new Set(workflows.map(item => item.id))
+    let index = 1
+    while (used.has(`wf-${index}`)) index += 1
+    return `wf-${index}`
+  }
+
+  async function loadComfy() {
+    clearNotice(dom.comfyNotice)
+    const result = await api('/api/admin/comfy')
+    if (isAuthFailure(result)) {
+      showNotice(dom.comfyNotice, AUTH_HINT)
+      setCurrent(dom.comfyStatus, '')
+      return
+    }
+    if (!result.ok) {
+      showNotice(dom.comfyNotice, result.error || 'ComfyUI 配置读取失败')
+      return
+    }
+    const data = result.data || {}
+    dom.comfyUrl.value = data.baseUrl || 'http://127.0.0.1:8188'
+    comfyWorkflows = Array.isArray(data.workflows) ? data.workflows : []
+    renderComfyWorkflows()
+    setCurrent(
+      dom.comfyStatus,
+      comfyWorkflows.length
+        ? `已加载 ${comfyWorkflows.length} 个工作流 · ${data.baseUrl || ''}`
+        : '还没有工作流，先导入一个 ComfyUI 工作流。',
+    )
+    setCurrent(dom.comfyResult, '')
+  }
+
+  async function testComfy() {
+    const baseUrl = dom.comfyUrl.value.trim()
+    if (!baseUrl) {
+      setCurrent(dom.comfyResult, '先填写 ComfyUI 地址', 'error')
+      return
+    }
+    await withBusy(dom.comfyTest, async () => {
+      setCurrent(dom.comfyResult, '正在连接 ComfyUI…')
+      const result = await api('/api/admin/comfy/test', { method: 'POST', body: { baseUrl } })
+      if (!result.ok) {
+        setCurrent(dom.comfyResult, result.error || '连接测试失败', 'error')
+        return
+      }
+      const data = result.data || {}
+      const bits = []
+      if (data.version) bits.push(`版本 ${data.version}`)
+      if (data.device) bits.push(data.device)
+      if (data.objectInfoCount) bits.push(`${data.objectInfoCount} 个节点类`)
+      if (data.workflowCount) bits.push(`${data.workflowCount} 个已保存工作流`)
+      setCurrent(
+        dom.comfyResult,
+        `${data.reachable ? '可连通' : '连不上'}：${data.detail || '没有更多信息'}${bits.length ? `（${bits.join(' · ')}）` : ''}`,
+        data.reachable ? 'ok' : 'error',
+      )
+    })
+  }
+
+  async function discoverComfy() {
+    const baseUrl = dom.comfyUrl.value.trim()
+    if (!baseUrl) {
+      setCurrent(dom.comfyResult, '先填写 ComfyUI 地址', 'error')
+      return
+    }
+    await withBusy(dom.comfyDiscover, async () => {
+      setCurrent(dom.comfyResult, '正在读取 ComfyUI 工作流列表…')
+      const result = await api('/api/admin/comfy/discover', { method: 'POST', body: { baseUrl } })
+      if (!result.ok) {
+        setCurrent(dom.comfyResult, result.error || '读取工作流列表失败', 'error')
+        return
+      }
+      const data = result.data || {}
+      comfyRemoteWorkflows = Array.isArray(data.workflows) ? data.workflows : []
+      dom.comfyRemoteSelect.innerHTML = comfyRemoteWorkflows.length
+        ? comfyRemoteWorkflows.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')
+        : '<option value="">没有已保存的工作流</option>'
+      setCurrent(dom.comfyResult, comfyRemoteWorkflows.length ? `读取到 ${comfyRemoteWorkflows.length} 个工作流，选择后点「导入所选」。` : 'ComfyUI 用户目录里没有已保存工作流。', comfyRemoteWorkflows.length ? 'ok' : 'error')
+    })
+  }
+
+  async function importComfy(payload, button) {
+    await withBusy(button, async () => {
+      let current
+      try {
+        current = collectComfyWorkflows()
+      } catch (error) {
+        setCurrent(dom.comfyResult, errorText(error), 'error')
+        return
+      }
+      setCurrent(dom.comfyResult, '正在转换工作流并读取节点映射…')
+      const result = await api('/api/admin/comfy/import', { method: 'POST', body: payload })
+      if (!result.ok) {
+        setCurrent(dom.comfyResult, result.error || '导入工作流失败', 'error')
+        return
+      }
+      const data = result.data || {}
+      const item = {
+        id: nextComfyWorkflowId(current),
+        label: String(data.label || 'ComfyUI 工作流').slice(0, 80),
+        enabled: true,
+        sourceName: String(data.sourceName || ''),
+        workflow: data.workflow || {},
+        mapping: data.mapping || {},
+        nodes: Array.isArray(data.nodes) ? data.nodes : [],
+        warnings: Array.isArray(data.warnings) ? data.warnings : [],
+      }
+      current.push(item)
+      renderComfyWorkflows(current)
+      setCurrent(
+        dom.comfyResult,
+        `已导入 ${Object.keys(item.workflow).length} 个节点${item.warnings.length ? `；${item.warnings.join('；')}` : ''}。请确认提示词/宽高/输出节点后保存。`,
+        item.warnings.length ? 'warn' : 'ok',
+      )
+    })
+  }
+
+  async function importComfyRemote() {
+    const baseUrl = dom.comfyUrl.value.trim()
+    const name = dom.comfyRemoteSelect.value
+    if (!name) {
+      setCurrent(dom.comfyResult, '先读取并选择一个 ComfyUI 工作流', 'error')
+      return
+    }
+    await importComfy({ baseUrl, name }, dom.comfyImportRemote)
+  }
+
+  async function importComfyFile() {
+    const file = dom.comfyFile.files && dom.comfyFile.files[0]
+    if (!file) {
+      setCurrent(dom.comfyResult, '先选择一个 JSON 文件', 'error')
+      return
+    }
+    try {
+      const raw = JSON.parse(await file.text())
+      await importComfy(
+        { baseUrl: dom.comfyUrl.value.trim(), workflow: raw, label: file.name },
+        dom.comfyImportFile,
+      )
+      dom.comfyFile.value = ''
+    } catch (error) {
+      setCurrent(dom.comfyResult, `读取文件失败：${errorText(error)}`, 'error')
+    }
+  }
+
+  async function saveComfy() {
+    let workflows
+    try {
+      workflows = collectComfyWorkflows()
+    } catch (error) {
+      setCurrent(dom.comfyResult, errorText(error), 'error')
+      return
+    }
+    const baseUrl = dom.comfyUrl.value.trim()
+    if (!baseUrl) {
+      setCurrent(dom.comfyResult, 'ComfyUI 地址不能为空', 'error')
+      return
+    }
+    await withBusy(dom.comfySave, async () => {
+      setCurrent(dom.comfyResult, '正在保存工作流…')
+      const result = await api('/api/admin/comfy', {
+        method: 'POST',
+        body: { baseUrl, workflows },
+      })
+      if (!result.ok) {
+        setCurrent(dom.comfyResult, result.error || '保存失败', 'error')
+        return
+      }
+      const data = result.data || {}
+      dom.comfyUrl.value = data.baseUrl || baseUrl
+      comfyWorkflows = Array.isArray(data.workflows) ? data.workflows : workflows
+      renderComfyWorkflows()
+      setCurrent(dom.comfyStatus, `已保存 ${comfyWorkflows.length} 个工作流 · ${data.baseUrl || baseUrl}`, 'ok')
+      setCurrent(dom.comfyResult, '保存成功，客户端下次打开模型下拉即可看到新工作流。', 'ok')
+      await loadUpstream()
     })
   }
 
@@ -4647,12 +5113,13 @@
         count + (provider.enabled ? provider.models.filter(model => model.enabled).length : 0),
       0,
     )
-    if (!enabledImageModels.length && !customEnabled) {
-      setCurrent(dom.upstreamResult, '客户端至少需要一个可用模型（内置或自定义供应商）', 'error')
+    const comfyEnabled = upstreamComfyWorkflows.filter(workflow => workflow.enabled !== false).length
+    if (!enabledImageModels.length && !customEnabled && !comfyEnabled) {
+      setCurrent(dom.upstreamResult, '客户端至少需要一个可用模型（内置、自定义供应商或 ComfyUI 工作流）', 'error')
       return
     }
 
-    if (!enabledImageModels.length && !visibleExtra) {
+    if (!enabledImageModels.length && !visibleExtra && !comfyEnabled) {
       setCurrent(dom.upstreamResult, '客户端至少要保留一个可见模型', 'error')
       return
     }
@@ -5519,6 +5986,30 @@
     dom.btnData.addEventListener('click', () => runMaintAction('open-data', '打开数据目录', dom.btnData))
     dom.btnLogDir.addEventListener('click', () => runMaintAction('open-logs', '打开日志目录', dom.btnLogDir))
     dom.btnKey.addEventListener('click', () => runMaintAction('copy-key', '复制管理密钥', dom.btnKey))
+
+    if (dom.comfyRefresh) dom.comfyRefresh.addEventListener('click', () => void loadComfy())
+    if (dom.comfyTest) dom.comfyTest.addEventListener('click', () => void testComfy())
+    if (dom.comfySave) dom.comfySave.addEventListener('click', () => void saveComfy())
+    if (dom.comfyDiscover) dom.comfyDiscover.addEventListener('click', () => void discoverComfy())
+    if (dom.comfyImportRemote) dom.comfyImportRemote.addEventListener('click', () => void importComfyRemote())
+    if (dom.comfyImportFile) dom.comfyImportFile.addEventListener('click', () => void importComfyFile())
+    if (dom.comfyWorkflowList) {
+      dom.comfyWorkflowList.addEventListener('click', event => {
+        const button = event.target.closest('.comfy-remove')
+        if (!button) return
+        const card = button.closest('.comfy-card')
+        if (!card) return
+        try {
+          const workflows = collectComfyWorkflows()
+          const index = [...dom.comfyWorkflowList.querySelectorAll('.comfy-card')].indexOf(card)
+          if (index >= 0) workflows.splice(index, 1)
+          renderComfyWorkflows(workflows)
+          setCurrent(dom.comfyResult, '已移除，点「保存工作流」后生效。', 'warn')
+        } catch (error) {
+          setCurrent(dom.comfyResult, errorText(error), 'error')
+        }
+      })
+    }
   }
 
   // ---------- 启动 ----------
@@ -5545,7 +6036,7 @@
 
   // ---------- 实时监控 ----------
 
-  const RT_BRANCH_LABELS = { custom: '自定义供应商', magpie: 'Magpie' }
+  const RT_BRANCH_LABELS = { custom: '自定义供应商', comfyui: 'ComfyUI', magpie: 'Magpie' }
   const RT_STATUS_LABELS = { running: '进行中', success: '成功', failed: '失败' }
 
   function rtMs(value) {
@@ -5950,6 +6441,7 @@
     monitor: ['实时监控', '生图请求的阶段耗时、活跃与慢请求'],
     accounts: ['账号管理', '注册审核、账号与每日额度'],
     upstream: ['上游与模型', 'Magpie 地址、生图模型与自定义供应商'],
+    comfy: ['ComfyUI 工作流', '导入工作流、节点映射与客户端生图模型'],
     limits: ['限流与并发', '请求限流、生图排队与客户端统计'],
     feedback: ['意见反馈', '用户提交的问题与建议'],
     stats: ['统计与维护', '生成量、成功率与运行维护'],
@@ -5976,6 +6468,9 @@
     }
     if (target === 'accounts' && acctAuto && !acctPaused) {
       void acctRefreshAll({ auto: true })
+    }
+    if (target === 'comfy') {
+      void loadComfy()
     }
     acctSchedule()
   }

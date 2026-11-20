@@ -14,6 +14,7 @@ import { createLogSink } from './platform/logging.js'
 import { registerStaticRoutes } from './platform/static.js'
 import { registerAdminRoutes } from '../api/admin.js'
 import { registerAuthRoutes, resolveAuth } from '../api/auth.js'
+import { registerComfyRoutes } from '../api/comfy.js'
 import { registerFeedbackRoutes } from '../api/feedback.js'
 import { registerFileRoutes } from '../api/files.js'
 import { registerUploadRoutes } from '../api/uploads.js'
@@ -281,6 +282,7 @@ registerMonitorRoutes(app, {
 })
 registerFeedbackRoutes(app, { feedback })
 registerUpstreamRoutes(app, { settings })
+registerComfyRoutes(app, { settings })
 registerUpdateRoutes(app, { checker: updateChecker })
 
 /* 优雅退出入口：只在注入了 SHUTDOWN_TOKEN 时开放，且必须带同一个 token 头。

@@ -1,4 +1,12 @@
 import { ApiError } from '../../platform/errors.js'
+import type { ImageResolution } from '../../platform/config.js'
+
+/** auto 时不带上游字段，保持与旧版完全一致的构图行为 */
+interface ResolutionParams {
+  /** 画幅 id，例如 16:9；仅在上游需要把档位换算成像素时使用 */
+  ratio?: string
+  resolution?: Exclude<ImageResolution, 'auto'>
+}
 
 export interface MagpieOptions {
   baseUrl: string
@@ -45,9 +53,20 @@ function bearer(apiKey?: string): Record<string, string> {
 
 export async function requestImage(
   options: MagpieOptions,
-  params: { prompt: string; ratioHint: string },
+  params: { prompt: string; ratioHint: string } & ResolutionParams,
 ): Promise<MagpieImageResult> {
   const prompt = `${params.prompt}\n\n${params.ratioHint}`
+  const body: Record<string, unknown> = {
+    model: options.model,
+    prompt,
+    n: 1,
+  }
+  // 不选清晰度时不传 size：实测传像素尺寸会让构图走样，文字描述比例反而更准。
+  // 选了 1K/2K/4K 才带比例形式的 size，让 Magpie 按画幅把档位换算成像素。
+  if (params.resolution && params.ratio) {
+    body.size = params.ratio
+    body.resolution = params.resolution
+  }
   return callImageEndpoint(
     options,
     `${options.baseUrl}/v1/images/generations`,
@@ -57,12 +76,7 @@ export async function requestImage(
         'Content-Type': 'application/json',
         ...bearer(options.apiKey),
       },
-      body: JSON.stringify({
-        model: options.model,
-        // 不传 size：实测传 size 会让构图走样，文字描述比例反而更准
-        prompt,
-        n: 1,
-      }),
+      body: JSON.stringify(body),
     },
     prompt,
   )
@@ -75,13 +89,17 @@ export async function requestImage(
  */
 export async function requestImageEdit(
   options: MagpieOptions,
-  params: { prompt: string; ratioHint: string; images: ReferenceImage[] },
+  params: { prompt: string; ratioHint: string; images: ReferenceImage[] } & ResolutionParams,
 ): Promise<MagpieImageResult> {
   const prompt = `${params.prompt}\n\n${params.ratioHint}`
   const form = new FormData()
   form.append('model', options.model)
   form.append('prompt', prompt)
   form.append('n', '1')
+  if (params.resolution && params.ratio) {
+    form.append('size', params.ratio)
+    form.append('resolution', params.resolution)
+  }
   for (const image of params.images) {
     form.append(
       'image',

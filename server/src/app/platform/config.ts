@@ -32,6 +32,23 @@ export interface ImageModelSpec {
   label: string
 }
 
+/** Magpie 新版图片接口的清晰度档位；auto 表示不传，沿用模型自己的默认尺寸 */
+export type ImageResolution = 'auto' | '1K' | '2K' | '4K'
+
+export interface ImageResolutionSpec {
+  id: ImageResolution
+  label: string
+  /** 长边像素，仅用于前端提示；auto 为 0 */
+  longEdge: number
+}
+
+const imageResolutions: ImageResolutionSpec[] = [
+  { id: 'auto', label: '自动', longEdge: 0 },
+  { id: '1K', label: '1K', longEdge: 1024 },
+  { id: '2K', label: '2K', longEdge: 2048 },
+  { id: '4K', label: '4K', longEdge: 4096 },
+]
+
 /**
  * 客户端可选的生图模型白名单。
  * 网关的 /v1/models 只列对话模型，生图模型得自己维护；
@@ -243,6 +260,8 @@ export const config = {
    */
   imageConcurrency: normalizeConcurrency(intFromEnv('IMAGE_CONCURRENCY', 5, 0)),
   requestTimeoutMs: intFromEnv('IMAGE_TIMEOUT_MS', 300000),
+  // ComfyUI 本机模型常要几分钟加载与采样（低显存更慢），单独给更宽的兜底
+  comfyTimeoutMs: intFromEnv('COMFY_TIMEOUT_MS', 900000),
   maxPromptLength: intFromEnv('MAX_PROMPT_LENGTH', 12000),
   storageDir: process.env.STORAGE_DIR || '',
   styleLibraryPath: process.env.STYLE_LIBRARY_PATH || '',
@@ -285,8 +304,10 @@ export const config = {
   ]),
   ratios,
   imageModels,
+  imageResolutions,
   defaultDisabledImageModels,
   defaultRatio: '1:1',
+  defaultImageResolution: 'auto' as ImageResolution,
   defaultRoleRatio: '3:4',
   defaultSceneRatio: '16:9',
   defaultPropRatio: '1:1',
@@ -295,6 +316,29 @@ export const config = {
 export function findRatio(id: unknown): RatioSpec | undefined {
   if (typeof id !== 'string') return undefined
   return ratios.find(ratio => ratio.id === id)
+}
+
+export function findImageResolution(id: unknown): ImageResolutionSpec | undefined {
+  if (typeof id !== 'string') return undefined
+  const key = id.trim().toUpperCase()
+  return imageResolutions.find(item => item.id.toUpperCase() === key)
+}
+
+/**
+ * 把「画幅 + 清晰度」换算成 ComfyUI 工作流可用的像素尺寸。
+ * Magpie 自己会按档位换算；ComfyUI 需要我们把宽高写进工作流节点。
+ * auto 保留工作流原有的原生尺寸，避免老行为发生变化。
+ */
+export function resolutionTargetSize(
+  ratio: RatioSpec,
+  resolution: ImageResolution,
+): { width: number; height: number } {
+  if (resolution === 'auto') return { width: ratio.nativeWidth, height: ratio.nativeHeight }
+  const edge = resolution === '4K' ? 4096 : resolution === '2K' ? 2048 : 1024
+  const ratioValue = ratio.width / ratio.height
+  return ratioValue >= 1
+    ? { width: edge, height: Math.round(edge / ratioValue) }
+    : { width: Math.round(edge * ratioValue), height: edge }
 }
 
 /** 客户端只能从白名单里挑模型，避免任意字符串被拼进上游请求 */

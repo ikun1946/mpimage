@@ -9,9 +9,14 @@ export function registerMetaRoutes(
   deps: { concurrency?: () => number; settings: SettingsStore },
 ): void {
   app.get('/api/config', async () => {
-    // 生图模型 = Magpie 实际返回的清单 + 后台配置的自定义供应商
+    // 生图模型 = Magpie 实际返回的清单 + 后台配置的自定义供应商 + ComfyUI 工作流
     const { models: clientModels } = await listClientImageModels(deps.settings)
-    const imageModels = clientModels.map(({ id, label }) => ({ id, label }))
+    const imageModels = clientModels.map(({ id, label, resolutionTiers, description }) => ({
+      id,
+      label,
+      resolutionTiers,
+      description,
+    }))
     const configuredModel = deps.settings.getImageModel()
     // 默认模型排第一位，客户端下拉打开就能看到它；默认值可能来自自定义供应商
     const defaultIndex = imageModels.findIndex(model => model.id === configuredModel)
@@ -30,6 +35,9 @@ export function registerMetaRoutes(
         nativeHeight,
         promptHint,
       })),
+      /** 生图清晰度档位；auto 不改变上游默认尺寸 */
+      resolutions: config.imageResolutions.map(({ id, label, longEdge }) => ({ id, label, longEdge })),
+      defaultResolution: config.defaultImageResolution,
       /** 客户端可选的生图模型；服务端控制台可以逐项关掉，关掉的不下发给客户端 */
       imageModels,
       /** 客户端不传 model 时用的模型；若后台默认模型被关掉，就用列表里第一个 */

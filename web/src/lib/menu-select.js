@@ -6,6 +6,45 @@
 const registry = new WeakMap()
 let openWrap = null
 
+/** 模型菜单的悬停说明气泡：挂在 body 上，避免被菜单的 overflow 裁掉 */
+let descriptionTip = null
+
+function ensureDescriptionTip() {
+  if (descriptionTip) return descriptionTip
+  descriptionTip = document.createElement('div')
+  descriptionTip.className = 'menu-select-tip'
+  descriptionTip.setAttribute('role', 'tooltip')
+  descriptionTip.hidden = true
+  document.body.appendChild(descriptionTip)
+  return descriptionTip
+}
+
+function hideDescriptionTip() {
+  if (descriptionTip) descriptionTip.hidden = true
+}
+
+function showDescriptionTip(item, text) {
+  if (!text) {
+    hideDescriptionTip()
+    return
+  }
+  const tip = ensureDescriptionTip()
+  tip.textContent = text
+  tip.hidden = false
+
+  const rect = item.getBoundingClientRect()
+  const tipRect = tip.getBoundingClientRect()
+  let left = rect.right + 10
+  if (left + tipRect.width > window.innerWidth - 8) {
+    left = rect.left - tipRect.width - 10
+  }
+  let top = rect.top + (rect.height - tipRect.height) / 2
+  top = Math.max(8, Math.min(top, window.innerHeight - tipRect.height - 8))
+  left = Math.max(8, left)
+  tip.style.left = `${Math.round(left)}px`
+  tip.style.top = `${Math.round(top)}px`
+}
+
 function closeOpen(except) {
   if (!openWrap || openWrap === except) return
   const state = registry.get(openWrap)
@@ -43,6 +82,7 @@ export function enhanceMenuSelect(select) {
   const compact = select.hasAttribute('data-menu-compact')
 
   const sync = () => {
+    hideDescriptionTip()
     const options = Array.from(select.options)
     const current = options[select.selectedIndex] || options[0] || null
     const label = current ? current.textContent : ''
@@ -57,6 +97,12 @@ export function enhanceMenuSelect(select) {
       const selected = option.selected
       item.setAttribute('aria-selected', String(selected))
       item.classList.toggle('is-selected', selected)
+      const description = option.getAttribute('data-description') || ''
+      if (description) {
+        item.dataset.description = description
+        item.title = description
+        item.classList.add('has-description')
+      }
       item.textContent = option.textContent
       item.addEventListener('click', () => {
         select.value = option.value
@@ -71,6 +117,7 @@ export function enhanceMenuSelect(select) {
   const close = () => {
     menu.hidden = true
     trigger.setAttribute('aria-expanded', 'false')
+    hideDescriptionTip()
     if (openWrap === wrap) openWrap = null
   }
 
@@ -86,6 +133,21 @@ export function enhanceMenuSelect(select) {
   menu.addEventListener('wheel', event => {
     event.stopPropagation()
   }, { passive: true })
+  menu.addEventListener('scroll', hideDescriptionTip, { passive: true })
+
+  // 模型菜单项悬停/键盘聚焦时显示介绍气泡
+  menu.addEventListener('mouseover', event => {
+    const item = event.target.closest('.menu-select-item[data-description]')
+    if (item) showDescriptionTip(item, item.dataset.description)
+  })
+  menu.addEventListener('mouseout', event => {
+    if (event.target.closest('.menu-select-item[data-description]')) hideDescriptionTip()
+  })
+  menu.addEventListener('focusin', event => {
+    const item = event.target.closest('.menu-select-item[data-description]')
+    if (item) showDescriptionTip(item, item.dataset.description)
+  })
+  menu.addEventListener('focusout', hideDescriptionTip)
 
   trigger.addEventListener('click', event => {
     event.stopPropagation()

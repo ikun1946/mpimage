@@ -5,7 +5,7 @@
  * 不伪造 DNS/TCP/TLS 等网络细节。所有耗时都是整数毫秒。
  */
 
-export type MonitorBranch = 'custom' | 'magpie'
+export type MonitorBranch = 'custom' | 'comfyui' | 'magpie'
 export type MonitorStatus = 'running' | 'success' | 'failed'
 
 export type MonitorMetrics = Record<string, number>

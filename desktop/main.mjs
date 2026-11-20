@@ -143,11 +143,13 @@ ipcMain.handle('panel:api', async (_event, path, init = {}) => {
   try {
     // 这是本机回环请求：用 Node 自带的 fetch 直连，别走 net.fetch——
     // 系统代理可能把 127.0.0.1 也代理出去，反而连不上
+    // ComfyUI 导入要读取 /object_info（本机也可能有两三 MB），给它更长的超时
+    const timeoutMs = path.startsWith('/api/admin/comfy') ? 60000 : 20000
     const response = await fetch(`${SERVER_ORIGIN}${path}`, {
       method,
       headers,
       body,
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(timeoutMs),
     })
     const text = await response.text()
     let data = null

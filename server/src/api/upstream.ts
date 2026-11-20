@@ -6,6 +6,7 @@ import { ModelCatalog } from '../app/control/model-catalog.js'
 import { ImageModelCatalog } from '../app/control/image-model-catalog.js'
 import type { ProviderConfig, ProviderModelConfig, SettingsStore } from '../app/control/settings-store.js'
 import { customModelId } from '../app/control/client-models.js'
+import { comfyModelId } from '../app/control/comfy-config.js'
 import { requireAdmin } from './auth.js'
 
 /** 缓存按上游地址分键，放在模块级才能跨请求复用 */
@@ -224,6 +225,7 @@ export function registerUpstreamRoutes(
     const baseUrl = await deps.settings.getBaseUrl()
     const catalog = await imageModelCatalog.list(baseUrl)
     const catalogIds = catalog.map(model => model.id)
+    const comfyConfig = deps.settings.getComfyConfig()
     return {
       baseUrl,
       model: deps.settings.getImageModel(),
@@ -247,6 +249,13 @@ export function registerUpstreamRoutes(
       enabledImageModelsFromSettings: deps.settings.isEnabledImageModelsFromSettings(),
       /** 自定义供应商与模型改名，控制台据此画供应商卡片 */
       providers: deps.settings.getProviders(),
+      /** ComfyUI 工作流只回摘要；完整 JSON/映射由独立的 ComfyUI 页面管理 */
+      comfyWorkflows: comfyConfig.workflows.map(({ id, label, enabled, sourceName }) => ({
+        id: comfyModelId(id),
+        label,
+        enabled,
+        sourceName: sourceName || '',
+      })),
       modelAliases: deps.settings.getModelAliases(),
       modelVisibility: deps.settings.getModelVisibility(),
     }
@@ -308,18 +317,28 @@ export function registerUpstreamRoutes(
           ).length,
         0,
       )
-    if (visibleBuiltins + visibleCustom === 0) {
-      throw new ApiError('UPSTREAM_INVALID', '客户端至少需要一个可见模型（内置或自定义供应商）', 400)
+    const visibleComfy = deps.settings
+      .getComfyConfig()
+      .workflows.filter(
+        workflow =>
+          workflow.enabled && visibilityForCheck[comfyModelId(workflow.id)] !== false,
+      ).length
+    if (visibleBuiltins + visibleCustom + visibleComfy === 0) {
+      throw new ApiError('UPSTREAM_INVALID', '客户端至少需要一个可见模型（内置、自定义供应商或 ComfyUI 工作流）', 400)
     }
 
-    // 生图模型可以是内置的，也可以是自定义供应商里的公开 ID
+    // 生图模型可以是内置的、自定义供应商里的公开 ID，也可以是一个 ComfyUI 工作流
     if (imageModel) {
       const customIds = (providers ?? deps.settings.getProviders()).flatMap(provider =>
         provider.models.map(model => customModelId(provider.id, model.id)),
       )
+      const comfyIds = deps.settings
+        .getComfyConfig()
+        .workflows.map(workflow => comfyModelId(workflow.id))
       if (
         !catalogIds.includes(imageModel) &&
         !customIds.includes(imageModel) &&
+        !comfyIds.includes(imageModel) &&
         !findImageModel(imageModel)
       ) {
         throw new ApiError('UPSTREAM_INVALID', '未知的生图模型：' + imageModel, 400)
@@ -375,6 +394,14 @@ export function registerUpstreamRoutes(
       enabledImageModels: deps.settings.getEnabledImageModels(catalog.map(model => model.id)),
       enabledImageModelsFromSettings: deps.settings.isEnabledImageModelsFromSettings(),
       providers: deps.settings.getProviders(),
+      comfyWorkflows: deps.settings.getComfyConfig().workflows.map(
+        ({ id, label, enabled, sourceName }) => ({
+          id: comfyModelId(id),
+          label,
+          enabled,
+          sourceName: sourceName || '',
+        }),
+      ),
       modelAliases: deps.settings.getModelAliases(),
       modelVisibility: deps.settings.getModelVisibility(),
     })
