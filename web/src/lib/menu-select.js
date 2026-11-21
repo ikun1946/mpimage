@@ -23,7 +23,7 @@ function hideDescriptionTip() {
   if (descriptionTip) descriptionTip.hidden = true
 }
 
-function showDescriptionTip(item, text) {
+function showDescriptionTip(menu, item, text) {
   if (!text) {
     hideDescriptionTip()
     return
@@ -32,15 +32,23 @@ function showDescriptionTip(item, text) {
   tip.textContent = text
   tip.hidden = false
 
-  const rect = item.getBoundingClientRect()
+  // 横向贴菜单外沿，纵向跟随当前选项：只靠 item.right 会把气泡
+  // 压进菜单的内边距/滚动条，看起来像叠在一起。
+  const menuRect = menu.getBoundingClientRect()
+  const itemRect = item.getBoundingClientRect()
   const tipRect = tip.getBoundingClientRect()
-  let left = rect.right + 10
+  const gap = 8
+  let left = menuRect.right + gap
   if (left + tipRect.width > window.innerWidth - 8) {
-    left = rect.left - tipRect.width - 10
+    left = menuRect.left - tipRect.width - gap
   }
-  let top = rect.top + (rect.height - tipRect.height) / 2
+  left = Math.max(8, Math.min(left, window.innerWidth - tipRect.width - 8))
+  let top = itemRect.top + (itemRect.height - tipRect.height) / 2
+  // 选项行若因布局变化给出过期坐标，也不让气泡飞出菜单范围
+  if (tipRect.height < menuRect.height) {
+    top = Math.max(menuRect.top, Math.min(top, menuRect.bottom - tipRect.height))
+  }
   top = Math.max(8, Math.min(top, window.innerHeight - tipRect.height - 8))
-  left = Math.max(8, left)
   tip.style.left = `${Math.round(left)}px`
   tip.style.top = `${Math.round(top)}px`
 }
@@ -97,10 +105,11 @@ export function enhanceMenuSelect(select) {
       const selected = option.selected
       item.setAttribute('aria-selected', String(selected))
       item.classList.toggle('is-selected', selected)
+      // 只走自定义气泡：不能再设原生 title，否则浏览器会再弹一个，
+      // 两个气泡一左一右同时出现。
       const description = option.getAttribute('data-description') || ''
       if (description) {
         item.dataset.description = description
-        item.title = description
         item.classList.add('has-description')
       }
       item.textContent = option.textContent
@@ -138,16 +147,26 @@ export function enhanceMenuSelect(select) {
   // 模型菜单项悬停/键盘聚焦时显示介绍气泡
   menu.addEventListener('mouseover', event => {
     const item = event.target.closest('.menu-select-item[data-description]')
-    if (item) showDescriptionTip(item, item.dataset.description)
+    if (item) showDescriptionTip(menu, item, item.dataset.description)
   })
+  // 菜单项之间移动时 relatedTarget 还在菜单里，这时不隐藏，避免来回闪
   menu.addEventListener('mouseout', event => {
-    if (event.target.closest('.menu-select-item[data-description]')) hideDescriptionTip()
+    if (!event.target.closest('.menu-select-item[data-description]')) return
+    if (menu.contains(event.relatedTarget)) return
+    hideDescriptionTip()
   })
+  menu.addEventListener('mouseleave', hideDescriptionTip)
   menu.addEventListener('focusin', event => {
     const item = event.target.closest('.menu-select-item[data-description]')
-    if (item) showDescriptionTip(item, item.dataset.description)
+    if (item) showDescriptionTip(menu, item, item.dataset.description)
   })
-  menu.addEventListener('focusout', hideDescriptionTip)
+  menu.addEventListener('focusout', event => {
+    if (menu.contains(event.relatedTarget)) return
+    hideDescriptionTip()
+  })
+  // 气泡是 fixed 定位：页面滚动或窗口尺寸变化后旧坐标会失真，直接收起
+  window.addEventListener('resize', hideDescriptionTip)
+  window.addEventListener('scroll', hideDescriptionTip, { capture: true, passive: true })
 
   trigger.addEventListener('click', event => {
     event.stopPropagation()
