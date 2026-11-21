@@ -8,6 +8,9 @@ let openWrap = null
 
 /** 模型菜单的悬停说明气泡：挂在 body 上，避免被菜单的 overflow 裁掉 */
 let descriptionTip = null
+/** 气泡当前跟随的菜单与选项；页面布局变化时要重新量 */
+let tipAnchor = null
+let tipTimer = 0
 
 function ensureDescriptionTip() {
   if (descriptionTip) return descriptionTip
@@ -19,21 +22,21 @@ function ensureDescriptionTip() {
   return descriptionTip
 }
 
-function hideDescriptionTip() {
-  if (descriptionTip) descriptionTip.hidden = true
-}
-
-function showDescriptionTip(menu, item, text) {
-  if (!text) {
+/**
+ * 按菜单与选项当前的位置摆放气泡。
+ * 横向贴菜单外沿，纵向跟随当前选项：只靠 item.right 会压进菜单的
+ * 内边距/滚动条，看起来像叠在一起。
+ */
+function placeDescriptionTip() {
+  const tip = descriptionTip
+  if (!tip || tip.hidden || !tipAnchor) return
+  const { menu, item } = tipAnchor
+  // 菜单被重新渲染或关掉后，旧坐标没有意义
+  if (!menu.isConnected || !item.isConnected) {
     hideDescriptionTip()
     return
   }
-  const tip = ensureDescriptionTip()
-  tip.textContent = text
-  tip.hidden = false
 
-  // 横向贴菜单外沿，纵向跟随当前选项：只靠 item.right 会把气泡
-  // 压进菜单的内边距/滚动条，看起来像叠在一起。
   const menuRect = menu.getBoundingClientRect()
   const itemRect = item.getBoundingClientRect()
   const tipRect = tip.getBoundingClientRect()
@@ -51,6 +54,37 @@ function showDescriptionTip(menu, item, text) {
   top = Math.max(8, Math.min(top, window.innerHeight - tipRect.height - 8))
   tip.style.left = `${Math.round(left)}px`
   tip.style.top = `${Math.round(top)}px`
+}
+
+function hideDescriptionTip() {
+  tipAnchor = null
+  if (tipTimer) {
+    clearInterval(tipTimer)
+    tipTimer = 0
+  }
+  if (descriptionTip) descriptionTip.hidden = true
+}
+
+function showDescriptionTip(menu, item, text) {
+  if (!text) {
+    hideDescriptionTip()
+    return
+  }
+  // 以选项所在的菜单为准，避免调用方传错节点时把气泡摆到别的菜单旁边
+  const owner = item.closest('.menu-select-menu') || menu
+  if (!owner || !owner.isConnected || owner.hidden || !owner.getClientRects().length) {
+    hideDescriptionTip()
+    return
+  }
+
+  const tip = ensureDescriptionTip()
+  tip.textContent = text
+  tip.hidden = false
+  tipAnchor = { menu: owner, item }
+  placeDescriptionTip()
+  // 生成完成、参考图出现、布局切换都会让菜单在悬停期间挪位置；
+  // 只在鼠标进出时量一次，气泡会停在旧坐标上，离菜单越来越远。
+  if (!tipTimer) tipTimer = setInterval(placeDescriptionTip, 80)
 }
 
 function closeOpen(except) {
