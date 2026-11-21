@@ -2641,6 +2641,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     function resizeFreePrompt() {
       const input = dom.freePrompt
       if (!input) return
+      // 改写面板展开时输入区是 display:none，scrollHeight 为 0；
+      // 这时写高度会把输入框压没，等它重新可见再算。
+      if (!input.offsetParent) return
       input.style.height = 'auto'
       input.style.height = `${Math.min(input.scrollHeight, 180)}px`
     }
@@ -3683,11 +3686,34 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
     /** 提示词写回输入框时要同时照顾字数与本地快照，避免刷新后回退 */
     function applyFreePrompt(value) {
-      dom.freePrompt.value = value
+      const input = dom.freePrompt
+      const before = input.offsetHeight
+      input.value = value
       state.freePrompt = value
       dom.freeCount.textContent = String(value.length)
       // 程序化写入不触发 input 事件，不手动重算高度，长文本会憋在原来的小框里
       resizeFreePrompt()
+      // 优化/改写会把整条提示词换掉：高度瞬间变化会让输入条「跳」一下。
+      // 只补一段高度过渡，让新旧内容的切换落在同一个动作里。
+      const after = input.offsetHeight
+      const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      if (!reduceMotion && before > 0 && after > 0 && before !== after && input.animate) {
+        for (const animation of input.getAnimations()) {
+          if (animation.id === 'prompt-resize') animation.cancel()
+        }
+        const animation = input.animate(
+          [{ height: `${before}px` }, { height: `${after}px` }],
+          { duration: 180, easing: 'cubic-bezier(0.2, 0.9, 0.25, 1)' },
+        )
+        animation.id = 'prompt-resize'
+        // 窗口在后台时浏览器不给动画帧，动画会停在起始高度；兜底收掉，
+        // 让输入框回到已经算好的最终高度，不留下一个悬空的大框。
+        setTimeout(() => {
+          if (animation.playState === 'running' && animation.currentTime < 180) {
+            animation.cancel()
+          }
+        }, 500)
+      }
       persistSoon()
     }
 
@@ -3702,6 +3728,12 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
     /** 用对话模型把一句短描述扩写成完整生图提示词；失败时原样保留用户输入 */
     async function optimizeFreePrompt() {
+      // 改写面板展开时输入框是隐藏的：这时优化会把结果写回看不见的输入框，
+      // 高度也会量成 0，面板的素材和原文还会和它对不上。
+      if (dom.freeRevise && !dom.freeRevise.hidden) {
+        showToast('先应用或收起改写面板，再优化提示词')
+        return
+      }
       let current = dom.freePrompt.value.trim()
       if (!current) {
         showToast('先写一点画面描述，AI 才能帮你扩写')
@@ -4016,7 +4048,6 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     /* 请求代次：收起面板或再发一次都会 +1，迟到的响应据此丢弃 */
     let reviseInlineSeq = 0
     let reviseInlineBusy = false
-    let reviseInlineBusyHandle = null
 
     /** 面板里的原文预览：长提示词打开时自动摊开，短提示词点「查看」才出现 */
     function setReviseInlineOrigin(open) {
@@ -4049,6 +4080,12 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       // 已经展开了：再点一次等于收起
       if (!dom.freeRevise.hidden) {
         closeReviseInline()
+        return
+      }
+      // 优化还在跑时别再开改写：忙碌胶囊会压到面板底部按钮上，
+      // 两条请求也会争着写同一个输入框。
+      if (dom.freePromptShell.classList.contains('is-ai-busy')) {
+        showToast('AI 正在优化提示词，完成后再改写')
         return
       }
 
@@ -4087,12 +4124,12 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       if (dom.freeRevise.hidden) return
       // 收起就作废这次请求，免得结果回来时面板已经关了还往里写
       reviseInlineSeq += 1
-      reviseInlineBusyHandle?.stop()
-      reviseInlineBusyHandle = null
       reviseInlineBusy = false
       resetReviseInlineActions()
       dom.freeRevise.hidden = true
       dom.freePromptShell.classList.remove('is-revising')
+      // 面板展开期间输入框是隐藏的，期间改过值也量不到高度；重新可见后补算一次
+      resizeFreePrompt()
       dom.freePrompt.focus()
     }
 
@@ -4103,20 +4140,26 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
      */
     function markReviseDiff(before, after) {
       const next = String(after)
+      // 连分隔符一起切，保留原文的换行和空格：预览必须和最终写回输入框的
+      // 文本一致，否则长提示词的分段会在预览里被挤成一段，看到的内容和
+      // 点「应用」后的内容对不上。
       const split = text =>
-        (String(text).match(/[^，。；：、,!?！？\n]+[，。；：、,!?！？\n]?/g) || [])
-          .map(part => part.trim())
-          .filter(Boolean)
-      const known = new Set(split(before))
+        String(text).match(/[^，。；：、,!?！？\n]*[，。；：、,!?！？\n]?/g) || []
+      const clauses = parts => parts.map(part => part.trim()).filter(Boolean)
+      const known = new Set(clauses(split(before)))
       const parts = split(next)
       if (!parts.length) return escapeHtml(next)
-      const total = parts.reduce((sum, part) => sum + part.length, 0) || 1
-      const changed = parts
+      const keys = clauses(parts)
+      const total = keys.reduce((sum, part) => sum + part.length, 0) || 1
+      const changed = keys
         .filter(part => !known.has(part))
         .reduce((sum, part) => sum + part.length, 0)
       if (changed / total > 0.5) return escapeHtml(next)
       return parts
-        .map(part => (known.has(part) ? escapeHtml(part) : `<mark>${escapeHtml(part)}</mark>`))
+        .map(part => {
+          const key = part.trim()
+          return !key || known.has(key) ? escapeHtml(part) : `<mark>${escapeHtml(part)}</mark>`
+        })
         .join('')
     }
 
@@ -4165,7 +4208,9 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         '<span class="revise-inline-spin" aria-hidden="true"></span>改写中'
       dom.freeReviseStatus.textContent =
         referencePaths.length || contextPaths.length ? '正在看图并改写…' : '正在改写…'
-      reviseInlineBusyHandle = startAiBusy(dom.freePromptShell, { pool: 'optimize', action: '改写' })
+      // 面板自己有扫光、按钮转圈和状态文案；再挂整条输入框的 AI 忙碌层
+      // 会把胶囊压到面板标题上，两种「正在…」也会重复。
+      // （资产弹窗的改写仍然用字段上的忙碌层，那边没有面板。）
 
       try {
         const result = await revisePrompt({
@@ -4187,8 +4232,6 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       } finally {
         if (seq === reviseInlineSeq) {
           reviseInlineBusy = false
-          reviseInlineBusyHandle?.stop()
-          reviseInlineBusyHandle = null
           dom.freeReviseRun.disabled = false
           // 有结果时按钮是「应用」，没结果回到「开始改写」
           dom.freeReviseRunText.textContent = dom.freeRevise.classList.contains('has-result')

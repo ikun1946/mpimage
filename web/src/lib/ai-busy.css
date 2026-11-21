@@ -119,16 +119,30 @@
 .ai-busy-dots i:nth-child(2) { animation-delay: 0.15s; }
 .ai-busy-dots i:nth-child(3) { animation-delay: 0.3s; }
 
-/* 忙碌时把首行往下让一点，避免胶囊压住文字；结束后平滑还原 */
-.prompt-shell .textarea,
+/* 自由创作的输入条高度跟着内容走，胶囊压首行会直接挡住文字，
+   把首行往下顶又会让矮输入框里的正文被裁掉。
+   这里改成把胶囊放进底部工具栏的空白处：不参与正文排版，也不改高度。 */
+.prompt-shell .ai-busy-pill {
+  top: auto;
+  bottom: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* 窄屏工具栏已经被按钮占满，宁可只留金色流光边框 */
+@media (max-width: 720px) {
+  .prompt-shell .ai-busy-pill {
+    display: none;
+  }
+}
+
+/* 弹窗与捏脸页的字段有固定高度，忙碌时把首行往下让一点；结束后平滑还原 */
 .face-text-field .textarea,
 .modal-prompt-field .textarea {
   transition: padding-top 180ms ease;
 }
 
-/* 类名写两遍：批次页的 .free-form .prompt-shell .textarea 也是三档权重，
-   这里压过它才能保证忙碌时首行让位给胶囊 */
-.prompt-shell.is-ai-busy.is-ai-busy > .textarea,
+/* 类名写两遍：批次页对 .textarea 的 padding 也是三档权重，这里要压过它 */
 .face-text-field.is-ai-busy.is-ai-busy > .textarea,
 .modal-prompt-field.is-ai-busy.is-ai-busy > .textarea {
   padding-top: 36px;

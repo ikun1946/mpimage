@@ -404,10 +404,77 @@ export function missingConstraints(prompt: string, constraints: readonly PromptC
 /** 改写 / 改图指令里点名过的约束，说明用户这次就是要动它，不再保护 */
 function instructionMentions(instruction: string, constraint: PromptConstraint): boolean {
   const haystack = normalize(instruction)
+  if (constraint.kind === 'negative') {
+    // 否定项「被点名」有两种相反的含义：
+    //   「加上文字水印」= 要改，放开保护；
+    //   「不要文字水印」「把水印去掉」= 在加强禁止，继续保护。
+    return constraint.tokens.some(token => {
+      const key = normalize(token)
+      if (key.length < 2) return false
+      let index = haystack.indexOf(key)
+      while (index >= 0) {
+        const before = haystack.slice(Math.max(0, index - 12), index)
+        const after = haystack.slice(index + key.length, index + key.length + 8)
+        if (!NEGATED_TARGET.test(before) && !REMOVED_AFTER.test(after)) return true
+        index = haystack.indexOf(key, index + 1)
+      }
+      return false
+    })
+  }
   return constraint.tokens.some(token => {
     const key = normalize(token)
     return key.length >= 2 && haystack.includes(key)
   })
+}
+
+/** 最长公共子串：指令和约束之间允许插修饰词，不能只认完整短语 */
+function commonSpan(a: string, b: string): string {
+  if (!a || !b) return ''
+  let best = ''
+  let prev = new Array<number>(b.length + 1).fill(0)
+  for (let i = 1; i <= a.length; i += 1) {
+    const row = new Array<number>(b.length + 1).fill(0)
+    for (let j = 1; j <= b.length; j += 1) {
+      if (a[i - 1] !== b[j - 1]) continue
+      const run = (prev[j - 1] ?? 0) + 1
+      row[j] = run
+      if (run > best.length) best = a.slice(i - run, i)
+    }
+    prev = row
+  }
+  return best
+}
+
+const NEGATED_TARGET =
+  /(?:不要|不用|无需|不需要|别|禁止|避免|拒绝|去掉|去除|删除|移除|不出现|不包含|remove|avoid|without|no|don't|do not|exclude)[^。；;，,\n]{0,6}$/
+const REMOVED_AFTER = /(?:去掉|去除|删除|移除|不要|禁止|避免|remove|avoid|without|exclude)/
+
+/**
+ * 改写指令是不是在点名要求「出现」这条否定项。
+ *
+ * 原文写「不要出现：三视图并列的排版」，后来又要求「改成三视图并列的
+ * 角色展示排版」时，旧的禁止项必须放开，否则回填逻辑会把两条互相矛盾
+ * 的约束一起塞进提示词，模型只能二选一。
+ * 反过来，「不要三视图」「把三视图去掉」是在强化禁止，不能放开。
+ */
+function instructionReversesNegative(instruction: string, constraint: PromptConstraint): boolean {
+  if (constraint.kind !== 'negative') return false
+  const body = normalize(constraint.text)
+  if (!body) return false
+  const haystack = normalize(instruction)
+  const core = commonSpan(haystack, body)
+  // 短对象（如「黑尾」）要求整词命中；长对象至少共享 3 个字的实义片段
+  const minCore = body.length <= 3 ? body.length : 3
+  if (core.length < minCore) return false
+
+  let index = haystack.indexOf(core)
+  while (index >= 0) {
+    const before = haystack.slice(Math.max(0, index - 12), index)
+    const after = haystack.slice(index + core.length, index + core.length + 8)
+    if (!NEGATED_TARGET.test(before) && !REMOVED_AFTER.test(after)) return true
+    index = haystack.indexOf(core, index + 1)
+  }
+  return false
 }
 
 const CHANGE_VERBS_TAIL = /(?:去掉|去除|删除|移除|不要|擦掉|换掉|改成|换成|变成|改为|调成|替换)$/
@@ -483,7 +550,11 @@ export function selectConstraints(
   return constraints.filter(constraint => {
     if (restyle && (constraint.kind === 'style' || constraint.kind === 'color')) return false
     if (toNonPhoto && PHOTO_PARAM_WORDS.some(word => constraint.text.includes(word))) return false
-    if (instructionTargetsChange(text, constraint)) return false
+    // 这次指令要的正是被禁止的对象：旧的否定项要一起退场
+    if (instructionReversesNegative(text, constraint)) return false
+    // 否定项不走「改动动词」判定：「不要 X」「把 X 去掉」是在加强禁止，
+    // 不是要把这条保护撤掉；只有上面「要求出现 X」才放开。
+    if (constraint.kind !== 'negative' && instructionTargetsChange(text, constraint)) return false
     if (options.ignoreMentions) return true
     return !instructionMentions(text, constraint)
   })
