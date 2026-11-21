@@ -10,6 +10,7 @@ import {
   testComfyConnection,
 } from '../app/products/images/comfyui.js'
 import { comfyLifecycle } from '../app/products/images/comfy-lifecycle.js'
+import { detectComfyInstalls } from '../app/products/images/comfy-detect.js'
 import { requireAdmin } from './auth.js'
 
 const IMPORT_BODY_LIMIT = 2 * 1024 * 1024
@@ -55,6 +56,14 @@ export function registerComfyRoutes(
   app.post('/api/admin/comfy/reconnect', async request => {
     requireAdmin(request)
     return comfyLifecycle.reconnect()
+  })
+
+  /** 自动检测本机 ComfyUI 安装位置：只做浅层扫描，不启动任何进程 */
+  app.get('/api/admin/comfy/detect', async request => {
+    requireAdmin(request)
+    const query = (request.query ?? {}) as { refresh?: string }
+    const candidates = await detectComfyInstalls({ refresh: query.refresh === '1' })
+    return { candidates }
   })
 
   /** 只测 ComfyUI 本身，不触发生成 */

@@ -18,6 +18,7 @@ import {
   type ComfyLaunchConfig,
 } from '../../control/comfy-config.js'
 import type { SettingsStore } from '../../control/settings-store.js'
+import { detectComfyInstalls } from './comfy-detect.js'
 
 export type ComfyState =
   | 'STOPPED'
@@ -117,15 +118,24 @@ interface LaunchSpec {
  *   Windows 便携包：<root>/python_embeded/python.exe + <root>/ComfyUI/main.py
  *   标准安装：<root>/venv/Scripts/python.exe + <root>/main.py
  */
-function resolveLaunchSpec(config: ComfyConfig): LaunchSpec {
+async function resolveLaunchSpec(config: ComfyConfig): Promise<LaunchSpec> {
   const launch = config.launch
-  const root = launch.installDir.trim()
-  const entryInput = launch.entryScript.trim()
-  const pythonInput = launch.pythonPath.trim()
+  let root = launch.installDir.trim()
+  let entryInput = launch.entryScript.trim()
+  let pythonInput = launch.pythonPath.trim()
+  if (!root && !entryInput) {
+    // 用户还没配过：先在常见位置找一遍，找到就直接用，不必先打开控制台
+    const detected = (await detectComfyInstalls())[0]
+    if (detected) {
+      root = detected.installDir
+      entryInput = detected.entryScript
+      pythonInput = pythonInput || detected.pythonPath
+    }
+  }
   if (!root && !entryInput) {
     throw new ApiError(
       'COMFY_NOT_CONFIGURED',
-      'ComfyUI 没有运行，且还没有配置安装目录。请在控制台填写 ComfyUI 安装目录，或先手动打开 ComfyUI。',
+      'ComfyUI 没有运行，也没有找到安装目录。请在控制台点「自动检测安装位置」，或手动填写安装目录。',
       400,
     )
   }
@@ -275,7 +285,7 @@ export class ComfyLifecycle {
   }
 
   private async startInternal(config: ComfyConfig): Promise<void> {
-    const spec = resolveLaunchSpec(config)
+    const spec = await resolveLaunchSpec(config)
     this.state = 'STARTING'
     this.error = null
     this.logTail = []

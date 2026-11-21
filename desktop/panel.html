@@ -2794,6 +2794,11 @@
         </div>
         <details class="comfy-stage">
           <summary>本机启动配置（远程地址不会启动本地进程）</summary>
+          <div class="form-row">
+            <button class="button mini" type="button" id="comfy-detect">自动检测安装位置</button>
+            <select id="comfy-detected" hidden></select>
+            <span class="current" id="comfy-detect-hint"></span>
+          </div>
           <div class="comfy-map-grid">
             <label>安装目录
               <input type="text" id="comfy-install-dir" placeholder="C:\\Users\\你\\ComfyUI\\ComfyUI_windows_portable" spellcheck="false" autocomplete="off" />
@@ -2808,7 +2813,7 @@
               <input type="text" id="comfy-extra-args" placeholder="例如 --lowvram --enable-manager" spellcheck="false" autocomplete="off" />
             </label>
           </div>
-          <p class="hint">未填写时按便携包 <code>python_embeded/python.exe + ComfyUI/main.py</code> 或标准安装的 <code>venv</code> 自动查找；只管理由本服务启动的实例，用户手动启动的实例只连接、不关闭。</p>
+          <p class="hint">通常只填「安装目录」就够了：Python 与入口脚本留空会按便携包 <code>python_embeded/python.exe + ComfyUI/main.py</code> 或标准安装的 <code>venv</code> 自动查找。只管理由本服务启动的实例，用户手动启动的实例只连接、不关闭。</p>
         </details>
       </div>
 
@@ -3176,6 +3181,9 @@
     comfyPythonPath: $('comfy-python-path'),
     comfyEntryScript: $('comfy-entry-script'),
     comfyExtraArgs: $('comfy-extra-args'),
+    comfyDetect: $('comfy-detect'),
+    comfyDetected: $('comfy-detected'),
+    comfyDetectHint: $('comfy-detect-hint'),
     feedbackNotice: $('feedback-notice'),
     feedbackList: $('feedback-list'),
     feedbackEmpty: $('feedback-empty'),
@@ -4894,6 +4902,71 @@
     dom.comfyExtraArgs.value = value.extraArgs || ''
   }
 
+  let comfyDetectedCandidates = []
+  let comfyDetectSeq = 0
+  let comfyDetectBusy = false
+  /** 用户改过启动配置还没保存：loadComfy 不要用已保存值覆盖 */
+  let comfyLaunchDirty = false
+
+  function fillComfyCandidate(candidate) {
+    if (!candidate) return
+    dom.comfyInstallDir.value = candidate.installDir || ''
+    dom.comfyPythonPath.value = candidate.pythonPath || ''
+    dom.comfyEntryScript.value = candidate.entryScript || ''
+    setCurrent(
+      dom.comfyDetectHint,
+      `已识别：${candidate.installDir}${candidate.portable ? '（便携包）' : ''}，确认后点「保存服务设置」`,
+      'ok',
+    )
+  }
+
+  async function detectComfyInstall(options) {
+    const auto = Boolean(options && options.auto)
+    if (!dom.comfyDetect) return
+    if (auto && comfyDetectBusy) return
+    // 每次检测领一个序号：先发后到的旧结果直接丢掉，避免覆盖用户后来的选择
+    const seq = ++comfyDetectSeq
+    comfyDetectBusy = true
+    if (!auto) {
+      dom.comfyDetect.disabled = true
+      setCurrent(dom.comfyDetectHint, '正在扫描常见安装位置…')
+    }
+    try {
+      const result = await api('/api/admin/comfy/detect' + (auto ? '' : '?refresh=1'))
+      if (seq !== comfyDetectSeq) return
+      if (!result.ok) {
+        if (!auto) setCurrent(dom.comfyDetectHint, result.error || '自动检测失败', 'error')
+        return
+      }
+      const list = Array.isArray(result.data && result.data.candidates) ? result.data.candidates : []
+      if (!list.length) {
+        if (!auto) setCurrent(dom.comfyDetectHint, '没找到 ComfyUI 安装目录，请手动填写安装目录', 'warn')
+        return
+      }
+      // 自动模式只在三项都空时填，避免覆盖用户已经填好的路径
+      const untouched =
+        !dom.comfyInstallDir.value.trim() &&
+        !dom.comfyPythonPath.value.trim() &&
+        !dom.comfyEntryScript.value.trim()
+      if (auto && !untouched) return
+      comfyDetectedCandidates = list
+      if (list.length > 1) {
+        dom.comfyDetected.innerHTML = list
+          .map((item, index) => `<option value="${index}">${escapeHtml(item.installDir)}</option>`)
+          .join('')
+        dom.comfyDetected.hidden = false
+      } else {
+        dom.comfyDetected.hidden = true
+      }
+      fillComfyCandidate(list[0])
+    } finally {
+      if (seq === comfyDetectSeq) {
+        comfyDetectBusy = false
+        if (dom.comfyDetect) dom.comfyDetect.disabled = false
+      }
+    }
+  }
+
   function renderComfyStatus(status) {
     if (!status) return
     const label = COMFY_STATE_TEXT[status.state] || status.state || '未知'
@@ -5007,6 +5080,7 @@
         comfyWorkflows = Array.isArray(data.workflows) ? data.workflows : workflows
         renderComfyWorkflows()
         renderComfyLaunch(data.launch)
+        comfyLaunchDirty = false
         saved = true
       } finally {
         comfyServiceBusy = false
@@ -5032,7 +5106,12 @@
     }
     const data = result.data || {}
     dom.comfyUrl.value = data.baseUrl || 'http://127.0.0.1:8188'
-    renderComfyLaunch(data.launch)
+    // 用户改过启动配置还没保存时不要覆盖，也别再自动填充
+    if (!comfyLaunchDirty) {
+      renderComfyLaunch(data.launch)
+      // 还没配置安装目录时自动找一遍，找到就填好（仍需点保存才写入设置）
+      if (!data.launch || !data.launch.installDir) void detectComfyInstall({ auto: true })
+    }
     comfyWorkflows = Array.isArray(data.workflows) ? data.workflows : []
     renderComfyWorkflows()
     setCurrent(
@@ -6281,6 +6360,28 @@
       dom.comfyIdleEnabled.addEventListener('change', () => {
         dom.comfyIdleMinutes.disabled = !dom.comfyIdleEnabled.checked
       })
+    }
+    if (dom.comfyDetect) {
+      dom.comfyDetect.addEventListener('click', () => void detectComfyInstall())
+    }
+    if (dom.comfyDetected) {
+      dom.comfyDetected.addEventListener('change', () => {
+        comfyLaunchDirty = true
+        fillComfyCandidate(comfyDetectedCandidates[Number(dom.comfyDetected.value)])
+      })
+    }
+    for (const input of [
+      dom.comfyInstallDir,
+      dom.comfyPythonPath,
+      dom.comfyEntryScript,
+      dom.comfyExtraArgs,
+      dom.comfyAutoStart,
+      dom.comfyIdleEnabled,
+      dom.comfyIdleMinutes,
+    ]) {
+      if (!input) continue
+      input.addEventListener('input', () => { comfyLaunchDirty = true })
+      input.addEventListener('change', () => { comfyLaunchDirty = true })
     }
     if (dom.comfyDiscover) dom.comfyDiscover.addEventListener('click', () => void discoverComfy())
     if (dom.comfyImportRemote) dom.comfyImportRemote.addEventListener('click', () => void importComfyRemote())
