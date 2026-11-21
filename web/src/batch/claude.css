@@ -1516,8 +1516,12 @@ body[data-mode="create"] .app-main main {
 
 /* 模型菜单的悬停介绍：挂到 body 上，避免被菜单滚动容器裁切 */
 .menu-select-tip {
-  position: fixed;
+  /* 跟菜单放在同一个定位容器里：位置用 offsetLeft/Top 算，和菜单共享
+     同一套布局坐标，页面缩放、视觉视口偏移时也不会各走各的。 */
+  position: absolute;
   z-index: 200;
+  /* 宽度按内容算，不受定位容器剩余宽度影响；再用 max-width 控制折行 */
+  width: max-content;
   max-width: 280px;
   padding: 10px 12px;
   color: var(--ink-soft);

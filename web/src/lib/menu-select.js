@@ -37,23 +37,41 @@ function placeDescriptionTip() {
     return
   }
 
-  const menuRect = menu.getBoundingClientRect()
-  const itemRect = item.getBoundingClientRect()
-  const tipRect = tip.getBoundingClientRect()
+  // 全部用 offset 坐标（文档布局坐标）摆放，不再混用视口矩形：
+  // 窗口缩放、视觉视口偏移或页面滚动时，气泡和菜单不会各走各的。
   const gap = 8
-  let left = menuRect.right + gap
-  if (left + tipRect.width > window.innerWidth - 8) {
-    left = menuRect.left - tipRect.width - gap
+  const tipWidth = tip.offsetWidth
+  const menuBox = documentOffset(menu)
+  const itemBox = documentOffset(item)
+  const menuWidth = menu.offsetWidth
+
+  // 右侧放不下就翻到菜单左侧
+  let left = menuBox.x + menuWidth + gap
+  if (left - window.scrollX + tipWidth > document.documentElement.clientWidth - 8) {
+    left = menuBox.x - tipWidth - gap
   }
-  left = Math.max(8, Math.min(left, window.innerWidth - tipRect.width - 8))
-  let top = itemRect.top + (itemRect.height - tipRect.height) / 2
-  // 选项行若因布局变化给出过期坐标，也不让气泡飞出菜单范围
-  if (tipRect.height < menuRect.height) {
-    top = Math.max(menuRect.top, Math.min(top, menuRect.bottom - tipRect.height))
-  }
-  top = Math.max(8, Math.min(top, window.innerHeight - tipRect.height - 8))
+
+  // 纵向用「选项中心 + translateY(-50%)」对齐：不依赖气泡自身高度，
+  // 文案换行数变化时也不会偏半截。
+  const top = itemBox.y - menu.scrollTop + item.offsetHeight / 2
+  // offsetLeft/Top 累加出来的就是文档坐标，absolute 也用文档坐标，
+  // 不能再加 scrollX/Y，否则页面滚动后气泡会被多推一个屏幕的距离。
   tip.style.left = `${Math.round(left)}px`
   tip.style.top = `${Math.round(top)}px`
+  tip.style.transform = 'translateY(-50%)'
+}
+
+/** 累加 offsetLeft/offsetTop 得到元素在文档里的布局坐标（不含 transform） */
+function documentOffset(element) {
+  let x = 0
+  let y = 0
+  let node = element
+  while (node) {
+    x += node.offsetLeft || 0
+    y += node.offsetTop || 0
+    node = node.offsetParent
+  }
+  return { x, y }
 }
 
 function hideDescriptionTip() {
