@@ -18,6 +18,7 @@ import {
   resolveCustomProviderModel,
 } from '../app/control/client-models.js'
 import { comfyGate, requestComfyImage } from '../app/products/images/comfyui.js'
+import { comfyLifecycle } from '../app/products/images/comfy-lifecycle.js'
 import type { RealtimeMonitor } from '../services/realtime-monitor.js'
 import { detectImageType, readImageSize } from '../app/products/images/imaging.js'
 import { generateImageTitle, titleForImage } from '../app/products/images/image-title.js'
@@ -431,22 +432,26 @@ export function registerImageRoutes(
             deps.monitor?.stage(callId, 'generating')
 
             if (comfyModel) {
-              return await requestComfyImage(
-                {
-                  baseUrl: comfyModel.baseUrl,
-                  model: selectedModel,
-                  workflow: comfyModel.workflow,
-                  // ComfyUI 首次加载模型、低显存交换都比文本网关慢，用总的生图超时
-                  timeoutMs: Math.max(promptTimeoutMs, config.comfyTimeoutMs),
-                },
-                {
-                  prompt,
-                  ratioHint: ratio.promptHint,
-                  width: comfySize.width,
-                  height: comfySize.height,
-                  references,
-                },
-              )
+              // 按需启动 + 活动计数：启动和生成期间不会被空闲关闭
+              return await comfyLifecycle.track(async () => {
+                const baseUrl = await comfyLifecycle.ensureReady()
+                return requestComfyImage(
+                  {
+                    baseUrl,
+                    model: selectedModel,
+                    workflow: comfyModel.workflow,
+                    // ComfyUI 首次加载模型、低显存交换都比文本网关慢，用总的生图超时
+                    timeoutMs: Math.max(promptTimeoutMs, config.comfyTimeoutMs),
+                  },
+                  {
+                    prompt,
+                    ratioHint: ratio.promptHint,
+                    width: comfySize.width,
+                    height: comfySize.height,
+                    references,
+                  },
+                )
+              })
             }
 
             if (!upstreamOptions) throw new Error('上游配置缺失')

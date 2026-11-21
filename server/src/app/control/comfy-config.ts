@@ -69,9 +69,35 @@ export interface ComfyWorkflowConfig {
   updatedAt?: string
 }
 
+/** 本机启动配置：只对 127.0.0.1 / localhost 生效，远程地址只连接不启动 */
+export interface ComfyLaunchConfig {
+  /** 使用 ComfyUI 模型时自动拉起本机服务 */
+  autoStart: boolean
+  /** 空闲多少分钟自动关闭；0 = 关闭自动关闭 */
+  idleMinutes: number
+  /** ComfyUI 根目录（便携包根目录或 ComfyUI 目录） */
+  installDir: string
+  /** Python 可执行文件；留空按常见布局自动找 */
+  pythonPath: string
+  /** 入口脚本；留空按 ComfyUI/main.py 或 main.py 自动找 */
+  entryScript: string
+  /** 追加启动参数，空格分隔 */
+  extraArgs: string
+}
+
+export const COMFY_DEFAULT_LAUNCH: ComfyLaunchConfig = {
+  autoStart: true,
+  idleMinutes: 15,
+  installDir: '',
+  pythonPath: '',
+  entryScript: '',
+  extraArgs: '',
+}
+
 export interface ComfyConfig {
   baseUrl: string
   workflows: ComfyWorkflowConfig[]
+  launch: ComfyLaunchConfig
 }
 
 export function comfyModelId(workflowId: string): string {
@@ -105,7 +131,23 @@ export function normalizeComfyConfig(raw: unknown): ComfyConfig {
     workflows.push(parsed)
   }
 
-  return { baseUrl, workflows }
+  return { baseUrl, workflows, launch: normalizeLaunch(object?.launch) }
+}
+
+/** 启动配置容错：坏值回落到默认，避免一份坏配置让服务起不来 */
+function normalizeLaunch(raw: unknown): ComfyLaunchConfig {
+  const object = asRecord(raw) ?? {}
+  const minutes = Number(object.idleMinutes)
+  return {
+    autoStart: object.autoStart !== false,
+    idleMinutes: Number.isFinite(minutes)
+      ? Math.min(1440, Math.max(0, Math.round(minutes)))
+      : COMFY_DEFAULT_LAUNCH.idleMinutes,
+    installDir: text(object.installDir).slice(0, 500),
+    pythonPath: text(object.pythonPath).slice(0, 500),
+    entryScript: text(object.entryScript).slice(0, 500),
+    extraArgs: text(object.extraArgs).slice(0, 1000),
+  }
 }
 
 /** 管理端保存时严格校验，任何一项有问题都整份拒绝，避免保存一半 */
@@ -145,7 +187,7 @@ export function parseComfyConfig(raw: unknown): ComfyConfig {
     })
   }
 
-  return { baseUrl, workflows }
+  return { baseUrl, workflows, launch: normalizeLaunch(object.launch) }
 }
 
 /** 公开模型 ID 可能来自低版本配置；find 不到时返回 null */
@@ -313,6 +355,17 @@ function parseOutputs(raw: unknown, workflow: ComfyApiWorkflow): string[] {
   return result
 }
 
+/**
+ * 本机地址没写端口时补 ComfyUI 默认端口。
+ * 不补的话探测会连 80、启动却写 --port 8188，永远对不上，只能等到 240 秒超时。
+ */
+function applyDefaultComfyPort(url: URL): string {
+  const host = url.hostname.toLowerCase()
+  const loopback = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]'
+  if (!url.port && loopback) url.port = '8188'
+  return `${url.origin}${url.pathname.replace(/\/+$/, '')}`
+}
+
 function parseBaseUrl(raw: unknown): string {
   const value = text(raw)
   if (!value) return COMFY_DEFAULT_BASE_URL
@@ -328,7 +381,7 @@ function parseBaseUrl(raw: unknown): string {
   if (url.username || url.password || url.search || url.hash) {
     throw new ApiError('UPSTREAM_INVALID', 'ComfyUI 地址不能包含账号、查询参数或锚点', 400)
   }
-  return `${url.origin}${url.pathname.replace(/\/+$/, '')}`
+  return applyDefaultComfyPort(url)
 }
 
 function normalizeBaseUrlSafe(raw: unknown): string {
@@ -338,7 +391,7 @@ function normalizeBaseUrlSafe(raw: unknown): string {
     const url = new URL(value)
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return ''
     if (url.username || url.password || url.search || url.hash) return ''
-    return `${url.origin}${url.pathname.replace(/\/+$/, '')}`
+    return applyDefaultComfyPort(url)
   } catch {
     return ''
   }

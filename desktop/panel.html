@@ -987,6 +987,47 @@
     margin-top: 10px;
   }
 
+  /* ComfyUI 服务：状态条 + 启动配置 */
+  .comfy-service {
+    margin: 4px 0 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface-subtle);
+  }
+
+  .comfy-service-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .comfy-service-head strong {
+    font-size: 13px;
+  }
+
+  .comfy-service .current {
+    margin: 0;
+  }
+
+  .comfy-service .form-row {
+    align-items: flex-end;
+  }
+
+  .comfy-service .check {
+    margin: 0;
+  }
+
+  .comfy-service input[type="number"] {
+    width: 84px;
+  }
+
+  .comfy-service .comfy-stage {
+    margin-top: 8px;
+  }
+
   /* ComfyUI 工作流：沿用供应商卡片，工作流 JSON 默认折叠 */
   .comfy-card .comfy-label {
     flex: 1;
@@ -2735,6 +2776,42 @@
     </div>
     <div class="card-body">
       <div class="notice" id="comfy-notice" hidden></div>
+
+      <div class="comfy-service">
+        <div class="comfy-service-head">
+          <strong>ComfyUI 服务</strong>
+          <span class="current" id="comfy-service-state">读取中…</span>
+          <span class="current" id="comfy-service-detail"></span>
+        </div>
+        <div class="form-row">
+          <button class="button mini" type="button" id="comfy-start">启动</button>
+          <button class="button mini" type="button" id="comfy-stop">停止</button>
+          <button class="button mini" type="button" id="comfy-reconnect">重新连接</button>
+          <label class="check"><input type="checkbox" id="comfy-auto-start" checked /> 自动启动</label>
+          <label class="check"><input type="checkbox" id="comfy-idle-enabled" checked /> 空闲自动关闭</label>
+          <label>空闲分钟 <input type="number" id="comfy-idle-minutes" min="1" max="1440" value="15" /></label>
+          <button class="button mini" type="button" id="comfy-service-save">保存服务设置</button>
+        </div>
+        <details class="comfy-stage">
+          <summary>本机启动配置（远程地址不会启动本地进程）</summary>
+          <div class="comfy-map-grid">
+            <label>安装目录
+              <input type="text" id="comfy-install-dir" placeholder="C:\\Users\\你\\ComfyUI\\ComfyUI_windows_portable" spellcheck="false" autocomplete="off" />
+            </label>
+            <label>Python 路径
+              <input type="text" id="comfy-python-path" placeholder="留空自动找 python_embeded\\python.exe" spellcheck="false" autocomplete="off" />
+            </label>
+            <label>入口脚本
+              <input type="text" id="comfy-entry-script" placeholder="留空自动找 ComfyUI\\main.py" spellcheck="false" autocomplete="off" />
+            </label>
+            <label>启动参数
+              <input type="text" id="comfy-extra-args" placeholder="例如 --lowvram --enable-manager" spellcheck="false" autocomplete="off" />
+            </label>
+          </div>
+          <p class="hint">未填写时按便携包 <code>python_embeded/python.exe + ComfyUI/main.py</code> 或标准安装的 <code>venv</code> 自动查找；只管理由本服务启动的实例，用户手动启动的实例只连接、不关闭。</p>
+        </details>
+      </div>
+
       <div class="form-row">
         <label class="grow">ComfyUI 地址
           <input type="url" id="comfy-url" placeholder="http://127.0.0.1:8188" spellcheck="false" autocomplete="off" />
@@ -3086,6 +3163,19 @@
     comfyRemoteSelect: $('comfy-remote-select'),
     comfyFile: $('comfy-file'),
     comfyWorkflowList: $('comfy-workflow-list'),
+    comfyServiceState: $('comfy-service-state'),
+    comfyServiceDetail: $('comfy-service-detail'),
+    comfyStart: $('comfy-start'),
+    comfyStop: $('comfy-stop'),
+    comfyReconnect: $('comfy-reconnect'),
+    comfyServiceSave: $('comfy-service-save'),
+    comfyAutoStart: $('comfy-auto-start'),
+    comfyIdleEnabled: $('comfy-idle-enabled'),
+    comfyIdleMinutes: $('comfy-idle-minutes'),
+    comfyInstallDir: $('comfy-install-dir'),
+    comfyPythonPath: $('comfy-python-path'),
+    comfyEntryScript: $('comfy-entry-script'),
+    comfyExtraArgs: $('comfy-extra-args'),
     feedbackNotice: $('feedback-notice'),
     feedbackList: $('feedback-list'),
     feedbackEmpty: $('feedback-empty'),
@@ -4753,6 +4843,181 @@
     return `wf-${index}`
   }
 
+  /* ---------- ComfyUI 服务：状态、手动启停、本机启动配置 ---------- */
+  const COMFY_STATE_TEXT = {
+    STOPPED: '未启动',
+    STARTING: '正在启动',
+    CONNECTING: '正在连接',
+    READY: '已就绪',
+    BUSY: '正在执行任务',
+    STOPPING: '正在关闭',
+    ERROR: '出错',
+  }
+  const COMFY_STATE_TONE = {
+    STOPPED: '',
+    STARTING: 'warn',
+    CONNECTING: 'warn',
+    READY: 'ok',
+    BUSY: 'ok',
+    STOPPING: 'warn',
+    ERROR: 'error',
+  }
+  let comfyServiceTimer = null
+  let comfyServiceBusy = false
+
+  function collectComfyLaunch() {
+    const minutes = Number(dom.comfyIdleMinutes.value)
+    return {
+      autoStart: dom.comfyAutoStart.checked,
+      idleMinutes: dom.comfyIdleEnabled.checked
+        ? Math.min(1440, Math.max(1, Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : 15))
+        : 0,
+      installDir: dom.comfyInstallDir.value.trim(),
+      pythonPath: dom.comfyPythonPath.value.trim(),
+      entryScript: dom.comfyEntryScript.value.trim(),
+      extraArgs: dom.comfyExtraArgs.value.trim(),
+    }
+  }
+
+  function renderComfyLaunch(launch) {
+    const value = launch || {}
+    dom.comfyAutoStart.checked = value.autoStart !== false
+    const minutes = Number(value.idleMinutes)
+    dom.comfyIdleEnabled.checked = !(Number.isFinite(minutes) && minutes === 0)
+    dom.comfyIdleMinutes.value = String(
+      Number.isFinite(minutes) && minutes > 0 ? minutes : 15,
+    )
+    dom.comfyIdleMinutes.disabled = !dom.comfyIdleEnabled.checked
+    dom.comfyInstallDir.value = value.installDir || ''
+    dom.comfyPythonPath.value = value.pythonPath || ''
+    dom.comfyEntryScript.value = value.entryScript || ''
+    dom.comfyExtraArgs.value = value.extraArgs || ''
+  }
+
+  function renderComfyStatus(status) {
+    if (!status) return
+    const label = COMFY_STATE_TEXT[status.state] || status.state || '未知'
+    setCurrent(dom.comfyServiceState, label, COMFY_STATE_TONE[status.state] || '')
+
+    const bits = []
+    bits.push(status.local ? '本机' : '远程（只连接，不启动）')
+    if (status.state === 'READY' || status.state === 'BUSY') {
+      bits.push(status.owned ? '由本服务启动' : '复用已有实例')
+      if (status.pid) bits.push(`PID ${status.pid}`)
+      if (status.queue) {
+        bits.push(`队列 运行 ${status.queue.running} · 排队 ${status.queue.pending}`)
+      }
+      if (status.active > 0) bits.push(`进行中请求 ${status.active}`)
+      if (typeof status.idleRemainingMs === 'number') {
+        const total = Math.ceil(status.idleRemainingMs / 1000)
+        const mm = String(Math.floor(total / 60)).padStart(2, '0')
+        const ss = String(total % 60).padStart(2, '0')
+        bits.push(`${mm}:${ss} 后空闲关闭`)
+      }
+    }
+    if (status.error && status.state !== 'READY') bits.push(status.error)
+    setCurrent(dom.comfyServiceDetail, bits.join(' · '))
+
+    const running = ['READY', 'BUSY'].includes(status.state)
+    const moving = ['STARTING', 'CONNECTING', 'STOPPING'].includes(status.state)
+    if (dom.comfyStart) dom.comfyStart.disabled = running || moving || comfyServiceBusy
+    if (dom.comfyStop) dom.comfyStop.disabled = (!running && status.state !== 'ERROR') || moving || comfyServiceBusy
+    if (dom.comfyReconnect) dom.comfyReconnect.disabled = moving || comfyServiceBusy
+    if (dom.comfyAutoStart) dom.comfyAutoStart.disabled = comfyServiceBusy
+    if (dom.comfyIdleEnabled) dom.comfyIdleEnabled.disabled = comfyServiceBusy
+    if (dom.comfyIdleMinutes) dom.comfyIdleMinutes.disabled = comfyServiceBusy || !dom.comfyIdleEnabled.checked
+  }
+
+  async function loadComfyServiceStatus(options) {
+    const silent = options && options.silent
+    if (!silent) setCurrent(dom.comfyServiceState, '读取中…')
+    const result = await api('/api/admin/comfy/status')
+    if (isAuthFailure(result)) {
+      setCurrent(dom.comfyServiceState, '需要登录', 'error')
+      return
+    }
+    if (!result.ok) {
+      if (!silent) setCurrent(dom.comfyServiceState, result.error || '状态读取失败', 'error')
+      return
+    }
+    renderComfyStatus(result.data || {})
+  }
+
+  function startComfyServicePolling() {
+    if (comfyServiceTimer) return
+    comfyServiceTimer = window.setInterval(() => {
+      if (document.hidden || activePanelPage !== 'comfy') return
+      void loadComfyServiceStatus({ silent: true })
+    }, 4000)
+  }
+
+  function stopComfyServicePolling() {
+    if (!comfyServiceTimer) return
+    window.clearInterval(comfyServiceTimer)
+    comfyServiceTimer = null
+  }
+
+  async function runComfyServiceAction(action, button, progressText) {
+    if (comfyServiceBusy) return
+    comfyServiceBusy = true
+    setCurrent(dom.comfyServiceDetail, progressText)
+    if (dom.comfyStart) dom.comfyStart.disabled = true
+    if (dom.comfyStop) dom.comfyStop.disabled = true
+    if (dom.comfyReconnect) dom.comfyReconnect.disabled = true
+    try {
+      const result = await withBusy(button, () => api(`/api/admin/comfy/${action}`, { method: 'POST' }))
+      if (!result) return
+      if (!result.ok) {
+        setCurrent(dom.comfyServiceState, COMFY_STATE_TEXT.ERROR, 'error')
+        setCurrent(dom.comfyServiceDetail, result.error || '操作失败', 'error')
+        return
+      }
+      renderComfyStatus(result.data || {})
+    } finally {
+      comfyServiceBusy = false
+      // 无论成功失败都拉一次最新状态，恢复按钮可用性
+      void loadComfyServiceStatus({ silent: true })
+    }
+  }
+
+  async function saveComfyService() {
+    let workflows
+    try {
+      workflows = collectComfyWorkflows()
+    } catch (error) {
+      setCurrent(dom.comfyServiceDetail, errorText(error), 'error')
+      return
+    }
+    const baseUrl = dom.comfyUrl.value.trim() || 'http://127.0.0.1:8188'
+    await withBusy(dom.comfyServiceSave, async () => {
+      comfyServiceBusy = true
+      setCurrent(dom.comfyServiceDetail, '正在保存服务设置…')
+      let saved = false
+      try {
+        const result = await api('/api/admin/comfy', {
+          method: 'POST',
+          body: { baseUrl, workflows, launch: collectComfyLaunch() },
+        })
+        if (!result.ok) {
+          setCurrent(dom.comfyServiceDetail, result.error || '保存失败', 'error')
+          return
+        }
+        const data = result.data || {}
+        dom.comfyUrl.value = data.baseUrl || baseUrl
+        comfyWorkflows = Array.isArray(data.workflows) ? data.workflows : workflows
+        renderComfyWorkflows()
+        renderComfyLaunch(data.launch)
+        saved = true
+      } finally {
+        comfyServiceBusy = false
+      }
+      if (!saved) return
+      // 必须等 busy 复位后再渲染状态，否则按钮会被 renderComfyStatus 按 busy 禁用到下一次轮询
+      await loadComfyServiceStatus({ silent: true })
+      setCurrent(dom.comfyServiceDetail, '服务设置已保存', 'ok')
+    })
+  }
+
   async function loadComfy() {
     clearNotice(dom.comfyNotice)
     const result = await api('/api/admin/comfy')
@@ -4767,6 +5032,7 @@
     }
     const data = result.data || {}
     dom.comfyUrl.value = data.baseUrl || 'http://127.0.0.1:8188'
+    renderComfyLaunch(data.launch)
     comfyWorkflows = Array.isArray(data.workflows) ? data.workflows : []
     renderComfyWorkflows()
     setCurrent(
@@ -4776,6 +5042,7 @@
         : '还没有工作流，先导入一个 ComfyUI 工作流。',
     )
     setCurrent(dom.comfyResult, '')
+    void loadComfyServiceStatus({ silent: true })
   }
 
   async function testComfy() {
@@ -4908,7 +5175,8 @@
       setCurrent(dom.comfyResult, '正在保存工作流…')
       const result = await api('/api/admin/comfy', {
         method: 'POST',
-        body: { baseUrl, workflows },
+        // 保存工作流时带上启动配置，否则服务端会按整份配置覆盖，把本机启动设置重置成默认值
+        body: { baseUrl, workflows, launch: collectComfyLaunch() },
       })
       if (!result.ok) {
         setCurrent(dom.comfyResult, result.error || '保存失败', 'error')
@@ -5991,6 +6259,29 @@
     if (dom.comfyRefresh) dom.comfyRefresh.addEventListener('click', () => void loadComfy())
     if (dom.comfyTest) dom.comfyTest.addEventListener('click', () => void testComfy())
     if (dom.comfySave) dom.comfySave.addEventListener('click', () => void saveComfy())
+    if (dom.comfyStart) {
+      dom.comfyStart.addEventListener('click', () =>
+        void runComfyServiceAction('start', dom.comfyStart, '正在启动 ComfyUI，首次加载模型可能要等一两分钟…'),
+      )
+    }
+    if (dom.comfyStop) {
+      dom.comfyStop.addEventListener('click', () =>
+        void runComfyServiceAction('stop', dom.comfyStop, '正在停止 ComfyUI…'),
+      )
+    }
+    if (dom.comfyReconnect) {
+      dom.comfyReconnect.addEventListener('click', () =>
+        void runComfyServiceAction('reconnect', dom.comfyReconnect, '正在重新连接 ComfyUI…'),
+      )
+    }
+    if (dom.comfyServiceSave) {
+      dom.comfyServiceSave.addEventListener('click', () => void saveComfyService())
+    }
+    if (dom.comfyIdleEnabled) {
+      dom.comfyIdleEnabled.addEventListener('change', () => {
+        dom.comfyIdleMinutes.disabled = !dom.comfyIdleEnabled.checked
+      })
+    }
     if (dom.comfyDiscover) dom.comfyDiscover.addEventListener('click', () => void discoverComfy())
     if (dom.comfyImportRemote) dom.comfyImportRemote.addEventListener('click', () => void importComfyRemote())
     if (dom.comfyImportFile) dom.comfyImportFile.addEventListener('click', () => void importComfyFile())
@@ -6472,6 +6763,9 @@
     }
     if (target === 'comfy') {
       void loadComfy()
+      startComfyServicePolling()
+    } else {
+      stopComfyServicePolling()
     }
     acctSchedule()
   }

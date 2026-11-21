@@ -9,6 +9,7 @@ import {
   listComfySavedWorkflows,
   testComfyConnection,
 } from '../app/products/images/comfyui.js'
+import { comfyLifecycle } from '../app/products/images/comfy-lifecycle.js'
 import { requireAdmin } from './auth.js'
 
 const IMPORT_BODY_LIMIT = 2 * 1024 * 1024
@@ -30,8 +31,30 @@ export function registerComfyRoutes(
     requireAdmin(request)
     const config = parseComfyConfig(request.body)
     await deps.settings.setComfyConfig(config)
+    comfyLifecycle.onConfigChanged()
     request.log.info({ count: config.workflows.length }, 'ComfyUI 工作流已更新')
     return reply.send({ ok: true, ...deps.settings.getComfyConfig() })
+  })
+
+  /** 服务状态：是否运行、是否由本服务启动、队列与空闲倒计时 */
+  app.get('/api/admin/comfy/status', async request => {
+    requireAdmin(request)
+    return comfyLifecycle.status()
+  })
+
+  app.post('/api/admin/comfy/start', async request => {
+    requireAdmin(request)
+    return comfyLifecycle.start()
+  })
+
+  app.post('/api/admin/comfy/stop', async request => {
+    requireAdmin(request)
+    return comfyLifecycle.stop()
+  })
+
+  app.post('/api/admin/comfy/reconnect', async request => {
+    requireAdmin(request)
+    return comfyLifecycle.reconnect()
   })
 
   /** 只测 ComfyUI 本身，不触发生成 */

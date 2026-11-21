@@ -41,6 +41,7 @@ import { UpdateChecker } from '../services/update-checker.js'
 import { UsageStore } from '../services/usage-store.js'
 import { UserStore } from '../services/user-store.js'
 import { RealtimeMonitor } from '../services/realtime-monitor.js'
+import { comfyLifecycle, initComfyLifecycle } from './products/images/comfy-lifecycle.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -171,6 +172,8 @@ const gate = new SerialGate(concurrency.get())
 // 后台保存的上游地址（settings.json）优先于 MAGPIE_BASE_URL，改完即时生效
 const settings = new SettingsStore(dataDir)
 await settings.init()
+// ComfyUI 生命周期：只登记设置与空闲检查器，不在这里启动服务
+initComfyLifecycle(settings, (message, meta) => app.log.info(meta ?? {}, message))
 // 版本检查：进程内缓存，桌面端轮询也不会反复打发布源
 const updateChecker = new UpdateChecker()
 
@@ -233,6 +236,10 @@ async function shutdown(reason: string): Promise<void> {
     await traffic.flushIfDirty()
     // 请求日志是防抖写盘，退出前补一次，别丢掉最后几条
     await requestLog.flush()
+  } catch {}
+  try {
+    // 只关闭本服务自己启动的 ComfyUI；用户手动开的实例不动
+    await comfyLifecycle.shutdown()
   } catch {}
   try {
     await app.close()
