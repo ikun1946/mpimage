@@ -208,16 +208,26 @@ export async function requestComfyImage(
   const activeBatch = activeRefs(mapping.batch, reachable)
   const activeReferences = activeRefs(mapping.references, reachable)
 
-  if (activeReferences.length && params.references.length !== activeReferences.length) {
+  if (params.references.length > activeReferences.length) {
     throw new ApiError(
       'REFERENCE_INVALID',
-      `这个 ComfyUI 工作流需要 ${activeReferences.length} 张参考图，本次收到 ${params.references.length} 张`,
+      `这个 ComfyUI 工作流最多支持 ${activeReferences.length} 张参考图，本次收到 ${params.references.length} 张`,
       400,
     )
   }
   if (!activeReferences.length && params.references.length) {
     throw new ApiError('REFERENCE_INVALID', '这个 ComfyUI 工作流的输出分支没有配置参考图节点', 400)
   }
+  if (activeReferences.length && params.references.length === 0) {
+    throw new ApiError('REFERENCE_INVALID', '这个 ComfyUI 工作流至少需要 1 张参考图', 400)
+  }
+
+  // 工作流可能预留了 6 个 LoadImage 槽位，但这次只带 1～5 张：
+  // 用前 N 个槽位，把多余的槽位和指向它们的连线一起删掉。
+  // MiniMax 这类多图节点是 Autogrow/可选输入，少传几张仍然能执行。
+  const usedReferences = activeReferences.slice(0, params.references.length)
+  const unusedReferences = activeReferences.slice(usedReferences.length)
+  if (unusedReferences.length) dropReferenceSlots(graph, unusedReferences)
 
   const promptText =
     mapping.appendRatioHint || (!activeWidth.length && !activeHeight.length)
@@ -234,12 +244,12 @@ export async function requestComfyImage(
   if (activeBatch.length) applyNumber(graph, activeBatch, 1)
 
   let uploadMs = 0
-  if (activeReferences.length) {
+  if (usedReferences.length) {
     const uploadStartedAt = Date.now()
     const uploaded = await Promise.all(
       params.references.map(image => uploadReferenceImage(options, image, deadline)),
     )
-    for (const [index, ref] of activeReferences.entries()) {
+    for (const [index, ref] of usedReferences.entries()) {
       const name = uploaded[index]
       if (name) setInput(graph, ref, name)
     }
@@ -462,6 +472,27 @@ function setInput(workflow: ComfyApiWorkflow, ref: ComfyInputRef, value: ComfyIn
 
 function activeRefs(refs: ComfyInputRef[], reachable: Set<string>): ComfyInputRef[] {
   return refs.filter(ref => reachable.has(ref.node))
+}
+
+/**
+ * 删除本次用不到的参考图槽位：连同 LoadImage 节点和所有指向它的连线。
+ * 多图节点（MiniMax H3 的 Autogrow images.image_N）允许少传，
+ * 但留下空的槽位会让节点读到一个不存在的图，必须一起摘掉。
+ */
+function dropReferenceSlots(workflow: ComfyApiWorkflow, slots: ComfyInputRef[]): void {
+  const drop = new Set(slots.map(slot => slot.node))
+  for (const id of drop) delete workflow[id]
+  for (const node of Object.values(workflow)) {
+    for (const [key, value] of Object.entries(node.inputs)) {
+      if (isNodeRef(value) && drop.has(value[0])) {
+        delete node.inputs[key]
+        continue
+      }
+      if (Array.isArray(value) && value.some(item => isNodeRef(item) && drop.has(item[0]))) {
+        node.inputs[key] = value.filter(item => !(isNodeRef(item) && drop.has(item[0])))
+      }
+    }
+  }
 }
 
 function collectReachable(workflow: ComfyApiWorkflow, outputIds: string[]): Set<string> {

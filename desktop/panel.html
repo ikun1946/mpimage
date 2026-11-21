@@ -4700,6 +4700,7 @@
         </div>
         <label class="check" style="margin-top:8px"><input type="checkbox" class="comfy-append-hint"${mapping.appendRatioHint ? ' checked' : ''}> 在提示词后追加比例描述</label>
         <p class="hint">映射格式：节点ID:输入名，多个用逗号分隔。${outputs.length ? `候选输出：${escapeHtml(outputs.join('、'))}` : '没有识别到 SaveImage 输出节点，请检查 JSON。'}</p>
+        <p class="hint">参考图槽位可以多于实际张数：本次带 1～N 张时，只使用前 N 个槽位，多余的槽位和连线会自动移除（适用于 MiniMax 这类可选多图输入）。</p>
         <textarea class="comfy-json" spellcheck="false" aria-label="ComfyUI API 工作流 JSON">${escapeHtml(workflowJson)}</textarea>
       </details>
     </div>`
