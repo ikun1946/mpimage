@@ -987,6 +987,174 @@
     margin-top: 10px;
   }
 
+  /* ---------- 上游与模型 ---------- */
+  .up-page { display: flex; flex-direction: column; gap: 14px; padding-bottom: 6px; }
+  .up-panel {
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: var(--shadow-soft);
+  }
+  .up-panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .up-panel-head h3 { margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 600; }
+  .up-panel-head .spacer { margin-left: auto; }
+  .up-sub { color: var(--ink-faint); font-size: 11.5px; font-weight: 400; }
+  .up-panel > .hint { margin: 0 0 12px; }
+  .up-panel-head + .up-conn-row { margin-top: 12px; }
+  .up-conn-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .up-conn-row input { flex: 1 1 360px; }
+  .up-conn-status { margin: 10px 0 0; }
+  .up-badge {
+    display: inline-flex; align-items: center; height: 19px; padding: 0 7px;
+    border: 1px solid var(--line-soft); border-radius: 999px;
+    background: var(--surface); color: var(--ink-faint);
+    font-size: 10.5px; white-space: nowrap;
+  }
+  .up-badge.custom { color: var(--gold); border-color: transparent; background: var(--gold-tint); }
+  .up-badge.comfy { color: var(--success); border-color: transparent; background: var(--success-tint); }
+  .up-model-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  .up-field {
+    padding: 12px 13px;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    background: var(--surface-subtle);
+  }
+  .up-field-cap { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+  .up-field-cap b { font-size: 12.5px; font-weight: 600; }
+  .up-field .current { margin: 8px 0 0; }
+  .up-field .form-row { margin-top: 8px; }
+
+  /* 可搜索的模型下拉 */
+  .model-picker { position: relative; }
+  .model-picker select.mp-native { display: none; }
+  .mp-trigger {
+    width: 100%; height: 32px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit; text-align: left; cursor: pointer;
+  }
+  .mp-trigger:hover { border-color: var(--line-strong); }
+  .mp-trigger:focus-visible { outline: none; border-color: var(--ink-soft); box-shadow: 0 0 0 3px var(--focus-ring); }
+  .model-picker.open .mp-trigger { border-color: var(--ink-soft); box-shadow: 0 0 0 3px var(--focus-ring); }
+  .mp-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mp-chev { width: 9px; height: 9px; flex: none; border-right: 1.5px solid var(--ink-faint); border-bottom: 1.5px solid var(--ink-faint); transform: rotate(45deg) translateY(-2px); transition: transform .16s; }
+  .model-picker.open .mp-chev { transform: rotate(-135deg) translateY(-2px); }
+  .mp-pop {
+    position: absolute; z-index: 60; top: calc(100% + 6px); left: 0; right: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    overscroll-behavior: contain;
+    animation: mp-in .14s ease;
+  }
+  @keyframes mp-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .mp-pop { animation: none; } }
+  .mp-search { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); background: var(--surface-subtle); }
+  .mp-search input { width: 100%; height: 28px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+  .mp-search input:focus { outline: none; border-color: var(--ink-soft); box-shadow: 0 0 0 3px var(--focus-ring); }
+  .mp-list { max-height: 250px; overflow: auto; padding: 5px; overscroll-behavior: contain; }
+  .mp-opt { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: 8px; cursor: pointer; }
+  .mp-opt:hover, .mp-opt.active { background: var(--surface-subtle); }
+  .mp-opt[aria-selected="true"] { background: var(--moss-tint); }
+  .mp-opt .mp-info { flex: 1; min-width: 0; }
+  .mp-opt .mp-name { display: flex; align-items: center; gap: 6px; font-size: 12.5px; min-width: 0; }
+  .mp-opt .mp-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mp-opt .mp-name .up-badge { flex: none; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mp-opt .mp-id { display: block; margin-top: 1px; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mp-opt .mp-tick { width: 14px; flex: none; text-align: center; color: var(--ink); }
+  .mp-empty { padding: 18px 12px; text-align: center; color: var(--ink-faint); font-size: 12px; }
+  .mp-foot { padding: 6px 10px; border-top: 1px solid var(--line-soft); background: var(--surface-subtle); color: var(--ink-faint); font-size: 10.5px; }
+
+  /* 客户端模型库 */
+  .up-lib-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0 10px; }
+  .up-lib-toolbar input { flex: 1 1 220px; }
+  .up-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface-subtle); }
+  .up-seg button { height: 25px; padding: 0 11px; border: 0; border-radius: 999px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 12px; cursor: pointer; }
+  .up-seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+  .up-lib-count { margin-left: auto; font-size: 11.5px; color: var(--ink-faint); }
+  .up-lib { border: 1px solid var(--line-soft); border-radius: 12px; overflow: hidden; }
+  .up-lib-head, .up-lib-row {
+    display: grid;
+    grid-template-columns: minmax(150px, 1.1fr) minmax(220px, 2fr) 116px 92px 38px 48px;
+    align-items: center; gap: 10px; padding: 8px 13px;
+  }
+  .up-lib-head { background: var(--surface-subtle); color: var(--ink-faint); font-size: 10.5px; }
+  .up-lib-row { border-top: 1px solid var(--line-soft); background: var(--surface); }
+  .up-lib-row:hover { background: var(--surface-subtle); }
+  .up-lib-row.is-off { opacity: .55; }
+  .up-lib-row .up-alias { width: 100%; height: 27px; }
+  .up-lib-row code { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .up-lib-row .up-cap { font-size: 11px; color: var(--ink-soft); }
+  .up-star { width: 25px; height: 25px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--ink-faint); font-size: 12px; line-height: 1; cursor: pointer; }
+  .up-star.on { color: var(--surface); border-color: var(--ink); background: var(--ink); }
+  .up-switch { position: relative; display: inline-block; width: 32px; height: 19px; flex: none; }
+  .up-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .up-switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--line-strong); transition: background .16s; }
+  .up-switch span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .18); transition: transform .16s; }
+  .up-switch input:checked + span { background: var(--ink); }
+  .up-switch input:checked + span::after { transform: translateX(13px); }
+  .up-switch input:disabled + span { opacity: .4; }
+
+  /* 供应商卡片 */
+  .provider-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  .provider-card { border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  .provider-head { display: flex; align-items: center; gap: 9px; padding: 9px 12px; }
+  .provider-name { flex: 0 1 190px; min-width: 80px; height: 28px; border-color: transparent; background: transparent; font-weight: 600; }
+  .provider-name:hover, .provider-name:focus { border-color: var(--line); background: var(--surface); }
+  .provider-url-text { color: var(--ink-faint); font-family: var(--font-mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; }
+  .provider-head .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .provider-body { display: none; padding: 12px; border-top: 1px solid var(--line-soft); background: var(--surface-subtle); }
+  .provider-card.open .provider-body { display: block; }
+  .provider-fields { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .provider-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--ink-faint); }
+  .provider-fields input { height: 30px; }
+  .provider-models { border: 1px solid var(--line-soft); border-radius: 9px; background: var(--surface); overflow: hidden; }
+  .provider-models-head { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-bottom: 1px solid var(--line-soft); color: var(--ink-faint); font-size: 11px; }
+  .provider-models-head .right { margin-left: auto; display: flex; gap: 6px; }
+  .provider-model-add { width: 128px; height: 26px; }
+  .provider-model-list { max-height: 220px; overflow: auto; }
+  .provider-model-row { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-top: 1px solid var(--line-soft); }
+  .provider-model-row:first-child { border-top: 0; }
+  .provider-model-row code { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .provider-model-remove { width: 22px; height: 22px; padding: 0; border: 0; background: none; color: var(--ink-faint); font-size: 14px; cursor: pointer; }
+  .provider-model-remove:hover { color: var(--danger); }
+  .provider-status { margin: 8px 0 0; }
+  .provider-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+
+  /* 吸底保存栏 */
+  .up-savebar {
+    position: sticky; bottom: 10px; z-index: 30;
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow);
+  }
+  .up-save-state { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; color: var(--ink-soft); }
+  .up-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--success); }
+  .up-dot.warn { background: var(--gold); }
+  .up-dot.error { background: var(--danger); }
+  .up-save-time { color: var(--ink-faint); }
+  .up-savebar .actions { margin-left: auto; display: flex; gap: 8px; }
+
+  @media (max-width: 900px) {
+    .up-model-grid { grid-template-columns: 1fr; }
+    .up-lib-head { display: none; }
+    .up-lib-row { grid-template-columns: 1fr auto; row-gap: 5px; }
+    .up-lib-row code { grid-column: 1 / -1; }
+    .provider-fields { grid-template-columns: 1fr; }
+    .provider-url-text { display: none; }
+  }
+
   /* ComfyUI 服务：状态条 + 启动配置 */
   .comfy-service {
     margin: 4px 0 14px;
@@ -2694,75 +2862,120 @@
     </div>
   </section>
 
-  <section data-page-panel="upstream" class="card page span-6" aria-labelledby="upstream-title">
-    <div class="card-head">
-      <h2 id="upstream-title">Magpie 与模型</h2>
-      <div class="head-actions">
+  <section data-page-panel="upstream" class="page up-page" aria-labelledby="upstream-title">
+    <h2 class="sr-only" id="upstream-title">上游与模型</h2>
+    <div class="notice" id="upstream-notice" hidden></div>
+
+    <section class="up-panel">
+      <div class="up-panel-head">
+        <h3>上游连接</h3>
+        <span class="up-sub">Magpie 网关地址</span>
+        <div class="spacer"></div>
+        <span class="up-badge magpie">Magpie</span>
         <button class="button mini" type="button" id="btn-upstream-refresh">刷新</button>
       </div>
-    </div>
-    <div class="card-body">
-      <div class="notice" id="upstream-notice" hidden></div>
-      <div class="form-row">
-        <label class="grow">上游地址
-          <input type="url" id="upstream-url" placeholder="http://127.0.0.1:3425" spellcheck="false" autocomplete="off" />
-        </label>
-        <button class="button" type="button" id="upstream-test">测试连通</button>
-        <button class="button primary" type="button" id="upstream-save">保存</button>
-      </div>
-      <div class="form-row">
-        <label class="grow">提示词优化模型
-          <select id="upstream-text-model" class="model-select" aria-describedby="upstream-model-status"></select>
-        </label>
+      <div class="up-conn-row">
+        <input type="url" id="upstream-url" placeholder="http://127.0.0.1:3425" spellcheck="false" autocomplete="off" aria-label="上游地址" />
+        <button class="button" type="button" id="upstream-test">测试连接</button>
         <button class="button" type="button" id="upstream-models-refresh">获取模型</button>
       </div>
-      <div class="form-row" id="upstream-text-model-custom-row" hidden>
-        <label class="grow">自定义模型 ID
-          <input type="text" id="upstream-text-model-custom" placeholder="auto/deepseek-v4.1-flash" spellcheck="false" autocomplete="off" aria-describedby="upstream-model-status" />
-        </label>
+      <p class="current up-conn-status" id="upstream-conn-status" role="status" aria-live="polite">读取中…</p>
+    </section>
+
+    <section class="up-panel">
+      <div class="up-panel-head">
+        <h3>默认模型</h3>
+        <span class="up-sub">服务端实际使用，保存后立即生效</span>
       </div>
-      <p class="current" id="upstream-model-status" role="status" aria-live="polite">还没获取模型列表。打开控制台会自动拉一次，也可以点「获取模型」强制刷新。</p>
-      <p class="hint">用于自由创作的 AI 优化提示词，需与上面地址是同一个网关；留空表示使用环境变量默认值。</p>
-      <div class="form-row">
-        <label class="grow">卡片标题模型
-          <select id="upstream-title-model" class="model-select" aria-describedby="upstream-title-model-status"></select>
-        </label>
-      </div>
-      <div class="form-row" id="upstream-title-model-custom-row" hidden>
-        <label class="grow">自定义标题模型 ID
-          <input type="text" id="upstream-title-model-custom" placeholder="留空则跟随提示词优化模型" spellcheck="false" autocomplete="off" aria-describedby="upstream-title-model-status" />
-        </label>
-      </div>
-      <p class="current" id="upstream-title-model-status" role="status" aria-live="polite"></p>
-      <p class="hint">只用于生成拼图卡片左下角的短名（最多 7 个字）；留空即跟随提示词优化模型。标题与生图并行，不会拖慢出图。</p>
-      <div class="form-row">
-        <label class="grow">生图模型
-          <select id="upstream-image-model" class="model-select" aria-describedby="upstream-image-model-status"></select>
-        </label>
-      </div>
-      <div class="form-row" id="upstream-image-model-custom-row" hidden>
-        <label class="grow">自定义生图模型 ID
-          <input type="text" id="upstream-image-model-custom" placeholder="codex/gpt-image-2" spellcheck="false" autocomplete="off" aria-describedby="upstream-image-model-status" />
-        </label>
-      </div>
-      <p class="current" id="upstream-image-model-status" role="status" aria-live="polite"></p>
-      <p class="hint">用于所有生图请求，需与上面地址是同一个网关，且该模型支持 /v1/images/generations 与图生图的 /v1/images/edits；留空表示使用环境变量默认值。</p>
-      <fieldset class="client-models">
-        <legend>客户端可选的生图模型</legend>
-        <div class="client-models-list" id="upstream-client-model-list"></div>
-        <p class="hint">勾选后才会出现在客户端；右侧可以设置客户端显示名，每行右侧标注了模型来源。</p>
-      </fieldset>
-      <fieldset class="providers">
-        <legend>自定义供应商</legend>
-        <p class="hint">接入任何兼容 OpenAI 图片接口（/v1/images/generations、/v1/images/edits）的网关。勾选的模型会出现在客户端下拉里，显示名可以单独填写。</p>
-        <div class="provider-list" id="provider-list"></div>
-        <div class="provider-actions">
-          <button class="button mini" type="button" id="provider-add">添加供应商</button>
-          <span class="hint">供应商配置随下面「保存」一起提交。</span>
+      <div class="up-model-grid">
+        <div class="up-field">
+          <div class="up-field-cap"><b>提示词优化模型</b><span class="up-badge" id="upstream-text-source">环境变量</span></div>
+          <div class="model-picker">
+            <select id="upstream-text-model" aria-label="提示词优化模型"></select>
+          </div>
+          <div class="form-row" id="upstream-text-model-custom-row" hidden>
+            <label class="grow">自定义模型 ID
+              <input type="text" id="upstream-text-model-custom" placeholder="auto/deepseek-v4.1-flash" spellcheck="false" autocomplete="off" aria-describedby="upstream-model-status" />
+            </label>
+          </div>
+          <p class="current" id="upstream-model-status" role="status" aria-live="polite">还没获取模型列表。</p>
         </div>
-      </fieldset>
-      <p class="current" id="upstream-meta">读取中…</p>
-      <p class="current" id="upstream-result"></p>
+        <div class="up-field">
+          <div class="up-field-cap"><b>卡片标题模型</b><span class="up-badge" id="upstream-title-source">跟随优化模型</span></div>
+          <div class="model-picker">
+            <select id="upstream-title-model" aria-label="卡片标题模型"></select>
+          </div>
+          <div class="form-row" id="upstream-title-model-custom-row" hidden>
+            <label class="grow">自定义标题模型 ID
+              <input type="text" id="upstream-title-model-custom" placeholder="留空则跟随提示词优化模型" spellcheck="false" autocomplete="off" aria-describedby="upstream-title-model-status" />
+            </label>
+          </div>
+          <p class="current" id="upstream-title-model-status" role="status" aria-live="polite"></p>
+        </div>
+        <div class="up-field">
+          <div class="up-field-cap"><b>默认生图模型</b><span class="up-badge magpie">Magpie</span></div>
+          <div class="model-picker">
+            <select id="upstream-image-model" aria-label="默认生图模型"></select>
+          </div>
+          <div class="form-row" id="upstream-image-model-custom-row" hidden>
+            <label class="grow">自定义生图模型 ID
+              <input type="text" id="upstream-image-model-custom" placeholder="codex/gpt-image-2" spellcheck="false" autocomplete="off" aria-describedby="upstream-image-model-status" />
+            </label>
+          </div>
+          <p class="current" id="upstream-image-model-status" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="up-panel">
+      <div class="up-panel-head">
+        <h3>客户端模型库</h3>
+        <span class="up-sub">决定客户端下拉里出现什么、叫什么名字</span>
+      </div>
+      <p class="hint">显示名留空就用模型原名；星标表示默认生图模型；关闭「可见」只是隐藏，不会删除配置。</p>
+      <div class="up-lib-toolbar">
+        <input type="text" id="upstream-lib-search" placeholder="搜索模型名称或 ID…" spellcheck="false" autocomplete="off" aria-label="搜索模型" />
+        <div class="up-seg" id="upstream-lib-filter" role="group" aria-label="按来源筛选">
+          <button type="button" class="on" data-kind="all">全部</button>
+          <button type="button" data-kind="magpie">Magpie</button>
+          <button type="button" data-kind="custom">自定义</button>
+          <button type="button" data-kind="comfy">ComfyUI</button>
+        </div>
+        <span class="current up-lib-count" id="upstream-lib-count"></span>
+      </div>
+      <div class="up-lib">
+        <div class="up-lib-head">
+          <span>显示名</span><span>模型</span><span>来源</span><span>能力</span><span>默认</span><span>可见</span>
+        </div>
+        <div id="upstream-client-model-list"></div>
+      </div>
+      <p class="hint" id="upstream-lib-empty" hidden>没有匹配的模型。</p>
+    </section>
+
+    <section class="up-panel">
+      <div class="up-panel-head">
+        <h3>自定义供应商</h3>
+        <span class="up-sub">任何兼容 OpenAI 图片接口的网关</span>
+        <div class="spacer"></div>
+        <span class="up-badge" id="upstream-provider-count"></span>
+      </div>
+      <p class="hint">这里的「启用」决定是否参与模型库；客户端是否可见到上面的模型库里单独控制。显示名统一在模型库设置。</p>
+      <div class="provider-list" id="provider-list"></div>
+      <div class="provider-actions">
+        <button class="button mini" type="button" id="provider-add">＋ 添加供应商</button>
+      </div>
+    </section>
+
+    <div class="up-savebar" id="upstream-savebar">
+      <div class="up-save-state">
+        <span class="up-dot" id="upstream-save-dot"></span>
+        <span id="upstream-save-status">读取中…</span>
+        <span class="up-save-time" id="upstream-save-time"></span>
+      </div>
+      <div class="actions">
+        <button class="button" type="button" id="upstream-discard">放弃更改</button>
+        <button class="button primary" type="button" id="upstream-save">保存更改</button>
+      </div>
     </div>
   </section>
 
@@ -3153,8 +3366,19 @@
     sideVersion: $('side-version'),
     upstreamTest: $('upstream-test'),
     upstreamSave: $('upstream-save'),
-    upstreamMeta: $('upstream-meta'),
-    upstreamResult: $('upstream-result'),
+    upstreamSavebar: $('upstream-savebar'),
+    upstreamSaveDot: $('upstream-save-dot'),
+    upstreamSaveStatus: $('upstream-save-status'),
+    upstreamSaveTime: $('upstream-save-time'),
+    upstreamDiscard: $('upstream-discard'),
+    upstreamConnStatus: $('upstream-conn-status'),
+    upstreamTextSource: $('upstream-text-source'),
+    upstreamTitleSource: $('upstream-title-source'),
+    upstreamLibSearch: $('upstream-lib-search'),
+    upstreamLibFilter: $('upstream-lib-filter'),
+    upstreamLibCount: $('upstream-lib-count'),
+    upstreamLibEmpty: $('upstream-lib-empty'),
+    upstreamProviderCount: $('upstream-provider-count'),
     comfyNotice: $('comfy-notice'),
     comfyUrl: $('comfy-url'),
     comfyStatus: $('comfy-status'),
@@ -3347,6 +3571,17 @@
   let upstreamModelAliases = {}
   let upstreamModelVisibility = {}
   let upstreamComfyWorkflows = []
+  /** 当前页有未保存的更改：刷新/启动时不要用服务端数据覆盖 */
+  let upstreamDirty = false
+  /** 模型库的搜索词与来源筛选 */
+  let upstreamLibQuery = ''
+  let upstreamLibFilter = 'all'
+  /** 供应商卡片刚载入时的 ID，用来在改名时迁移别名/可见性/默认模型 */
+  let upstreamProviderBaseIds = []
+  let upstreamTextPicker = null
+  let upstreamTitlePicker = null
+  let upstreamImagePicker = null
+  let upstreamProviderRenderTimer = 0
 
   // ComfyUI 工作流注册表（独立保存，不跟上游客串）
   let comfyWorkflows = []
@@ -4263,13 +4498,212 @@
 
   // ---------- 上游 ----------
 
-  async function loadUpstream() {
+  function clockText() {
+    const now = new Date()
+    const pad = value => String(value).padStart(2, '0')
+    return `${pad(now.getHours())}:${pad(now.getMinutes())}`
+  }
+
+  function refreshUpstreamSavebar(tone, text) {
+    if (dom.upstreamSaveDot) {
+      dom.upstreamSaveDot.className = `up-dot${tone ? ` ${tone}` : ''}`
+    }
+    if (text !== undefined && dom.upstreamSaveStatus) dom.upstreamSaveStatus.textContent = text
+  }
+
+  function markUpstreamDirty() {
+    if (upstreamDirty) return
+    upstreamDirty = true
+    refreshUpstreamSavebar('warn', '有未保存的更改')
+  }
+
+  function clearUpstreamDirty() {
+    upstreamDirty = false
+    refreshUpstreamSavebar('ok', '没有未保存的更改')
+  }
+
+  /** 把三个原生 select 包装成带搜索的下拉；select 仍保存真实值 */
+  function createModelPicker(select) {
+    const root = select.parentElement
+    if (!root) return null
+    if (root.__picker) return root.__picker
+    select.classList.add('mp-native')
+    root.insertAdjacentHTML('beforeend', `
+      <button class="mp-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+        <span class="mp-text"></span><span class="mp-chev" aria-hidden="true"></span>
+      </button>
+      <div class="mp-pop" hidden>
+        <div class="mp-search"><input type="text" placeholder="搜索模型名称或 ID…" aria-label="搜索模型" /></div>
+        <div class="mp-list" role="listbox"></div>
+        <div class="mp-foot"></div>
+      </div>`)
+
+    const trigger = root.querySelector('.mp-trigger')
+    const textEl = root.querySelector('.mp-text')
+    const pop = root.querySelector('.mp-pop')
+    const search = root.querySelector('.mp-search input')
+    const listEl = root.querySelector('.mp-list')
+    const foot = root.querySelector('.mp-foot')
+    let query = ''
+    let active = 0
+    let visible = []
+
+    function readOptions() {
+      return [...select.options].map(option => ({
+        value: option.value,
+        label: option.dataset.short || option.textContent || '',
+        id: option.dataset.modelId || '',
+        badge: option.dataset.badge || '',
+        badgeClass: option.dataset.badgeClass || '',
+      }))
+    }
+    function selectedOption() {
+      return select.options[select.selectedIndex] || null
+    }
+    function refresh() {
+      const option = selectedOption()
+      textEl.textContent = option
+        ? (option.dataset.short || option.textContent || '')
+        : '未选择'
+      // 选项在展开期间被替换（例如「获取模型」返回）时同步重画列表
+      if (root.classList.contains('open')) renderList()
+    }
+    function renderList() {
+      const all = readOptions()
+      const q = query.trim().toLowerCase()
+      visible = all.filter(option =>
+        !q || option.label.toLowerCase().includes(q) || option.id.toLowerCase().includes(q) ||
+        option.value.toLowerCase().includes(q))
+      if (active >= visible.length) active = Math.max(0, visible.length - 1)
+      const current = select.value
+      listEl.innerHTML = visible.length
+        ? visible.map((option, index) => `
+            <div class="mp-opt${index === active ? ' active' : ''}" role="option" data-value="${escapeHtml(option.value)}" aria-selected="${option.value === current}">
+              <div class="mp-info">
+                <span class="mp-name"><span class="mp-label">${escapeHtml(option.label)}</span>${option.badge ? `<span class="up-badge ${option.badgeClass}">${escapeHtml(option.badge)}</span>` : ''}</span>
+                ${option.id ? `<span class="mp-id">${escapeHtml(option.id)}</span>` : ''}
+              </div>
+              <span class="mp-tick">${option.value === current ? '✓' : ''}</span>
+            </div>`).join('')
+        : '<div class="mp-empty">没有匹配的模型</div>'
+      foot.textContent = `${visible.length} 个选项 · ↑↓ 选择 · Enter 确认 · Esc 关闭`
+    }
+    function close() {
+      root.classList.remove('open')
+      pop.hidden = true
+      trigger.setAttribute('aria-expanded', 'false')
+    }
+    function closeOthers() {
+      document.querySelectorAll('.model-picker.open').forEach(other => {
+        if (other === root) return
+        other.classList.remove('open')
+        const otherPop = other.querySelector('.mp-pop')
+        if (otherPop) otherPop.hidden = true
+        const otherTrigger = other.querySelector('.mp-trigger')
+        if (otherTrigger) otherTrigger.setAttribute('aria-expanded', 'false')
+      })
+    }
+    function open() {
+      closeOthers()
+      root.classList.add('open')
+      pop.hidden = false
+      trigger.setAttribute('aria-expanded', 'true')
+      query = ''
+      search.value = ''
+      active = Math.max(0, readOptions().findIndex(option => option.value === select.value))
+      renderList()
+      window.setTimeout(() => search.focus(), 0)
+    }
+    function choose(value) {
+      select.value = value
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+      refresh()
+      close()
+      trigger.focus()
+    }
+
+    trigger.addEventListener('click', () => (root.classList.contains('open') ? close() : open()))
+    search.addEventListener('input', () => {
+      query = search.value
+      active = 0
+      renderList()
+    })
+    search.addEventListener('keydown', event => {
+      if (event.isComposing) return
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        active = Math.min(visible.length - 1, active + 1)
+        renderList()
+        listEl.querySelector('.mp-opt.active')?.scrollIntoView({ block: 'nearest' })
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        active = Math.max(0, active - 1)
+        renderList()
+        listEl.querySelector('.mp-opt.active')?.scrollIntoView({ block: 'nearest' })
+      } else if (event.key === 'Enter') {
+        event.preventDefault()
+        const option = visible[active]
+        if (option) choose(option.value)
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        close()
+        trigger.focus()
+      }
+    })
+    listEl.addEventListener('click', event => {
+      const option = event.target.closest('[data-value]')
+      if (option) choose(option.dataset.value)
+    })
+    // 列表滚到边界时别再带动整页
+    pop.addEventListener('wheel', event => {
+      const canScroll = listEl.scrollHeight > listEl.clientHeight + 1
+      if (!canScroll) {
+        event.preventDefault()
+        return
+      }
+      const atTop = listEl.scrollTop <= 0
+      const atBottom = listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 1
+      if ((event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom)) event.preventDefault()
+    }, { passive: false })
+    select.addEventListener('change', refresh)
+
+    const api = { refresh, close }
+    root.__picker = api
+    refresh()
+    return api
+  }
+
+  function ensureUpstreamPickers() {
+    if (upstreamTextPicker) return
+    if (dom.upstreamTextModel) upstreamTextPicker = createModelPicker(dom.upstreamTextModel)
+    if (dom.upstreamTitleModel) upstreamTitlePicker = createModelPicker(dom.upstreamTitleModel)
+    if (dom.upstreamImageModel) upstreamImagePicker = createModelPicker(dom.upstreamImageModel)
+  }
+
+  /** 一次性写入 select 选项，并同步下拉触发器文案 */
+  function writeModelOptions(select, definitions, wanted) {
+    select.innerHTML = definitions.map(item => {
+      const attrs = [`value="${escapeHtml(item.value)}"`]
+      if (item.badge) attrs.push(`data-badge="${escapeHtml(item.badge)}"`)
+      if (item.badgeClass) attrs.push(`data-badge-class="${escapeHtml(item.badgeClass)}"`)
+      if (item.id) attrs.push(`data-model-id="${escapeHtml(item.id)}"`)
+      if (item.short && item.short !== item.label) attrs.push(`data-short="${escapeHtml(item.short)}"`)
+      return `<option ${attrs.join(' ')}>${escapeHtml(item.label)}</option>`
+    }).join('')
+    select.value = definitions.some(item => item.value === wanted) ? wanted : ''
+    select.parentElement?.__picker?.refresh()
+  }
+
+  async function loadUpstream(options = {}) {
+    const force = Boolean(options.force)
+    // 用户正在编辑时，刷新/服务重启不能把未保存的内容冲掉
+    if (upstreamDirty && !force) return
     clearNotice(dom.upstreamNotice)
     const result = await api('/api/admin/upstream')
 
     if (isAuthFailure(result)) {
       showNotice(dom.upstreamNotice, AUTH_HINT)
-      setCurrent(dom.upstreamMeta, '')
+      setCurrent(dom.upstreamConnStatus, '')
       return
     }
     if (!result.ok) {
@@ -4287,21 +4721,46 @@
     upstreamImageModels = Array.isArray(data.imageModels) ? data.imageModels : []
     upstreamEnabledImageModels = Array.isArray(data.enabledImageModels) ? data.enabledImageModels : []
     upstreamProviders = Array.isArray(data.providers) ? data.providers : []
+    upstreamProviderBaseIds = upstreamProviders.map(provider => provider.id)
     upstreamComfyWorkflows = Array.isArray(data.comfyWorkflows) ? data.comfyWorkflows : []
     upstreamModelAliases =
-      data.modelAliases && typeof data.modelAliases === 'object' ? data.modelAliases : {}
+      data.modelAliases && typeof data.modelAliases === 'object' ? { ...data.modelAliases } : {}
     upstreamModelVisibility =
-      data.modelVisibility && typeof data.modelVisibility === 'object' ? data.modelVisibility : {}
+      data.modelVisibility && typeof data.modelVisibility === 'object' ? { ...data.modelVisibility } : {}
+    upstreamModelSelection = null
+    upstreamTitleModelSelection = null
+    upstreamImageModelSelection = null
+    upstreamModelStatusNotes = []
+    upstreamModelStatusTone = ''
+
     renderProviderCards()
+    ensureUpstreamPickers()
+
+    document.addEventListener('click', event => {
+      if (event.target.closest('.model-picker')) return
+      document.querySelectorAll('.model-picker.open').forEach(root => {
+        root.classList.remove('open')
+        const pop = root.querySelector('.mp-pop')
+        if (pop) pop.hidden = true
+        const trigger = root.querySelector('.mp-trigger')
+        if (trigger) trigger.setAttribute('aria-expanded', 'false')
+      })
+    })
     renderUpstreamModelOptions()
     renderUpstreamTitleModelOptions()
     renderUpstreamImageModelOptions()
     renderClientModelFlags()
+    renderUpstreamModelStatus('', upstreamModels.length ? undefined : UPSTREAM_MODEL_STATUS_DEFAULT)
+
     setCurrent(
-      dom.upstreamMeta,
-      `生图模型：${data.imageModel || data.model || '—'}（${data.imageModelFromSettings ? '后台设置' : '环境变量默认值'}） · 地址来源：${data.fromSettings ? '后台设置（settings.json）' : '环境变量默认值'} · 优化模型：${data.textModel || '未设置'}（${data.textModelFromSettings ? '后台设置' : '环境变量默认值'}） · 标题模型：${data.titleModel || '未设置'}（${data.titleModelFromSettings ? '独立设置' : '跟随优化模型'}）`,
+      dom.upstreamConnStatus,
+      `${data.fromSettings ? '地址来自后台设置' : '地址来自环境变量'} · ${upstreamImageModels.length} 个生图模型 · ${upstreamComfyWorkflows.length} 个 ComfyUI 工作流`,
     )
-    setCurrent(dom.upstreamResult, '')
+    clearUpstreamDirty()
+    if (dom.upstreamSaveTime) dom.upstreamSaveTime.textContent = `· 读取于 ${clockText()}`
+    clearNotice(dom.upstreamNotice)
+    // 模型目录只拉一次；失败会自己复位，下次刷新再试
+    void autoLoadUpstreamModels()
   }
 
   /**
@@ -4309,32 +4768,42 @@
    * 能力标注只看上游显式声明，没声明就不写，绝不按名字猜。
    */
   function renderUpstreamModelOptions() {
-    const options = [{
+    const definitions = [{
       value: '',
       label: upstreamEffectiveTextModel
         ? `跟随环境变量默认（${upstreamEffectiveTextModel}）`
         : '跟随环境变量默认',
+      short: '跟随环境变量默认',
+      badge: '环境变量',
     }]
 
     for (const model of upstreamModels) {
       const vision = model.capabilities ? model.capabilities.vision : null
-      const suffix = vision === true ? ' · 支持看图' : vision === false ? ' · 仅文本' : ''
-      options.push({ value: model.id, label: `${model.id}${suffix}` })
+      definitions.push({
+        value: model.id,
+        label: model.id,
+        id: model.id,
+        badge: vision === true ? '读图' : vision === false ? '仅文本' : '',
+      })
     }
 
-    // 已保存的模型上游这次没列出来：补一条，免得保存值被下拉悄悄吞掉
     if (upstreamSavedTextModel && !upstreamModels.some(model => model.id === upstreamSavedTextModel)) {
-      options.push({ value: upstreamSavedTextModel, label: `${upstreamSavedTextModel} · 已保存` })
+      definitions.push({
+        value: upstreamSavedTextModel,
+        label: upstreamSavedTextModel,
+        id: upstreamSavedTextModel,
+        badge: '已保存',
+      })
     }
-    options.push({ value: CUSTOM_MODEL_VALUE, label: '自定义模型 ID…' })
-
-    dom.upstreamTextModel.innerHTML = options
-      .map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
-      .join('')
+    definitions.push({ value: CUSTOM_MODEL_VALUE, label: '自定义模型 ID…' })
 
     const wanted = upstreamModelSelection === null ? upstreamSavedTextModel : upstreamModelSelection
-    dom.upstreamTextModel.value = options.some(option => option.value === wanted) ? wanted : ''
+    writeModelOptions(dom.upstreamTextModel, definitions, wanted)
+    if (dom.upstreamTextSource) {
+      dom.upstreamTextSource.textContent = upstreamSavedTextModel ? '后台设置' : '环境变量'
+    }
     syncCustomModelInput()
+    renderUpstreamModelStatus()
   }
 
   /** 只有选中「自定义模型 ID…」才露出输入框，并把已保存的值填进去 */
@@ -4355,30 +4824,40 @@
 
   /** 重画「卡片标题模型」下拉：跟随优化模型 → 上游模型 → 已保存 → 自定义 */
   function renderUpstreamTitleModelOptions() {
-    const options = [{
+    const definitions = [{
       value: '',
       label: upstreamEffectiveTextModel
         ? `跟随提示词优化模型（${upstreamEffectiveTextModel}）`
         : '跟随提示词优化模型',
+      short: '跟随提示词优化模型',
+      badge: '默认',
     }]
 
     for (const model of upstreamModels) {
       const vision = model.capabilities ? model.capabilities.vision : null
-      const suffix = vision === true ? ' · 支持看图' : vision === false ? ' · 仅文本' : ''
-      options.push({ value: model.id, label: `${model.id}${suffix}` })
+      definitions.push({
+        value: model.id,
+        label: model.id,
+        id: model.id,
+        badge: vision === true ? '读图' : vision === false ? '仅文本' : '',
+      })
     }
 
     if (upstreamSavedTitleModel && !upstreamModels.some(model => model.id === upstreamSavedTitleModel)) {
-      options.push({ value: upstreamSavedTitleModel, label: `${upstreamSavedTitleModel} · 已保存` })
+      definitions.push({
+        value: upstreamSavedTitleModel,
+        label: upstreamSavedTitleModel,
+        id: upstreamSavedTitleModel,
+        badge: '已保存',
+      })
     }
-    options.push({ value: CUSTOM_MODEL_VALUE, label: '自定义模型 ID…' })
-
-    dom.upstreamTitleModel.innerHTML = options
-      .map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
-      .join('')
+    definitions.push({ value: CUSTOM_MODEL_VALUE, label: '自定义模型 ID…' })
 
     const wanted = upstreamTitleModelSelection === null ? upstreamSavedTitleModel : upstreamTitleModelSelection
-    dom.upstreamTitleModel.value = options.some(option => option.value === wanted) ? wanted : ''
+    writeModelOptions(dom.upstreamTitleModel, definitions, wanted)
+    if (dom.upstreamTitleSource) {
+      dom.upstreamTitleSource.textContent = upstreamSavedTitleModel ? '独立设置' : '跟随优化模型'
+    }
     syncTitleModelInput()
     renderUpstreamTitleModelStatus()
   }
@@ -4408,53 +4887,73 @@
     )
   }
 
-  /** 重画生图模型下拉：空值项 → 常用清单 → 已保存但清单里没有的值 → 自定义 */
+  /** 重画生图模型下拉：环境变量默认 → Magpie 目录 → 自定义供应商 → ComfyUI → 自定义 */
   function renderUpstreamImageModelOptions() {
-    const options = [{
+    const definitions = [{
       value: '',
       label: upstreamEffectiveImageModel
         ? `跟随环境变量默认（${upstreamEffectiveImageModel}）`
         : '跟随环境变量默认',
+      short: '跟随环境变量默认',
+      badge: '环境变量',
     }]
 
-    // 优先用 Magpie 实际返回的生图模型；拿不到时退回内置清单
     const source = upstreamImageModels.length ? upstreamImageModels : IMAGE_MODEL_PRESETS
     for (const model of source) {
-      const suffix = model.label ? ` · ${model.label}` : ''
-      options.push({ value: model.id, label: `${model.id}${suffix}` })
+      definitions.push({
+        value: model.id,
+        label: model.label || model.id,
+        id: model.id,
+        badge: 'Magpie',
+        badgeClass: 'magpie',
+      })
     }
 
-    // 自定义供应商的模型也能设为默认
-    for (const provider of upstreamProviders) {
+    // 供应商用卡片里的草稿值，新加的供应商不用先保存就能选
+    const providers = dom.providerList ? collectProviders() : upstreamProviders
+    for (const provider of providers) {
       if (provider.enabled === false) continue
       for (const model of Array.isArray(provider.models) ? provider.models : []) {
         if (model.enabled === false) continue
         const publicId = `p:${provider.id}:${model.id}`
-        const label = model.label || model.id
-        options.push({ value: publicId, label: `${label} · ${provider.name || provider.id}` })
+        definitions.push({
+          value: publicId,
+          label: model.label || model.id,
+          id: publicId,
+          badge: '自定义',
+          badgeClass: 'custom',
+        })
       }
     }
 
-    // ComfyUI 工作流也能作为默认生图模型
     for (const workflow of upstreamComfyWorkflows) {
       if (workflow.enabled === false) continue
-      options.push({
+      definitions.push({
         value: workflow.id,
-        label: `${workflow.label || workflow.id} · ComfyUI`,
+        label: workflow.label || workflow.id,
+        id: workflow.id,
+        badge: 'ComfyUI',
+        badgeClass: 'comfy',
       })
     }
 
-    if (upstreamSavedImageModel && !options.some(option => option.value === upstreamSavedImageModel)) {
-      options.push({ value: upstreamSavedImageModel, label: `${upstreamSavedImageModel} · 已保存` })
+    if (upstreamSavedImageModel && !definitions.some(item => item.value === upstreamSavedImageModel)) {
+      definitions.push({
+        value: upstreamSavedImageModel,
+        label: upstreamSavedImageModel,
+        id: upstreamSavedImageModel,
+        badge: '已保存',
+      })
     }
-    options.push({ value: CUSTOM_MODEL_VALUE, label: '自定义模型 ID…' })
-
-    dom.upstreamImageModel.innerHTML = options
-      .map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
-      .join('')
 
     const wanted = upstreamImageModelSelection === null ? upstreamSavedImageModel : upstreamImageModelSelection
-    dom.upstreamImageModel.value = options.some(option => option.value === wanted) ? wanted : ''
+    // 默认模型如果在本次编辑中变成了不可用（例如删掉了对应供应商/工作流），
+    // 仍把它留在下拉里标成「已选择」，保存时给出明确提示，而不是静默清空
+    if (wanted && !definitions.some(item => item.value === wanted)) {
+      definitions.push({ value: wanted, label: wanted, id: wanted, badge: '已选择' })
+    }
+    definitions.push({ value: CUSTOM_MODEL_VALUE, label: '自定义模型 ID…' })
+    writeModelOptions(dom.upstreamImageModel, definitions, wanted)
     syncCustomImageModelInput()
     renderUpstreamImageModelStatus()
   }
@@ -4479,73 +4978,134 @@
     if (!dom.upstreamImageModelStatus) return
     const effective = upstreamEffectiveImageModel || '未设置'
     const source = upstreamSavedImageModel ? '后台设置' : '环境变量 MAGPIE_IMAGE_MODEL'
+    const rows = upstreamLibraryRows()
+    const visible = rows.filter(row => row.visible && !row.disabled).length
     const comfyCount = upstreamComfyWorkflows.filter(workflow => workflow.enabled !== false).length
-    const clientCount = upstreamEnabledImageModels.length + comfyCount
     dom.upstreamImageModelStatus.textContent =
-      `当前生效：${effective}（${source}）· 客户端可选 ${clientCount} 个${comfyCount ? `（ComfyUI ${comfyCount}）` : ''} · 改动会在下一次生图时生效`
+      `当前生效：${effective}（${source}）· 客户端可见 ${visible} 个${comfyCount ? ` · ComfyUI ${comfyCount} 个` : ''}`
   }
 
-  /** 客户端可见模型：勾选框 + 显示名输入，按服务端白名单渲染 */
-  function clientModelRowHtml({ id, label, source, kind, checked, alias, disabled }) {
-    return `<div class="client-model-row">
-      <label>
-        <input type="checkbox" data-kind="${kind}" value="${escapeHtml(id)}"${checked ? ' checked' : ''}${disabled ? ' disabled' : ''}>
-        <span>${escapeHtml(label)}</span>
-        <code>${escapeHtml(id)}</code>
-        <span class="model-source">${escapeHtml(source)}</span>
-      </label>
-      <input type="text" class="model-alias" data-model-id="${escapeHtml(id)}" value="${escapeHtml(alias || '')}" placeholder="客户端显示名" autocomplete="off">
-    </div>`
-  }
-
-  /** 客户端可选模型：内置与自定义供应商统一列出，并标注来源 */
-  function renderClientModelFlags() {
-    if (!dom.upstreamClientModelList) return
-    const enabled = new Set(upstreamEnabledImageModels)
-    const visibility = upstreamModelVisibility || {}
+  /** 模型库的数据行：内置、自定义供应商、ComfyUI 全部列出，禁用项也保留，避免保存时丢别名 */
+  function upstreamLibraryRows() {
     const rows = []
+    const enabled = new Set(upstreamEnabledImageModels)
+    const aliases = upstreamModelAliases
+    const visibility = upstreamModelVisibility
+    const seen = new Set()
 
-    for (const model of upstreamImageModels) {
-      rows.push(clientModelRowHtml({
+    const catalog = upstreamImageModels.length ? upstreamImageModels : IMAGE_MODEL_PRESETS
+    for (const model of catalog) {
+      seen.add(model.id)
+      rows.push({
         id: model.id,
         label: model.label || model.id,
-        source: 'Magpie',
+        source: 'magpie',
+        sourceText: 'Magpie',
+        badgeClass: 'magpie',
+        cap: '生图',
         kind: 'builtin',
-        checked: enabled.has(model.id),
-        alias: upstreamModelAliases[model.id] || '',
-      }))
+        visible: enabled.has(model.id),
+        alias: aliases[model.id] || '',
+        disabled: false,
+      })
+    }
+    // 已保存但当前目录没列出来的内置模型也要留着，否则保存一次就被裁掉
+    for (const id of upstreamEnabledImageModels) {
+      if (seen.has(id)) continue
+      rows.push({
+        id,
+        label: id,
+        source: 'magpie',
+        sourceText: 'Magpie',
+        badgeClass: 'magpie',
+        cap: '上游未列出',
+        kind: 'builtin',
+        visible: true,
+        alias: aliases[id] || '',
+        disabled: false,
+      })
     }
 
-    for (const provider of upstreamProviders) {
-      if (provider.enabled === false) continue
+    const providers = dom.providerList ? collectProviders() : upstreamProviders
+    for (const provider of providers) {
+      const providerOff = provider.enabled === false
       for (const model of Array.isArray(provider.models) ? provider.models : []) {
-        if (model.enabled === false) continue
         const id = `p:${provider.id}:${model.id}`
-        rows.push(clientModelRowHtml({
+        rows.push({
           id,
           label: model.label || model.id,
-          source: provider.name || provider.id,
+          source: 'custom',
+          sourceText: `自定义 · ${provider.name || provider.id}`,
+          badgeClass: 'custom',
+          cap: '生图',
           kind: 'extra',
-          checked: visibility[id] !== false,
-          alias: upstreamModelAliases[id] || '',
-        }))
+          visible: visibility[id] !== false,
+          alias: aliases[id] || '',
+          disabled: providerOff || model.enabled === false,
+        })
       }
     }
 
     for (const workflow of upstreamComfyWorkflows) {
-      if (workflow.enabled === false) continue
-      rows.push(clientModelRowHtml({
+      rows.push({
         id: workflow.id,
         label: workflow.label || workflow.id,
-        source: 'ComfyUI',
+        source: 'comfy',
+        sourceText: 'ComfyUI',
+        badgeClass: 'comfy',
+        cap: '生图 · 4 档',
         kind: 'extra',
-        checked: visibility[workflow.id] !== false,
-        alias: upstreamModelAliases[workflow.id] || '',
-      }))
+        visible: visibility[workflow.id] !== false,
+        alias: aliases[workflow.id] || '',
+        disabled: workflow.enabled === false,
+      })
     }
+    return rows
+  }
 
-    dom.upstreamClientModelList.innerHTML =
-      rows.join('') || '<p class="hint">还没有可配置的模型。</p>'
+  function libraryRowHtml(row, defaultId) {
+    const disabled = row.disabled ? ' disabled' : ''
+    const kind = row.kind === 'builtin' ? 'builtin' : 'extra'
+    return `<div class="up-lib-row${row.disabled || !row.visible ? ' is-off' : ''}">
+      <input type="text" class="up-alias" data-model-id="${escapeHtml(row.id)}" value="${escapeHtml(row.alias)}" placeholder="${escapeHtml(row.label)}" autocomplete="off" aria-label="${escapeHtml(row.label)} 的显示名">
+      <code title="${escapeHtml(row.id)}">${escapeHtml(row.id)}</code>
+      <span><span class="up-badge ${row.badgeClass}">${escapeHtml(row.sourceText)}</span></span>
+      <span class="up-cap">${escapeHtml(row.cap)}</span>
+      <button type="button" class="up-star${row.id === defaultId ? ' on' : ''}" data-star-id="${escapeHtml(row.id)}"${row.disabled || !row.visible ? ' disabled' : ''} title="${row.disabled || !row.visible ? '该模型当前不可用，先启用并设为可见' : '设为默认生图模型'}" aria-label="设为默认">★</button>
+      <label class="up-switch"><input type="checkbox" data-visible-id="${escapeHtml(row.id)}" data-kind="${kind}"${row.visible ? ' checked' : ''}${disabled}><span></span></label>
+    </div>`
+  }
+
+  /** 客户端模型库：搜索 + 来源筛选 + 显示名 + 默认星标 + 可见开关 */
+  function renderClientModelFlags() {
+    if (!dom.upstreamClientModelList) return
+    const all = upstreamLibraryRows()
+    const q = upstreamLibQuery.trim().toLowerCase()
+    const rows = all.filter(row =>
+      (upstreamLibFilter === 'all' || row.source === upstreamLibFilter) &&
+      (!q || row.label.toLowerCase().includes(q) || row.id.toLowerCase().includes(q)))
+    const defaultId = currentImageModelValue()
+    dom.upstreamClientModelList.innerHTML = rows.map(row => libraryRowHtml(row, defaultId)).join('')
+    if (dom.upstreamLibEmpty) dom.upstreamLibEmpty.hidden = rows.length > 0
+    const visible = all.filter(row => row.visible && !row.disabled).length
+    setCurrent(dom.upstreamLibCount, `${all.length} 个模型 · ${visible} 个可见`)
+  }
+
+  /** 把某行设为默认生图模型；不在下拉选项里的 ID 走自定义输入 */
+  function setUpstreamDefaultImageModel(id) {
+    upstreamImageModelSelection = id
+    const exists = [...dom.upstreamImageModel.options].some(option => option.value === id)
+    if (exists) {
+      dom.upstreamImageModel.value = id
+    } else {
+      dom.upstreamImageModel.value = CUSTOM_MODEL_VALUE
+      dom.upstreamImageModelCustom.value = id
+    }
+    dom.upstreamImageModel.parentElement?.__picker?.refresh()
+    syncCustomImageModelInput()
+    renderUpstreamImageModelStatus()
+    renderClientModelFlags()
+    markUpstreamDirty()
   }
 
   // ---------- 自定义供应商 ----------
@@ -4555,40 +5115,53 @@
     const rows = models
       .map(model => providerModelRowHtml(model.id, model.label || '', model.enabled !== false))
       .join('')
-    return `<div class="provider-card">
+    const open = provider.open === true
+    const originalId = provider.originalId || provider.id || ''
+    const currentId = provider.currentId || provider.id || ''
+    return `<div class="provider-card${open ? ' open' : ''}" data-original-id="${escapeHtml(originalId)}" data-current-id="${escapeHtml(currentId)}">
       <div class="provider-head">
-        <label class="check"><input type="checkbox" class="provider-enabled"${provider.enabled === false ? '' : ' checked'}> 启用</label>
-        <input type="text" class="provider-name" value="${escapeHtml(provider.name || '')}" placeholder="供应商名称（仅供后台识别）" autocomplete="off">
-        <button type="button" class="button mini provider-remove">删除</button>
+        <label class="up-switch"><input type="checkbox" class="provider-enabled"${provider.enabled === false ? '' : ' checked'} aria-label="启用供应商"><span></span></label>
+        <input type="text" class="provider-name" value="${escapeHtml(provider.name || '')}" placeholder="供应商名称" autocomplete="off" aria-label="供应商名称">
+        <span class="provider-url-text">${escapeHtml(provider.baseUrl || '未填地址')}</span>
+        <div class="right">
+          <span class="up-badge custom provider-count">${models.length} 个模型</span>
+          <button type="button" class="button mini provider-toggle">${open ? '收起' : '展开'}</button>
+          <button type="button" class="button mini provider-remove">删除</button>
+        </div>
       </div>
-      <div class="form-row">
-        <label>供应商 ID
-          <input type="text" class="provider-id" value="${escapeHtml(provider.id || '')}" placeholder="my-gateway" spellcheck="false" autocomplete="off">
-        </label>
-        <label class="grow">接口地址
-          <input type="url" class="provider-url" value="${escapeHtml(provider.baseUrl || '')}" placeholder="https://api.example.com" spellcheck="false" autocomplete="off">
-        </label>
-        <label class="grow">API Key
-          <input type="password" class="provider-key" value="${escapeHtml(provider.apiKey || '')}" placeholder="留空表示不需要" autocomplete="new-password">
-        </label>
+      <div class="provider-body">
+        <div class="provider-fields">
+          <label>供应商 ID
+            <input type="text" class="provider-id" value="${escapeHtml(provider.id || '')}" placeholder="my-gateway" spellcheck="false" autocomplete="off">
+          </label>
+          <label>接口地址
+            <input type="url" class="provider-url" value="${escapeHtml(provider.baseUrl || '')}" placeholder="https://api.example.com" spellcheck="false" autocomplete="off">
+          </label>
+          <label>API Key
+            <input type="password" class="provider-key" value="${escapeHtml(provider.apiKey || '')}" placeholder="留空表示不需要" autocomplete="new-password">
+          </label>
+        </div>
+        <div class="provider-models">
+          <div class="provider-models-head">
+            <span>模型（勾选表示启用）</span>
+            <div class="right">
+              <button type="button" class="button mini provider-fetch">拉取模型</button>
+              <input type="text" class="provider-model-add" placeholder="手动添加模型 ID" spellcheck="false" autocomplete="off">
+              <button type="button" class="button mini provider-add-model">添加</button>
+            </div>
+          </div>
+          <div class="provider-model-list">${rows}</div>
+        </div>
+        <p class="current provider-status"></p>
       </div>
-      <div class="provider-model-head">
-        <span>模型</span>
-        <button type="button" class="button mini provider-fetch">拉取模型</button>
-        <input type="text" class="provider-model-add" placeholder="手动添加模型 ID，如 gpt-image-1" spellcheck="false" autocomplete="off">
-        <button type="button" class="button mini provider-add-model">添加</button>
-      </div>
-      <div class="provider-model-list">${rows}</div>
-      <p class="current provider-status"></p>
     </div>`
   }
 
   function providerModelRowHtml(id, label, enabled) {
-    return `<div class="provider-model-row">
-      <label class="check"><input type="checkbox" class="provider-model-enabled"${enabled ? ' checked' : ''}></label>
+    return `<div class="provider-model-row" data-label="${escapeHtml(label || '')}">
+      <label class="up-switch"><input type="checkbox" class="provider-model-enabled"${enabled ? ' checked' : ''} aria-label="启用模型"><span></span></label>
       <code title="${escapeHtml(id)}">${escapeHtml(id)}</code>
       <input type="hidden" class="provider-model-id" value="${escapeHtml(id)}">
-      <input type="text" class="provider-model-label" value="${escapeHtml(label || '')}" placeholder="客户端显示名" autocomplete="off">
       <button type="button" class="provider-model-remove" title="移除" aria-label="移除">×</button>
     </div>`
   }
@@ -4602,18 +5175,70 @@
       baseUrl: (card.querySelector('.provider-url')?.value || '').trim(),
       apiKey: card.querySelector('.provider-key')?.value || '',
       enabled: Boolean(card.querySelector('.provider-enabled')?.checked),
+      open: card.classList.contains('open'),
+      originalId: card.dataset.originalId || '',
+      currentId: card.dataset.currentId || '',
       models: [...card.querySelectorAll('.provider-model-row')].map(row => ({
         id: (row.querySelector('.provider-model-id')?.value || '').trim(),
-        label: (row.querySelector('.provider-model-label')?.value || '').trim(),
+        label: row.dataset.label || '',
         enabled: Boolean(row.querySelector('.provider-model-enabled')?.checked),
       })),
     }))
+  }
+
+  function updateUpstreamProviderCount() {
+    if (!dom.upstreamProviderCount) return
+    const providers = dom.providerList ? collectProviders() : upstreamProviders
+    const models = providers.reduce((count, provider) =>
+      count + (Array.isArray(provider.models) ? provider.models.length : 0), 0)
+    dom.upstreamProviderCount.textContent = `${providers.length} 个供应商 · ${models} 个模型`
   }
 
   function renderProviderCards(providers) {
     if (!dom.providerList) return
     if (Array.isArray(providers)) upstreamProviders = providers
     dom.providerList.innerHTML = upstreamProviders.map(providerCardHtml).join('')
+    updateUpstreamProviderCount()
+  }
+
+  /** 供应商 ID 一改，立刻把 p:旧ID:模型 的别名/可见性/默认模型迁到新 ID，避免重绘时读不到旧值 */
+  function migrateProviderKeys(oldId, newId) {
+    if (!oldId || !newId || oldId === newId) return
+    const from = `p:${oldId}:`
+    const to = `p:${newId}:`
+    for (const map of [upstreamModelAliases, upstreamModelVisibility]) {
+      for (const key of Object.keys(map)) {
+        if (!key.startsWith(from)) continue
+        const nextKey = `${to}${key.slice(from.length)}`
+        if (!(nextKey in map)) map[nextKey] = map[key]
+        delete map[key]
+      }
+    }
+    if (upstreamImageModelSelection && upstreamImageModelSelection.startsWith(from)) {
+      upstreamImageModelSelection = `${to}${upstreamImageModelSelection.slice(from.length)}`
+    }
+    if (upstreamSavedImageModel.startsWith(from)) {
+      upstreamSavedImageModel = `${to}${upstreamSavedImageModel.slice(from.length)}`
+    }
+  }
+
+  function syncProviderCardHeader(card) {
+    if (!card) return
+    const url = (card.querySelector('.provider-url')?.value || '').trim()
+    const urlEl = card.querySelector('.provider-url-text')
+    if (urlEl) urlEl.textContent = url || '未填地址'
+    const countEl = card.querySelector('.provider-count')
+    if (countEl) countEl.textContent = `${card.querySelectorAll('.provider-model-row').length} 个模型`
+    updateUpstreamProviderCount()
+  }
+
+  /** 供应商草稿变化后延迟刷新模型库和默认模型下拉，不用先保存 */
+  function scheduleUpstreamDraftRefresh() {
+    window.clearTimeout(upstreamProviderRenderTimer)
+    upstreamProviderRenderTimer = window.setTimeout(() => {
+      renderClientModelFlags()
+      renderUpstreamImageModelOptions()
+    }, 250)
   }
 
   function addProviderCard() {
@@ -4621,11 +5246,22 @@
     let n = providers.length + 1
     const ids = new Set(providers.map(item => item.id))
     while (ids.has(`provider-${n}`)) n += 1
-    providers.push({ id: `provider-${n}`, name: '', baseUrl: '', apiKey: '', enabled: true, models: [] })
+    providers.push({
+      id: `provider-${n}`,
+      name: '',
+      baseUrl: '',
+      apiKey: '',
+      enabled: true,
+      open: true,
+      originalId: '',
+      models: [],
+    })
     renderProviderCards(providers)
     const cards = dom.providerList.querySelectorAll('.provider-card')
     const card = cards[cards.length - 1]
     card?.querySelector('.provider-url')?.focus()
+    markUpstreamDirty()
+    scheduleUpstreamDraftRefresh()
   }
 
   function appendModelRow(card, id, label, enabled) {
@@ -4636,6 +5272,7 @@
     const existing = [...list.querySelectorAll('.provider-model-id')].map(input => input.value.trim())
     if (existing.includes(trimmed)) return false
     list.insertAdjacentHTML('beforeend', providerModelRowHtml(trimmed, label || '', enabled !== false))
+    syncProviderCardHeader(card)
     return true
   }
 
@@ -4656,6 +5293,8 @@
       setCurrent(status, result.error || '拉取模型失败', 'error')
       return
     }
+    // 等请求的这段时间里卡片可能被增删/重绘，旧节点已脱离文档，别再往里写
+    if (!card.isConnected) return
     const data = result.data || {}
     if (data.ok === false) {
       setCurrent(status, data.detail || '拉取模型失败', 'error')
@@ -4670,10 +5309,14 @@
     setCurrent(
       status,
       added
-        ? `拉取到 ${models.length} 个模型，新增 ${added} 个（默认未勾选，勾选后客户端才可见）`
+        ? `拉取到 ${models.length} 个模型，新增 ${added} 个（默认未勾选，勾选后才会出现在模型库）`
         : `拉取到 ${models.length} 个模型，列表里都已经有了`,
       'ok',
     )
+    if (added) {
+      markUpstreamDirty()
+      scheduleUpstreamDraftRefresh()
+    }
   }
 
   if (dom.providerAdd) {
@@ -4685,11 +5328,20 @@
       const card = event.target.closest('.provider-card')
       if (!card) return
 
+      if (event.target.closest('.provider-toggle')) {
+        const open = card.classList.toggle('open')
+        const button = card.querySelector('.provider-toggle')
+        if (button) button.textContent = open ? '收起' : '展开'
+        return
+      }
+
       if (event.target.closest('.provider-remove')) {
         const providers = collectProviders()
         const index = [...dom.providerList.querySelectorAll('.provider-card')].indexOf(card)
         if (index >= 0) providers.splice(index, 1)
         renderProviderCards(providers)
+        markUpstreamDirty()
+        scheduleUpstreamDraftRefresh()
         return
       }
 
@@ -4699,6 +5351,8 @@
           if (input) input.value = ''
           const status = card.querySelector('.provider-status')
           setCurrent(status, '')
+          markUpstreamDirty()
+          scheduleUpstreamDraftRefresh()
         }
         return
       }
@@ -4710,16 +5364,49 @@
 
       if (event.target.closest('.provider-model-remove')) {
         event.target.closest('.provider-model-row')?.remove()
+        syncProviderCardHeader(card)
+        markUpstreamDirty()
+        scheduleUpstreamDraftRefresh()
+      }
+    })
+
+    dom.providerList.addEventListener('input', event => {
+      const card = event.target.closest('.provider-card')
+      if (!card) return
+      markUpstreamDirty()
+      const idInput = event.target.closest('.provider-id')
+      if (idInput) {
+        const previous = card.dataset.currentId || ''
+        const next = idInput.value.trim()
+        if (previous && next && previous !== next) migrateProviderKeys(previous, next)
+        if (next) card.dataset.currentId = next
+      }
+      if (event.target.closest('.provider-name, .provider-url, .provider-id')) {
+        syncProviderCardHeader(card)
+        scheduleUpstreamDraftRefresh()
+      }
+    })
+
+    dom.providerList.addEventListener('change', event => {
+      const card = event.target.closest('.provider-card')
+      if (!card) return
+      if (event.target.closest('.provider-enabled, .provider-model-enabled')) {
+        markUpstreamDirty()
+        scheduleUpstreamDraftRefresh()
       }
     })
 
     dom.providerList.addEventListener('keydown', event => {
-      if (event.key !== 'Enter') return
+      if (event.key !== 'Enter' || event.isComposing) return
       const input = event.target.closest('.provider-model-add')
       if (!input) return
       event.preventDefault()
       const card = input.closest('.provider-card')
-      if (card && appendModelRow(card, input.value, '', true)) input.value = ''
+      if (card && appendModelRow(card, input.value, '', true)) {
+        input.value = ''
+        markUpstreamDirty()
+        scheduleUpstreamDraftRefresh()
+      }
     })
   }
 
@@ -5082,6 +5769,8 @@
         renderComfyLaunch(data.launch)
         comfyLaunchDirty = false
         saved = true
+        // 工作流增删会影响上游页的模型库，没未保存编辑就顺手刷新
+        if (!upstreamDirty) void loadUpstream()
       } finally {
         comfyServiceBusy = false
       }
@@ -5267,12 +5956,14 @@
       renderComfyWorkflows()
       setCurrent(dom.comfyStatus, `已保存 ${comfyWorkflows.length} 个工作流 · ${data.baseUrl || baseUrl}`, 'ok')
       setCurrent(dom.comfyResult, '保存成功，客户端下次打开模型下拉即可看到新工作流。', 'ok')
-      await loadUpstream()
+      // 上游页有未保存编辑时不要重载，避免静默覆盖
+      if (!upstreamDirty) await loadUpstream()
     })
   }
 
   /** 状态行 = 拉取说明 + 当前选中模型的能力提示 */
   function renderUpstreamModelStatus(tone, overrideText) {
+    if (!dom.upstreamModelStatus) return
     if (tone !== undefined) upstreamModelStatusTone = tone
     const notes = [...upstreamModelStatusNotes]
     const selected = currentTextModelValue()
@@ -5287,22 +5978,38 @@
 
   /**
    * 拉取上游模型列表。
-   * refresh=true 跳过服务端 60 秒缓存（手动点「获取模型」或改完地址保存后）；
-   * 自动拉取走缓存，失败只写状态行、不弹错。
+   * 「获取模型」用输入框里的地址，不必先保存；refresh=true 跳过服务端 60 秒缓存。
    */
-  async function loadUpstreamModels({ refresh = true, busy = true } = {}) {
+  async function loadUpstreamModels({ refresh = true, busy = true, baseUrl = '' } = {}) {
     const run = async () => {
-      setCurrent(dom.upstreamModelStatus, '正在获取上游模型列表…')
-      const result = await api(`/api/admin/upstream/models${refresh ? '?refresh=1' : ''}`)
+      const address = (baseUrl || dom.upstreamUrl.value || '').trim()
+      if (busy && !address) {
+        setCurrent(dom.upstreamConnStatus, '先填写上游地址', 'error')
+        return false
+      }
+      const params = new URLSearchParams()
+      if (refresh) params.set('refresh', '1')
+      if (address) params.set('baseUrl', address)
+      setCurrent(dom.upstreamConnStatus, '正在获取上游模型列表…')
+
+      let result
+      try {
+        result = await api(`/api/admin/upstream/models?${params.toString()}`)
+      } catch (error) {
+        setCurrent(dom.upstreamConnStatus, `获取模型失败：${errorText(error)}`, 'error')
+        return false
+      }
 
       if (isAuthFailure(result)) {
         upstreamModelStatusNotes = []
         renderUpstreamModelStatus('error', AUTH_HINT)
+        setCurrent(dom.upstreamConnStatus, AUTH_HINT, 'error')
         return false
       }
       if (!result.ok) {
         upstreamModelStatusNotes = []
         renderUpstreamModelStatus('error', result.error || '获取模型列表失败')
+        setCurrent(dom.upstreamConnStatus, result.error || '获取模型列表失败', 'error')
         return false
       }
 
@@ -5316,21 +6023,36 @@
       renderUpstreamModelOptions()
       renderUpstreamTitleModelOptions()
 
+      // 手动「获取模型」时顺带刷新图片模型目录，用输入框里的地址，不用先保存
+      if (busy && address) {
+        const configResult = await api(`/api/admin/upstream?baseUrl=${encodeURIComponent(address)}`)
+        const imageModels = configResult.ok && configResult.data ? configResult.data.imageModels : null
+        if (Array.isArray(imageModels)) {
+          upstreamImageModels = imageModels
+          renderUpstreamImageModelOptions()
+          renderClientModelFlags()
+        }
+      }
+
       if (!models.length) {
         upstreamModelStatusNotes = []
         renderUpstreamModelStatus('', '上游返回的模型列表是空的，可以在「自定义模型 ID…」里手填')
+        setCurrent(dom.upstreamConnStatus, '上游没有返回对话模型', 'warn')
         return true
       }
 
-      const notes = [`已获取 ${models.length} 个模型（来源：${data.source === 'cache' ? '缓存' : '上游'}）`]
+      const notes = [`${models.length} 个模型`]
       const textCapable = models.filter(model => model.capabilities.text === true).length
       // 上游常常不声明能力：照实说没验证，绝不按名字猜
-      if (textCapable === 0) notes.push('上游没有声明模型能力，能力未验证，保存前请确认它支持对话')
+      if (textCapable === 0) notes.push('上游没有声明能力，保存前请确认支持对话')
       else notes.push(`${textCapable} 个标注支持对话`)
-      const fetchedAt = formatTime(data.fetchedAt)
-      if (fetchedAt !== '—') notes.push(`拉取于 ${fetchedAt}`)
       upstreamModelStatusNotes = notes
       renderUpstreamModelStatus('ok')
+      setCurrent(
+        dom.upstreamConnStatus,
+        `已连接 · ${models.length} 个对话模型 · 来源：${data.source === 'cache' ? '缓存' : '上游'}`,
+        'ok',
+      )
       return true
     }
 
@@ -5350,129 +6072,102 @@
   async function testUpstream() {
     const baseUrl = dom.upstreamUrl.value.trim()
     if (!baseUrl) {
-      setCurrent(dom.upstreamResult, '先填写上游地址', 'error')
+      setCurrent(dom.upstreamConnStatus, '先填写上游地址', 'error')
       return
     }
 
     await withBusy(dom.upstreamTest, async () => {
-      setCurrent(dom.upstreamResult, '正在测试连通…')
+      setCurrent(dom.upstreamConnStatus, '正在测试连通…')
       const result = await api('/api/admin/upstream/test', { method: 'POST', body: { baseUrl } })
       if (isAuthFailure(result)) {
-        setCurrent(dom.upstreamResult, AUTH_HINT, 'error')
+        setCurrent(dom.upstreamConnStatus, AUTH_HINT, 'error')
         return
       }
       if (!result.ok) {
-        setCurrent(dom.upstreamResult, result.error || '测试请求失败', 'error')
+        setCurrent(dom.upstreamConnStatus, result.error || '测试请求失败', 'error')
         return
       }
       const data = result.data || {}
       setCurrent(
-        dom.upstreamResult,
+        dom.upstreamConnStatus,
         `${data.reachable ? '可连通' : '连不上'}：${data.detail || '没有更多信息'}（只测地址连通，不校验模型）`,
         data.reachable ? 'ok' : 'error',
       )
     })
   }
 
+  function failUpstreamSave(text) {
+    refreshUpstreamSavebar('error', text)
+    setCurrent(dom.upstreamConnStatus, text, 'error')
+    dom.upstreamSavebar?.scrollIntoView({ block: 'nearest' })
+  }
+
   async function saveUpstream() {
     const baseUrl = dom.upstreamUrl.value.trim()
-    if (!baseUrl) {
-      setCurrent(dom.upstreamResult, '上游地址不能为空', 'error')
-      return
-    }
+    if (!baseUrl) return failUpstreamSave('上游地址不能为空')
 
     // 留空表示清除后台覆写、回落到环境变量默认值，所以这里不拦空值
     const textModel = currentTextModelValue()
-    if (textModel.length > 120) {
-      setCurrent(dom.upstreamResult, '提示词优化模型最多 120 个字符', 'error')
-      return
-    }
-    if (/\s/.test(textModel)) {
-      setCurrent(dom.upstreamResult, '提示词优化模型里不能有空格', 'error')
-      return
-    }
+    if (textModel.length > 120) return failUpstreamSave('提示词优化模型最多 120 个字符')
+    if (/\s/.test(textModel)) return failUpstreamSave('提示词优化模型里不能有空格')
 
     const titleModel = currentTitleModelValue()
-    if (titleModel.length > 120) {
-      setCurrent(dom.upstreamResult, '卡片标题模型最多 120 个字符', 'error')
-      return
-    }
-    if (/\s/.test(titleModel)) {
-      setCurrent(dom.upstreamResult, '卡片标题模型里不能有空格', 'error')
-      return
-    }
+    if (titleModel.length > 120) return failUpstreamSave('卡片标题模型最多 120 个字符')
+    if (/\s/.test(titleModel)) return failUpstreamSave('卡片标题模型里不能有空格')
 
-    const imageModel = currentImageModelValue()
-    if (imageModel.length > 120) {
-      setCurrent(dom.upstreamResult, '生图模型最多 120 个字符', 'error')
-      return
-    }
-    if (/\s/.test(imageModel)) {
-      setCurrent(dom.upstreamResult, '生图模型里不能有空格', 'error')
-      return
-    }
-
-    const enabledImageModels = [...dom.upstreamClientModelList.querySelectorAll('input[data-kind="builtin"]:checked')]
-      .map(input => input.value)
-
-    // 非内置模型的可见性：自定义供应商走同一张表
-    const modelVisibility = {}
-    let visibleExtra = 0
-    for (const input of dom.upstreamClientModelList.querySelectorAll('input[data-kind="extra"]')) {
-      if (input.disabled) continue
-      modelVisibility[input.value] = input.checked
-      if (input.checked) visibleExtra += 1
-    }
-
-    // 模型显示名：留空表示用默认名字
-    const modelAliases = {}
-    for (const input of dom.upstreamClientModelList.querySelectorAll('.model-alias')) {
-      const id = input.dataset.modelId || ''
-      const label = input.value.trim()
-      if (id && label) modelAliases[id] = label
-    }
+    let imageModel = currentImageModelValue()
+    if (imageModel.length > 120) return failUpstreamSave('生图模型最多 120 个字符')
+    if (/\s/.test(imageModel)) return failUpstreamSave('生图模型里不能有空格')
 
     // 供应商：前端只做基本必填检查，完整校验在服务端
     const providers = collectProviders()
     const providerIds = new Set()
     for (const provider of providers) {
-      if (!provider.id) {
-        setCurrent(dom.upstreamResult, '每个供应商都要填 ID', 'error')
-        return
-      }
-      if (providerIds.has(provider.id)) {
-        setCurrent(dom.upstreamResult, `供应商 ID 重复：${provider.id}`, 'error')
-        return
-      }
+      if (!provider.id) return failUpstreamSave('每个供应商都要填 ID')
+      if (providerIds.has(provider.id)) return failUpstreamSave(`供应商 ID 重复：${provider.id}`)
       providerIds.add(provider.id)
       if (!provider.baseUrl) {
-        setCurrent(dom.upstreamResult, `供应商「${provider.name || provider.id}」还缺接口地址`, 'error')
-        return
+        return failUpstreamSave(`供应商「${provider.name || provider.id}」还缺接口地址`)
       }
       if (!provider.models.length) {
-        setCurrent(dom.upstreamResult, `供应商「${provider.name || provider.id}」还没有模型`, 'error')
-        return
+        return failUpstreamSave(`供应商「${provider.name || provider.id}」还没有模型`)
       }
     }
 
-    // 内置模型可以全部不勾，但整份配置里至少要留下一个可用的模型
+    // 模型库里的编辑已经实时写进这两份工作副本，改名也已在输入时迁移完
+    const modelAliases = { ...upstreamModelAliases }
+    const modelVisibility = { ...upstreamModelVisibility }
+
+    // 默认生图模型必须还存在于本次提交的模型集合里；删掉供应商/工作流后要重新选
+    const validImageIds = new Set([
+      ...upstreamImageModels.map(model => model.id),
+      ...IMAGE_MODEL_PRESETS.map(model => model.id),
+      ...providers.flatMap(provider => provider.models.map(model => `p:${provider.id}:${model.id}`)),
+      ...upstreamComfyWorkflows.map(workflow => workflow.id),
+    ])
+    if (imageModel && !validImageIds.has(imageModel)) {
+      return failUpstreamSave(`默认生图模型已不可用（${imageModel}），请重新选择`)
+    }
+
+    const enabledImageModels = [...upstreamEnabledImageModels]
+    const comfyEnabled = upstreamComfyWorkflows.filter(workflow => workflow.enabled !== false).length
     const customEnabled = providers.reduce(
       (count, provider) =>
         count + (provider.enabled ? provider.models.filter(model => model.enabled).length : 0),
       0,
     )
-    const comfyEnabled = upstreamComfyWorkflows.filter(workflow => workflow.enabled !== false).length
     if (!enabledImageModels.length && !customEnabled && !comfyEnabled) {
-      setCurrent(dom.upstreamResult, '客户端至少需要一个可用模型（内置、自定义供应商或 ComfyUI 工作流）', 'error')
-      return
+      return failUpstreamSave('客户端至少需要一个可用模型（内置、自定义供应商或 ComfyUI 工作流）')
     }
 
-    if (!enabledImageModels.length && !visibleExtra && !comfyEnabled) {
-      setCurrent(dom.upstreamResult, '客户端至少要保留一个可见模型', 'error')
-      return
+    // 可见性用模型库当前行计算，禁用供应商/模型的隐藏项不计入
+    const rows = upstreamLibraryRows()
+    if (!rows.some(row => row.visible && !row.disabled)) {
+      return failUpstreamSave('客户端至少要保留一个可见模型')
     }
 
     await withBusy(dom.upstreamSave, async () => {
+      refreshUpstreamSavebar('warn', '正在保存…')
       const result = await api('/api/admin/upstream', {
         method: 'PUT',
         body: {
@@ -5481,32 +6176,38 @@
           titleModel,
           imageModel,
           enabledImageModels,
-          providers,
+          providers: providers.map(provider => ({
+            id: provider.id,
+            name: provider.name,
+            baseUrl: provider.baseUrl,
+            apiKey: provider.apiKey,
+            enabled: provider.enabled,
+            models: provider.models.map(model => ({
+              id: model.id,
+              label: model.label,
+              enabled: model.enabled,
+            })),
+          })),
           modelAliases,
           modelVisibility,
         },
       })
       if (isAuthFailure(result)) {
-        setCurrent(dom.upstreamResult, AUTH_HINT, 'error')
+        failUpstreamSave(AUTH_HINT)
         return
       }
       if (!result.ok) {
-        setCurrent(dom.upstreamResult, result.error || '上游地址保存失败', 'error')
+        failUpstreamSave(result.error || '保存失败')
         return
       }
-      const saved = (result.data && result.data.baseUrl) || baseUrl
-      const effectiveModel = (result.data && result.data.textModel) || '未设置'
-      const fromSettings = Boolean(result.data && result.data.textModelFromSettings)
-      const effectiveImageModel = (result.data && result.data.imageModel) || '未设置'
-      const imageFromSettings = Boolean(result.data && result.data.imageModelFromSettings)
-      const effectiveTitleModel = (result.data && result.data.titleModel) || '未设置'
-      const titleFromSettings = Boolean(result.data && result.data.titleModelFromSettings)
-      flash(
-        `上游地址已保存：${saved} · 生图模型：${effectiveImageModel}（${imageFromSettings ? '后台设置' : '环境变量默认值'}） · 提示词优化模型：${effectiveModel}（${fromSettings ? '后台设置' : '环境变量默认值'}） · 标题模型：${effectiveTitleModel}（${titleFromSettings ? '独立设置' : '跟随优化模型'}）`,
-      )
-      await loadUpstream()
+      await loadUpstream({ force: true })
+      refreshUpstreamSavebar('ok', '已保存')
+      if (dom.upstreamSaveTime) dom.upstreamSaveTime.textContent = `· 上次保存 ${clockText()}`
       // 地址可能换过，上游可用的模型也跟着换，保存后强制回源一次
-      await loadUpstreamModels({ refresh: true })
+      await loadUpstreamModels({
+        refresh: true,
+        baseUrl: (result.data && result.data.baseUrl) || baseUrl,
+      })
     })
   }
 
@@ -6246,28 +6947,92 @@
     dom.rlSave.addEventListener('click', saveRateLimit)
     dom.ccSave.addEventListener('click', saveConcurrency)
 
-    dom.btnUpstreamRefresh.addEventListener('click', () => loadUpstream())
+    dom.btnUpstreamRefresh.addEventListener('click', () => {
+      if (upstreamDirty && !window.confirm('还有未保存的更改，刷新会丢弃它们。继续？')) return
+      void loadUpstream({ force: true })
+    })
     dom.upstreamModelsRefresh.addEventListener('click', () => loadUpstreamModels({ refresh: true }))
+    dom.upstreamUrl.addEventListener('input', markUpstreamDirty)
     dom.upstreamTextModel.addEventListener('change', () => {
       upstreamModelSelection = dom.upstreamTextModel.value
       syncCustomModelInput()
       renderUpstreamModelStatus()
+      markUpstreamDirty()
     })
-    dom.upstreamTextModelCustom.addEventListener('input', () => renderUpstreamModelStatus())
+    dom.upstreamTextModelCustom.addEventListener('input', () => {
+      renderUpstreamModelStatus()
+      markUpstreamDirty()
+    })
     dom.upstreamTitleModel.addEventListener('change', () => {
       upstreamTitleModelSelection = dom.upstreamTitleModel.value
       syncTitleModelInput()
       renderUpstreamTitleModelStatus()
+      markUpstreamDirty()
     })
-    dom.upstreamTitleModelCustom.addEventListener('input', () => renderUpstreamTitleModelStatus())
+    dom.upstreamTitleModelCustom.addEventListener('input', () => {
+      renderUpstreamTitleModelStatus()
+      markUpstreamDirty()
+    })
     dom.upstreamImageModel.addEventListener('change', () => {
       upstreamImageModelSelection = dom.upstreamImageModel.value
       syncCustomImageModelInput()
       renderUpstreamImageModelStatus()
+      renderClientModelFlags()
+      markUpstreamDirty()
     })
-    dom.upstreamImageModelCustom.addEventListener('input', () => renderUpstreamImageModelStatus())
+    dom.upstreamImageModelCustom.addEventListener('input', () => {
+      renderUpstreamImageModelStatus()
+      markUpstreamDirty()
+    })
     dom.upstreamTest.addEventListener('click', testUpstream)
     dom.upstreamSave.addEventListener('click', saveUpstream)
+    dom.upstreamDiscard?.addEventListener('click', () => { void loadUpstream({ force: true }) })
+    dom.upstreamLibSearch?.addEventListener('input', () => {
+      upstreamLibQuery = dom.upstreamLibSearch.value
+      renderClientModelFlags()
+    })
+    dom.upstreamLibFilter?.addEventListener('click', event => {
+      const button = event.target.closest('button[data-kind]')
+      if (!button) return
+      upstreamLibFilter = button.dataset.kind
+      for (const item of dom.upstreamLibFilter.querySelectorAll('button')) {
+        item.classList.toggle('on', item === button)
+      }
+      renderClientModelFlags()
+    })
+    dom.upstreamClientModelList?.addEventListener('input', event => {
+      const input = event.target.closest('.up-alias')
+      if (!input) return
+      const id = input.dataset.modelId || ''
+      if (!id) return
+      const value = input.value.trim()
+      if (value) upstreamModelAliases[id] = value
+      else delete upstreamModelAliases[id]
+      markUpstreamDirty()
+    })
+    dom.upstreamClientModelList?.addEventListener('change', event => {
+      const input = event.target.closest('[data-visible-id]')
+      if (!input) return
+      const id = input.dataset.visibleId || ''
+      if (!id) return
+      if (input.dataset.kind === 'builtin') {
+        const next = new Set(upstreamEnabledImageModels)
+        if (input.checked) next.add(id)
+        else next.delete(id)
+        upstreamEnabledImageModels = [...next]
+      } else {
+        upstreamModelVisibility[id] = input.checked
+      }
+      markUpstreamDirty()
+      renderClientModelFlags()
+      renderUpstreamImageModelOptions()
+    })
+    dom.upstreamClientModelList?.addEventListener('click', event => {
+      const star = event.target.closest('[data-star-id]')
+      if (!star) return
+      setUpstreamDefaultImageModel(star.dataset.starId || '')
+    })
+    ensureUpstreamPickers()
 
     for (const button of dom.feedbackFilters) {
       button.addEventListener('click', () => loadFeedback(button.dataset.filter))
@@ -6868,6 +7633,8 @@
     } else {
       stopComfyServicePolling()
     }
+    // 切回上游页时重读一次，ComfyUI 那边新加/删除的工作流才能同步过来（有未保存改动时会被守卫拦住）
+    if (target === 'upstream') void loadUpstream()
     acctSchedule()
   }
 

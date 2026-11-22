@@ -222,8 +222,13 @@ export function registerUpstreamRoutes(
 ): void {
   app.get('/api/admin/upstream', async request => {
     requireAdmin(request)
+    const query = (request.query ?? {}) as { baseUrl?: unknown }
     const baseUrl = await deps.settings.getBaseUrl()
-    const catalog = await imageModelCatalog.list(baseUrl)
+    // 「获取模型」带上输入框地址时，用这个地址探测图片模型目录，不必先保存
+    const catalogBaseUrl = typeof query.baseUrl === 'string' && query.baseUrl.trim()
+      ? parseBaseUrl(query.baseUrl)
+      : baseUrl
+    const catalog = await imageModelCatalog.list(catalogBaseUrl)
     const catalogIds = catalog.map(model => model.id)
     const comfyConfig = deps.settings.getComfyConfig()
     return {
@@ -267,8 +272,11 @@ export function registerUpstreamRoutes(
    */
   app.get('/api/admin/upstream/models', async request => {
     requireAdmin(request)
-    const query = (request.query ?? {}) as { refresh?: unknown }
-    const baseUrl = await deps.settings.getBaseUrl()
+    const query = (request.query ?? {}) as { refresh?: unknown; baseUrl?: unknown }
+    // 控制台「获取模型」用输入框里的地址，还没保存也能先看模型；不传则用已保存地址
+    const baseUrl = typeof query.baseUrl === 'string' && query.baseUrl.trim()
+      ? parseBaseUrl(query.baseUrl)
+      : await deps.settings.getBaseUrl()
     const result = await modelCatalog.list(baseUrl, { force: wantsRefresh(query.refresh) })
     return { baseUrl, ...result }
   })
