@@ -41,6 +41,10 @@ const SPARKLE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.
 
 const STATES = new WeakMap()
 
+function motionAllowed() {
+  return !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+}
+
 function refill(state) {
   const list = PHRASES[state.pool] || PHRASES.optimize
   const queue = list.slice()
@@ -72,6 +76,7 @@ function paint(state) {
 }
 
 function rotate(state) {
+  if (!motionAllowed()) return
   state.current = pick(state)
   if (!state.textEl) return
   state.textEl.classList.add('is-swapping')
@@ -135,7 +140,9 @@ export function startAiBusy(target, options = {}) {
     target.classList.add('is-ai-busy')
     state.current = pick(state)
     paint(state)
-    state.timer = setInterval(() => rotate(state), 2600)
+    if (motionAllowed()) {
+      state.timer = setInterval(() => rotate(state), 2600)
+    }
     STATES.set(target, state)
   } else {
     if (options.pool) state.pool = options.pool

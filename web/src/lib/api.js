@@ -61,10 +61,11 @@ export function optimizePrompt({ prompt, ratio, referenceCount, referencePaths }
  * 改写已有提示词：instruction 是用户这次的修改要求。
  * referencePaths 为参考图（参考图/），contextPaths 为已生成的结果图。
  */
-export function revisePrompt({ prompt, instruction, ratio, referencePaths, contextPaths }) {
+export function revisePrompt({ prompt, instruction, ratio, referencePaths, contextPaths, signal }) {
   return request('/api/prompts/revise', {
     method: 'POST',
     body: JSON.stringify({ prompt, instruction, ratio, referencePaths, contextPaths }),
+    signal,
   })
 }
 

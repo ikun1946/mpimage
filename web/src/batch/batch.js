@@ -4178,6 +4178,8 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     /* 请求代次：收起面板或再发一次都会 +1，迟到的响应据此丢弃 */
     let reviseInlineSeq = 0
     let reviseInlineBusy = false
+    /* 内联改写的请求控制器：取消或重发时真正断开旧请求，而不只是藏起动画 */
+    let reviseInlineAbort = null
 
     /** 面板里的原文预览：长提示词打开时自动摊开，短提示词点「查看」才出现 */
     function setReviseInlineOrigin(open) {
@@ -4191,6 +4193,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
     function resetReviseInlineActions() {
       dom.freeRevise.classList.remove('has-result', 'is-loading')
+      dom.freeRevise.removeAttribute('aria-busy')
       dom.freeReviseResult.hidden = true
       dom.freeReviseResultBody.textContent = ''
       dom.freeReviseResultBody.dataset.text = ''
@@ -4254,8 +4257,11 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       if (dom.freeRevise.hidden) return
       // 收起就作废这次请求，免得结果回来时面板已经关了还往里写
       reviseInlineSeq += 1
+      reviseInlineAbort?.abort()
+      reviseInlineAbort = null
       reviseInlineBusy = false
       resetReviseInlineActions()
+      reviseInlineTarget = null
       dom.freeRevise.hidden = true
       dom.freePromptShell.classList.remove('is-revising')
       // 面板展开期间输入框是隐藏的，期间改过值也量不到高度；重新可见后补算一次
@@ -4297,6 +4303,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     function showReviseInlineResult(next, result) {
       const note = optimizeKeptNote(result).replace(/^[，,]\s*/, '')
       dom.freeRevise.classList.remove('is-loading')
+      dom.freeRevise.removeAttribute('aria-busy')
       dom.freeRevise.classList.add('has-result')
       dom.freeReviseResult.hidden = false
       dom.freeReviseResultBody.innerHTML = markReviseDiff(reviseInlineTarget?.prompt || '', next)
@@ -4329,7 +4336,11 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       const seq = ++reviseInlineSeq
 
       reviseInlineBusy = true
+      reviseInlineAbort?.abort()
+      const controller = new AbortController()
+      reviseInlineAbort = controller
       dom.freeRevise.classList.add('is-loading')
+      dom.freeRevise.setAttribute('aria-busy', 'true')
       dom.freeRevise.classList.remove('has-result')
       dom.freeReviseResult.hidden = true
       dom.freeReviseAgain.hidden = true
@@ -4349,6 +4360,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
           ratio: target.ratio,
           referencePaths,
           contextPaths,
+          signal: controller.signal,
         })
         if (seq !== reviseInlineSeq) return
         const next = (result?.prompt || '').trim()
@@ -4356,11 +4368,14 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         showReviseInlineResult(next, result)
       } catch (error) {
         if (seq !== reviseInlineSeq) return
+        if (error?.name === 'AbortError') return
         dom.freeRevise.classList.remove('is-loading')
+        dom.freeRevise.removeAttribute('aria-busy')
         dom.freeReviseStatus.textContent = error.message || '改写失败，请稍后重试'
         showToast(error.message || '改写失败，请稍后重试', true)
       } finally {
         if (seq === reviseInlineSeq) {
+          if (reviseInlineAbort === controller) reviseInlineAbort = null
           reviseInlineBusy = false
           dom.freeReviseRun.disabled = false
           // 有结果时按钮是「应用」，没结果回到「开始改写」

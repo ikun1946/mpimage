@@ -1332,6 +1332,10 @@
   color: var(--ink-faint);
 }
 
+.revise-inline-body {
+  transition: opacity 160ms ease;
+}
+
 .revise-inline-presets {
   display: flex;
   flex-wrap: wrap;
@@ -1383,7 +1387,8 @@
   transition:
     background 130ms ease,
     box-shadow 130ms ease,
-    color 130ms ease;
+    color 130ms ease,
+    opacity 160ms ease;
 }
 
 .revise-inline-chip:hover {
@@ -1522,10 +1527,12 @@
   left: 18px;
   height: 2px;
   border-radius: 99px;
-  background: linear-gradient(90deg, transparent, var(--moss), transparent);
+  background: linear-gradient(90deg, transparent 0%, var(--moss) 50%, transparent 100%);
+  background-size: 30% 100%;
+  background-repeat: no-repeat;
+  background-position: -30% 0;
   content: "";
   opacity: 0;
-  transform: translateX(-120%);
   transition: opacity 160ms ease;
 }
 
@@ -1536,10 +1543,10 @@
 
 @keyframes revise-inline-sweep {
   from {
-    transform: translateX(-120%);
+    background-position: -30% 0;
   }
   to {
-    transform: translateX(320%);
+    background-position: 130% 0;
   }
 }
 
@@ -1570,6 +1577,14 @@
   .revise-inline,
   .revise-inline-result {
     animation: none;
+  }
+  .revise-inline.is-loading::before,
+  .revise-inline-spin {
+    animation: none;
+  }
+  .revise-inline.is-loading::before {
+    opacity: 0.65;
+    background-position: 50% 0;
   }
 }
 

@@ -454,6 +454,7 @@ generated/
 ```bash
 npm run test:resolution
 npm run test:resolution:ui
+npm run test:revise:ui
 ```
 
 > 老版本 README 曾记录：Codex 通道对 `size` 和提示词里的分辨率写法都不敏感。

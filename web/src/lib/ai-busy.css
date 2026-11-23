@@ -181,4 +181,7 @@ html[data-theme="dark"] {
   .ai-busy-dots i {
     animation: none;
   }
+  .ai-busy-text {
+    transition: none;
+  }
 }
