@@ -11,10 +11,11 @@ export function registerMetaRoutes(
   app.get('/api/config', async () => {
     // 生图模型 = Magpie 实际返回的清单 + 后台配置的自定义供应商 + ComfyUI 工作流
     const { models: clientModels } = await listClientImageModels(deps.settings)
-    const imageModels = clientModels.map(({ id, label, resolutionTiers, description }) => ({
+    const imageModels = clientModels.map(({ id, label, resolutionTiers, resolutionNote, description }) => ({
       id,
       label,
       resolutionTiers,
+      resolutionNote,
       description,
     }))
     const configuredModel = deps.settings.getImageModel()

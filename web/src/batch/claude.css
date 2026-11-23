@@ -1358,6 +1358,17 @@ body[data-mode="create"] .app-main main {
   align-items: center;
 }
 
+.resolution-note {
+  margin: 6px 2px 0;
+  color: var(--ink-faint);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.resolution-note[hidden] {
+  display: none;
+}
+
 .meta-info {
   display: flex;
   flex: 0 1 auto;

@@ -27,6 +27,8 @@ export interface MonitorImage {
   bytes?: number
   width?: number
   height?: number
+  /** 所选分辨率档位是否被上游实际执行 */
+  resolution_matched?: boolean | null
   stored_path?: string
   duration_ms?: number
   metrics: MonitorMetrics

@@ -17,13 +17,12 @@ import type {
 } from '../../control/comfy-config.js'
 import type { ComfyObjectInfo } from './comfy-convert.js'
 import { estimateTokens, type MagpieImageResult, type ReferenceImage } from './magpie.js'
+import { fitComfySize } from '../../control/comfy-size.js'
 
 const COMFY_REQUEST_TIMEOUT_MS = 20_000
 const COMFY_POLL_MS = 900
 const MAX_IMAGE_BYTES = 40 * 1024 * 1024
 const MAX_REFERENCE_BYTES = 8 * 1024 * 1024
-const DEFAULT_COMFY_MAX_PIXELS = 4_200_000
-const DEFAULT_COMFY_MAX_SIDE = 2048
 
 /** ComfyUI 本机任务只放一张进 GPU；外面的产品并发再高，也会在这里排队 */
 export const comfyGate = new SerialGate(1)
@@ -524,27 +523,6 @@ function cloneWorkflow(workflow: ComfyApiWorkflow): ComfyApiWorkflow {
 
 function isNodeRef(value: ComfyInputValue): value is [string, number] {
   return Array.isArray(value) && value.length >= 2 && typeof value[0] === 'string' && typeof value[1] === 'number'
-}
-
-function fitComfySize(rawWidth: number, rawHeight: number): { width: number; height: number } {
-  const ratio = rawWidth > 0 && rawHeight > 0 ? rawWidth / rawHeight : 1
-  let best = { width: 1024, height: 1024, score: Number.POSITIVE_INFINITY }
-  const targetArea = Math.min(
-    DEFAULT_COMFY_MAX_PIXELS,
-    Math.max(256 * 256, rawWidth * rawHeight),
-  )
-  for (let height = 256; height <= DEFAULT_COMFY_MAX_SIDE; height += 32) {
-    const idealWidth = height * ratio
-    for (const width of [Math.floor(idealWidth / 32) * 32, Math.ceil(idealWidth / 32) * 32]) {
-      if (width < 256 || width > DEFAULT_COMFY_MAX_SIDE) continue
-      if (width * height > DEFAULT_COMFY_MAX_PIXELS) continue
-      const score =
-        Math.abs(width / height - ratio) * 100 +
-        Math.abs(width * height - targetArea) / Math.max(1, targetArea)
-      if (score < best.score) best = { width, height, score }
-    }
-  }
-  return { width: best.width, height: best.height }
 }
 
 function randomSeed(): number {

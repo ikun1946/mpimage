@@ -17,6 +17,11 @@ export interface RequestLogImage {
   width?: number
   height?: number
   bytes?: number
+  /** 该张图片请求的清晰度档位与目标尺寸 */
+  resolution?: string
+  requestedSize?: string | null
+  resolutionMatched?: boolean | null
+  resolutionWarning?: string | null
 }
 
 export interface RequestLogEntry {

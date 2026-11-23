@@ -652,7 +652,7 @@
                 </div>
                 <span class="meta-dot" aria-hidden="true">·</span>
                 <div class="meta-field">
-                  <select class="select" id="free-resolution" data-resolution-select data-menu-compact aria-label="分辨率" title="分辨率（自动跟随模型；1K/2K/4K 会按画幅换算尺寸，ComfyUI 受显存限制可能回落）">
+                  <select class="select" id="free-resolution" data-resolution-select data-menu-compact aria-label="分辨率" title="只显示当前模型实际支持的档位；生成后会显示真实像素尺寸">
                     <option value="auto">自动</option>
                     <option value="1K">1K</option>
                     <option value="2K">2K</option>
@@ -684,6 +684,7 @@
                 <span class="free-status" id="free-status" aria-live="polite">等待你的想象</span>
               </div>
             </div>
+            <p class="resolution-note" id="free-resolution-note" aria-live="polite" hidden></p>
 
                         <div class="free-progress" id="free-progress">
                           <div class="free-progress-meta">

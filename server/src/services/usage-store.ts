@@ -13,6 +13,16 @@ export interface UsageEntry {
   category: string
   name: string
   ratio: string
+  /** 用户请求的清晰度档位；老记录没有这个字段 */
+  resolution?: string
+  /** 该档位换算出的目标像素，如 1024x1024 */
+  requestedSize?: string | null
+  /** 实际输出是否与所选档位一致 */
+  resolutionMatched?: boolean | null
+  /** 不一致时的明确提示 */
+  resolutionWarning?: string | null
+  /** 实际发给上游的分辨率参数摘要，便于回溯 */
+  upstreamResolutionRequest?: string
   /** 实际使用的生图模型；老记录没有这个字段 */
   model?: string
   width: number

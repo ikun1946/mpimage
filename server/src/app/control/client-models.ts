@@ -10,7 +10,7 @@
  */
 import type { ProviderConfig, ProviderModelConfig, SettingsStore } from './settings-store.js'
 import { ImageModelCatalog } from './image-model-catalog.js'
-import { resolutionTiersForModel } from './image-resolution-capabilities.js'
+import { resolutionSupportForModel } from './image-resolution-capabilities.js'
 import { modelDescription } from './image-model-descriptions.js'
 import type { ImageResolution } from '../platform/config.js'
 import {
@@ -29,6 +29,8 @@ export interface ClientImageModel {
   provider: string
   /** 该模型实际可用的清晰度档位；客户端据此过滤下拉 */
   resolutionTiers: ImageResolution[]
+  /** 支持范围与限制说明；客户端显示在分辨率控件旁 */
+  resolutionNote: string
   /** 模型选择菜单里的悬停介绍 */
   description: string
 }
@@ -71,11 +73,13 @@ export async function listClientImageModels(
     .filter(model => enabled.has(model.id))
     .map(model => {
       const label = aliases[model.id] || model.label
+      const resolution = resolutionSupportForModel(model.id)
       return {
         id: model.id,
         label,
         provider: 'magpie',
-        resolutionTiers: resolutionTiersForModel(model.id),
+        resolutionTiers: resolution.tiers,
+        resolutionNote: resolution.note,
         description: modelDescription(model.id, label),
       }
     })
@@ -87,11 +91,13 @@ export async function listClientImageModels(
       const publicId = customModelId(provider.id, model.id)
       if (visibility[publicId] === false) continue
       const label = aliases[publicId] || model.label || model.id
+      const resolution = resolutionSupportForModel(publicId)
       models.push({
         id: publicId,
         label,
         provider: provider.id,
-        resolutionTiers: resolutionTiersForModel(publicId),
+        resolutionTiers: resolution.tiers,
+        resolutionNote: resolution.note,
         description: modelDescription(publicId, label),
       })
     }
@@ -102,11 +108,13 @@ export async function listClientImageModels(
     const publicId = comfyModelId(workflow.id)
     if (visibility[publicId] === false) continue
     const label = aliases[publicId] || workflow.label || workflow.id
+    const resolution = resolutionSupportForModel(publicId, workflow)
     models.push({
       id: publicId,
       label,
       provider: 'comfyui',
-      resolutionTiers: resolutionTiersForModel(publicId),
+      resolutionTiers: resolution.tiers,
+      resolutionNote: resolution.note,
       description: modelDescription(publicId, label),
     })
   }

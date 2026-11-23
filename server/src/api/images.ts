@@ -28,6 +28,11 @@ import { REFERENCE_CATEGORY, type ImageStorage } from '../services/storage.js'
 import type { QuotaStore } from '../app/control/quota-store.js'
 import type { SettingsStore } from '../app/control/settings-store.js'
 import type { UsageStore } from '../services/usage-store.js'
+import {
+  assessResolutionOutput,
+  resolutionSupportForModel,
+  resolutionTargetForModel,
+} from '../app/control/image-resolution-capabilities.js'
 import { requireAuth } from './auth.js'
 import { isLoopbackAddress } from './update.js'
 
@@ -45,6 +50,14 @@ interface GeneratedImageInfo {
   width: number
   height: number
   ratio: string
+  /** 用户请求的清晰度档位；auto 表示不指定 */
+  resolution: string
+  /** 本次档位换算出的目标像素；auto 或模型不支持时为 null */
+  requestedSize: { width: number; height: number } | null
+  /** 生成后核对结果；auto 不做档位核对 */
+  resolutionMatched: boolean | null
+  /** 与所选档位不一致时的明确提示 */
+  resolutionWarning?: string
   tokens: { input: number; output: number | null; total: number | null; source: string }
 }
 
@@ -231,6 +244,26 @@ export function registerImageRoutes(
       (knownModelIds.includes(configuredModel) ? configuredModel : knownModelIds[0] || configuredModel)
     const modelResolveMs = Date.now() - modelResolveStartedAt
 
+    // 分辨率必须按“当前模型”校验，不能只校验字段格式：
+    // 否则旧页面或直接调接口仍会把 4K 发给只支持原生尺寸的模型。
+    const comfyModel = resolveComfyWorkflow(deps.settings, selectedModel)
+    const selectedModelInfo = clientModels.models.find(model => model.id === selectedModel)
+    const resolutionSupport = resolutionSupportForModel(selectedModel, comfyModel?.workflow)
+    if (!resolutionSupport.tiers.includes(resolution)) {
+      const modelLabel = selectedModelInfo?.label || selectedModel
+      throw new ApiError(
+        'RESOLUTION_UNSUPPORTED',
+        `模型「${modelLabel}」不支持 ${resolution}。${resolutionSupport.note}`,
+        422,
+      )
+    }
+    const resolutionTarget = resolutionTargetForModel(
+      ratio,
+      resolution,
+      selectedModel,
+      comfyModel?.workflow,
+    )
+
     // 参考图：只接受上传接口产出的「参考图/」路径，防止拿任意文件当输入。
     // 单张 referencePath 是角色资产等老调用；referencePaths 是自由创作的多图直传，
     // 两者合并去重后一起送上游，顺序为「先 referencePath，再 referencePaths」。
@@ -348,6 +381,9 @@ export function registerImageRoutes(
       name: assetName,
       ratio: ratio.id,
       resolution,
+      resolutionTarget: resolutionTarget
+        ? `${resolutionTarget.width}x${resolutionTarget.height}`
+        : null,
       references: referencePaths.length,
       promptLength: prompt.length,
       promptPreview: prompt.slice(0, 160),
@@ -386,13 +422,14 @@ export function registerImageRoutes(
     // 每次生图都重读上游地址：后台改完立即生效，无需重启服务
     // ComfyUI 工作流 / 自定义供应商 / 内置 Magpie 走三条独立分支
     const customModel = resolveCustomProviderModel(deps.settings, selectedModel)
-    const comfyModel = resolveComfyWorkflow(deps.settings, selectedModel)
     deps.monitor?.annotate(callId, {
       branch: comfyModel ? 'comfyui' : customModel ? 'custom' : 'magpie',
     })
     // ComfyUI 由我们把档位换算成宽高写进工作流；Magpie 直接把档位交给上游。
     // 自定义供应商的接口能力未知，不额外塞 resolution，避免打断原有调用。
-    const comfySize = resolutionTargetSize(ratio, resolution)
+    const comfySize = comfyModel && resolutionTarget
+      ? { width: resolutionTarget.width, height: resolutionTarget.height }
+      : resolutionTargetSize(ratio, resolution)
     const magpieResolution = !customModel && resolution !== 'auto' ? resolution : undefined
     let upstreamOptions: MagpieOptions | undefined
     if (!comfyModel && customModel) {
@@ -478,6 +515,34 @@ export function registerImageRoutes(
           }
 
           const size = readImageSize(upstream.buffer)
+          const resolutionCheck = assessResolutionOutput({
+            requested: resolution,
+            ratio,
+            target: resolutionTarget,
+            actual: size ?? null,
+            modelNote: resolutionSupport.note,
+          })
+          if (resolutionCheck.checked && !resolutionCheck.matched) {
+            auditLog(
+              request.log,
+              'warn',
+              'image.resolution.mismatch',
+              auth,
+              '生图分辨率与请求不一致',
+              {
+                jobId,
+                source,
+                model: upstream.model,
+                ratio: ratio.id,
+                resolution,
+                requestedSize: resolutionTarget
+                  ? `${resolutionTarget.width}x${resolutionTarget.height}`
+                  : null,
+                actualSize: size ? `${size.width}x${size.height}` : null,
+                warning: resolutionCheck.warning,
+              },
+            )
+          }
           // 上游按画幅输出的原生尺寸已足够准确，直接交付原图，不做缩放
           const stored = await deps.storage.save(upstream.buffer, type.extension, {
             category: typeof body.category === 'string' ? body.category : undefined,
@@ -494,6 +559,7 @@ export function registerImageRoutes(
             bytes: stored.bytes,
             width: size?.width,
             height: size?.height,
+            resolution_matched: resolutionCheck.matched,
             stored_path: stored.relativePath,
           })
 
@@ -502,6 +568,7 @@ export function registerImageRoutes(
             model: upstream.model,
             mimeType: type.mimeType,
             size,
+            resolutionCheck,
             tokens: upstream.tokens,
           }
         } catch (error) {
@@ -566,6 +633,21 @@ export function registerImageRoutes(
         category,
         name: imageName,
         ratio: ratio.id,
+        resolution,
+        requestedSize: resolutionTarget
+          ? `${resolutionTarget.width}x${resolutionTarget.height}`
+          : null,
+        resolutionMatched: generated.resolutionCheck.checked
+          ? generated.resolutionCheck.matched
+          : null,
+        resolutionWarning: generated.resolutionCheck.warning ?? null,
+        upstreamResolutionRequest: comfyModel
+          ? `comfy ${comfySize.width}x${comfySize.height}`
+          : customModel
+            ? 'custom none'
+            : magpieResolution
+              ? `magpie size=${ratio.id}, resolution=${magpieResolution}`
+              : 'magpie none',
         model: generated.model,
         width,
         height,
@@ -587,6 +669,21 @@ export function registerImageRoutes(
         category,
         name: imageName,
         ratio: ratio.id,
+        resolution,
+        requestedSize: resolutionTarget
+          ? `${resolutionTarget.width}x${resolutionTarget.height}`
+          : null,
+        resolutionMatched: generated.resolutionCheck.checked
+          ? generated.resolutionCheck.matched
+          : null,
+        resolutionWarning: generated.resolutionCheck.warning ?? null,
+        upstreamResolutionRequest: comfyModel
+          ? `comfy ${comfySize.width}x${comfySize.height}`
+          : customModel
+            ? 'custom none'
+            : magpieResolution
+              ? `magpie size=${ratio.id}, resolution=${magpieResolution}`
+              : 'magpie none',
         model: generated.model,
         references: referencePaths.length,
         promptLength: prompt.length,
@@ -616,6 +713,16 @@ export function registerImageRoutes(
         width,
         height,
         ratio: ratio.id,
+        resolution,
+        requestedSize: resolutionTarget
+          ? { width: resolutionTarget.width, height: resolutionTarget.height }
+          : null,
+        resolutionMatched: generated.resolutionCheck.checked
+          ? generated.resolutionCheck.matched
+          : null,
+        ...(generated.resolutionCheck.warning
+          ? { resolutionWarning: generated.resolutionCheck.warning }
+          : {}),
         tokens: {
           input: generated.tokens.inputTokens,
           output: generated.tokens.outputTokens,
@@ -654,6 +761,14 @@ export function registerImageRoutes(
         width: item.size?.width ?? ratio.nativeWidth,
         height: item.size?.height ?? ratio.nativeHeight,
         bytes: item.stored.bytes,
+        resolution,
+        requestedSize: resolutionTarget
+          ? `${resolutionTarget.width}x${resolutionTarget.height}`
+          : null,
+        resolutionMatched: item.resolutionCheck.checked
+          ? item.resolutionCheck.matched
+          : null,
+        resolutionWarning: item.resolutionCheck.warning ?? null,
       })),
       counts: {
         requested: imageCount,
@@ -665,6 +780,22 @@ export function registerImageRoutes(
         ratio: ratio.id,
         ratioLabel: ratio.label,
         resolution,
+        resolutionTarget: resolutionTarget
+          ? `${resolutionTarget.width}x${resolutionTarget.height}`
+          : null,
+        resolutionMatched: generatedList.some(item => item.resolutionCheck.checked && !item.resolutionCheck.matched)
+          ? false
+          : generatedList.some(item => item.resolutionCheck.checked)
+            ? true
+            : null,
+        resolutionWarning: generatedList.find(item => item.resolutionCheck.warning)?.resolutionCheck.warning ?? null,
+        upstreamResolutionRequest: comfyModel
+          ? `comfy ${comfySize.width}x${comfySize.height}`
+          : customModel
+            ? 'custom none'
+            : magpieResolution
+              ? `magpie size=${ratio.id}, resolution=${magpieResolution}`
+              : 'magpie none',
         imageCount,
         referenceCount: referencePaths.length,
         outputName: displayName,
@@ -714,6 +845,9 @@ export function registerImageRoutes(
           ratio: ratio.id,
           ratioLabel: ratio.label,
           resolution,
+          resolutionTarget: resolutionTarget
+            ? `${resolutionTarget.width}x${resolutionTarget.height}`
+            : null,
           imageCount,
           referenceCount: referencePaths.length,
         },
@@ -731,6 +865,9 @@ export function registerImageRoutes(
         name: assetName,
         ratio: ratio.id,
         resolution,
+        resolutionTarget: resolutionTarget
+          ? `${resolutionTarget.width}x${resolutionTarget.height}`
+          : null,
         references: referencePaths.length,
         promptLength: prompt.length,
         promptPreview: prompt.slice(0, 160),

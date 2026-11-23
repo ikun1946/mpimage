@@ -9,14 +9,17 @@ export function modelDescription(publicId: string, label: string): string {
   const name = label.trim() || publicId
 
   if (id.startsWith('comfy:')) {
-    return `本机 ComfyUI 工作流「${name}」，按已导入的工作流生成，不消耗 Magpie 额度。`
+    return `本机 ComfyUI 工作流「${name}」，按已导入的工作流生成，不消耗 Magpie 额度；受显存限制最高 2K，4K 不可用。`
   }
   if (id.startsWith('p:')) {
     return `自定义供应商模型「${name}」，使用后台配置的接口出图；当前不接收分辨率档位。`
   }
 
-  if (id.includes('gpt-image-2') || id.startsWith('codex/')) {
-    return 'OpenAI GPT Image 2：擅长写实、文字排版和复杂指令，支持自动/1K/2K/4K；4K 受 3840 长边与面积上限限制。'
+  if (id.startsWith('codex/')) {
+    return 'Codex 通道的 GPT Image 2：擅长写实、文字排版和复杂指令；当前只按画幅输出原生尺寸，不支持 1K/2K/4K。'
+  }
+  if (id.includes('gpt-image-2')) {
+    return 'OpenAI GPT Image 2：擅长写实、文字排版和复杂指令，通过 Magpie 支持 1K/2K/4K；4K 受 3840 长边与面积上限限制。'
   }
   if (id.includes('gemini-3-pro')) {
     return 'Google Gemini 3 Pro Image（Nano Banana Pro）：理解力强，适合复杂构图、多图参考与高细节画面，支持 1K/2K/4K。'
@@ -40,7 +43,7 @@ export function modelDescription(publicId: string, label: string): string {
     return `${name}：Google Gemini 图像模型，擅长角色一致性与参考图编辑，支持 1K/2K/4K。`
   }
   if (id.includes('grok')) {
-    return 'xAI Grok Imagine：偏风格化与创意表达，最高支持 2K；选择 4K 会按 2K 发送。'
+    return 'xAI Grok Imagine：偏风格化与创意表达，原生最高 2K，不支持 4K。'
   }
   if (id.includes('qwen')) {
     return 'Qwen Image：通义千问图像模型，当前接口只接收像素尺寸，不支持 1K/2K/4K 档位。'
