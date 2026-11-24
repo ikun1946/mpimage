@@ -45,7 +45,7 @@ mpimage/
 │   │   │   │   ├── concurrency-store.ts 生图并发上限
 │   │   │   │   └── rate-limiter.ts      请求限流
 │   │   │   └── products/      业务能力
-│   │   │       ├── images/    magpie / imaging / reference-images / image-title / face-design
+│   │   │       ├── images/    magpie / imaging / reference-images / image-title
 │   │   │       ├── prompts/   prompt-optimizer / rulebook / constraints / chat-completion / image-analysis
 │   │   │       ├── styles/    style-library
 │   │   │       └── projects/  project-store
@@ -237,8 +237,6 @@ npm run desktop:build  # 出安装包 + 便携版，产物在 release/
 | `image.generate`（失败） | 上游报错、超时 | errorCode、errorMessage、durationMs、提示词摘要 |
 | `prompt.optimize` | AI 优化提示词完成/失败 | mode、输入/输出长度与摘要、参考图数、保留/补回约束数、tokens、durationMs |
 | `prompt.revise` | AI 改写提示词完成/失败 | 改写要求摘要、送图张数、输出长度与摘要、tokens、durationMs |
-| `face.design` | 捏脸方案生成完成/失败 | 年龄/性别/画面类型/风格、原文长度、分析/提示词/负面词长度、tokens |
-| `face.refine` | 捏脸单栏修改完成/失败 | 字段、要求摘要、输入/输出长度与摘要、tokens、durationMs |
 
 按 `audit` 搜这份日志就能拉出全部业务动作；每个账号的生图明细另存在 `usage.json`，
 管理端统计读的就是它。
@@ -301,23 +299,6 @@ POST /api/prompts/revise
           lockedConstraints, restoredConstraints }
         输出整条改写后的提示词；带图时先观察再改，看图失败退回多模态直送；
         用户这次点名要改的约束不再保护，其余风格与设定原样保留
-
-POST /api/prompts/face-design
-  请求  { age?, gender?, temperament?, identity?, framing?, background?, style?, extra?, sourceText? }   需要登录
-        字段都是字符串：extra ≤600 字，style ≤80 字，其余 ≤20–60 字；
-        sourceText 为原始文本（人设 / 小说片段，≤4000 字），给了就由模型先解析成设定再设计；
-        全部为空时 400
-  成功  { analysis, prompt, negativePrompt, fields?, model, tokens }
-        按《夏冬一捏脸 Skill》产出：角色分析、素颜正脸定妆提示词、负面提示词；
-        带 sourceText 时 fields 返回解析出的角色设定，供表单回填
-
-POST /api/prompts/face-refine
-  请求  { field, value, instruction, analysis?, other? }   需要登录
-        field 为 prompt（完整提示词）或 negative（负面提示词）；
-        value 为该栏当前内容（≤3000–6000 字），instruction ≤500 字；
-        analysis 与 other 用来守住人物设定、避免和另一栏矛盾
-  成功  { field, value, model, tokens }
-        只改一个字段；提示词保持分段与 500–800 字，负面词保持中文逗号分隔
 
 GET    /api/config      画面比例、原生尺寸、提示词上限、默认值
 GET  /api/health      后端与上游 Magpie 的连通状态

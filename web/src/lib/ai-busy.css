@@ -1,6 +1,6 @@
 /* ===== AI 执行中的字段动画 =====
    方案一：金色流光边框 + 状态胶囊 + 短句轮播。
-   挂在提示词框的包裹层上（.prompt-shell / .face-field / .modal-prompt-field），
+   挂在提示词框的包裹层上（.prompt-shell / .modal-prompt-field），
    不拦截点击，输入框仍然可以编辑。 */
 
 @property --ai-busy-angle {
@@ -10,7 +10,6 @@
 }
 
 .prompt-shell,
-.face-text-field,
 .modal-prompt-field {
   position: relative;
 }
@@ -136,14 +135,12 @@
   }
 }
 
-/* 弹窗与捏脸页的字段有固定高度，忙碌时把首行往下让一点；结束后平滑还原 */
-.face-text-field .textarea,
+/* 弹窗字段有固定高度，忙碌时把首行往下让一点；结束后平滑还原 */
 .modal-prompt-field .textarea {
   transition: padding-top 180ms ease;
 }
 
 /* 类名写两遍：批次页对 .textarea 的 padding 也是三档权重，这里要压过它 */
-.face-text-field.is-ai-busy.is-ai-busy > .textarea,
 .modal-prompt-field.is-ai-busy.is-ai-busy > .textarea {
   padding-top: 36px;
 }

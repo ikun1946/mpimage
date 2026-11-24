@@ -3,7 +3,6 @@ import { randomBytes } from 'node:crypto'
 import { config, findRatio } from '../app/platform/config.js'
 import { auditFailure, auditLog } from '../app/platform/audit.js'
 import { ApiError } from '../app/platform/errors.js'
-import { designFace, refineFaceField } from '../app/products/images/face-design.js'
 import { optimizePrompt, revisePrompt } from '../app/products/prompts/prompt-optimizer.js'
 import type { RequestLogStore } from '../services/request-log-store.js'
 import {
@@ -256,126 +255,10 @@ export function registerPromptRoutes(
       throw error
     }
   })
-
-  // 捏脸：一份角色设定 → 角色分析 + 素颜正脸定妆提示词 + 负面提示词
-  app.post('/api/prompts/face-design', async request => {
-    const auth = requireAuth(request)
-    const body = (request.body ?? {}) as FaceDesignBody
-
-    const params = {
-      age: readText(body.age, 40, '年龄感'),
-      gender: readText(body.gender, 20, '性别'),
-      temperament: readText(body.temperament, 60, '气场'),
-      identity: readText(body.identity, 60, '身份'),
-      framing: readText(body.framing, 40, '画面类型'),
-      background: readText(body.background, 40, '背景'),
-      style: readText(body.style, 80, '风格'),
-      extra: readText(body.extra, 600, '特殊诉求'),
-      sourceText: readText(body.sourceText, 4000, '原始文本'),
-    }
-
-    const startedAt = Date.now()
-    try {
-      const result = await designFace(
-        {
-          baseUrl: await deps.settings.getBaseUrl(),
-          model: await deps.settings.getTextModel(),
-          timeoutMs: config.promptOptimizeTimeoutMs,
-        },
-        params,
-      )
-      auditLog(request.log, 'info', 'face.design', auth, '捏脸方案生成完成', {
-        model: result.model,
-        age: params.age,
-        gender: params.gender,
-        framing: params.framing,
-        style: params.style,
-        sourceTextLength: params.sourceText?.length ?? 0,
-        extraLength: params.extra?.length ?? 0,
-        analysisLength: result.analysis.length,
-        promptLength: result.prompt.length,
-        promptPreview: result.prompt.slice(0, 120),
-        negativeLength: result.negativePrompt.length,
-        tokens: result.tokens,
-        durationMs: Date.now() - startedAt,
-      })
-      return result
-    } catch (error) {
-      auditFailure(request.log, 'face.design', auth, startedAt, error, '捏脸方案生成失败', {
-        gender: params.gender,
-        framing: params.framing,
-        style: params.style,
-        sourceTextLength: params.sourceText?.length ?? 0,
-      })
-      throw error
-    }
-  })
-
-  // 捏脸的定向修改：一次只改完整提示词或负面提示词中的一个字段
-  app.post('/api/prompts/face-refine', async request => {
-    const auth = requireAuth(request)
-    const body = (request.body ?? {}) as FaceRefineBody
-
-    const field =
-      body.field === 'negative' ? 'negative' : body.field === 'prompt' ? 'prompt' : null
-    if (!field) {
-      throw new ApiError('INVALID_PROMPT', '只能修改完整提示词或负面提示词')
-    }
-
-    const value = readText(
-      body.value,
-      field === 'prompt' ? MAX_FACE_PROMPT_VALUE : MAX_FACE_NEGATIVE_VALUE,
-      '当前内容',
-    )
-    const instruction = readText(body.instruction, 500, '修改要求')
-    if (!value) throw new ApiError('INVALID_PROMPT', '这一栏还没有内容可以修改')
-    if (!instruction) throw new ApiError('INVALID_PROMPT', '先说说想怎么改')
-
-    const startedAt = Date.now()
-    try {
-      const result = await refineFaceField(
-        {
-          baseUrl: await deps.settings.getBaseUrl(),
-          model: await deps.settings.getTextModel(),
-          timeoutMs: config.promptOptimizeTimeoutMs,
-        },
-        {
-          field,
-          value,
-          instruction,
-          analysis: readText(body.analysis, 3000, '角色分析'),
-          other: readText(body.other, MAX_FACE_PROMPT_VALUE, '另一个字段'),
-        },
-      )
-      auditLog(request.log, 'info', 'face.refine', auth, '捏脸字段修改完成', {
-        field,
-        model: result.model,
-        instructionLength: instruction.length,
-        instructionPreview: instruction.slice(0, 120),
-        inputLength: value.length,
-        outputLength: result.value.length,
-        outputPreview: result.value.slice(0, 120),
-        tokens: result.tokens,
-        durationMs: Date.now() - startedAt,
-      })
-      return result
-    } catch (error) {
-      auditFailure(request.log, 'face.refine', auth, startedAt, error, '捏脸字段修改失败', {
-        field,
-        inputLength: value.length,
-        instructionLength: instruction.length,
-      })
-      throw error
-    }
-  })
 }
 
 /** 改写要求最多这么长：再长就不是「改一句」而是重写整条，超出直接拦下 */
 const MAX_REVISE_INSTRUCTION = 2000
-
-/** 捏脸结果可以被用户手改，所以给得比生成时的 500–800 字宽一些 */
-const MAX_FACE_PROMPT_VALUE = 6000
-const MAX_FACE_NEGATIVE_VALUE = 3000
 
 interface ReviseBody {
   prompt?: unknown
@@ -385,40 +268,6 @@ interface ReviseBody {
   referencePaths?: unknown
   /** 已生成结果图：存储目录里的任意类别路径 */
   contextPaths?: unknown
-}
-
-interface FaceDesignBody {
-  age?: unknown
-  gender?: unknown
-  temperament?: unknown
-  identity?: unknown
-  framing?: unknown
-  background?: unknown
-  style?: unknown
-  extra?: unknown
-  /** 原始文本：人设 / 小说片段，给了就由模型先解析再设计 */
-  sourceText?: unknown
-}
-
-interface FaceRefineBody {
-  field?: unknown
-  value?: unknown
-  instruction?: unknown
-  analysis?: unknown
-  other?: unknown
-}
-
-/** 表单字段：非字符串按格式错误处理，超长直接拦下，避免把整段小说塞进提示词 */
-function readText(value: unknown, max: number, label: string): string | undefined {
-  if (value === undefined || value === null) return undefined
-  if (typeof value !== 'string') {
-    throw new ApiError('INVALID_PROMPT', `${label}格式无效`)
-  }
-  const text = value.trim()
-  if (text.length > max) {
-    throw new ApiError('INVALID_PROMPT', `${label}最多 ${max} 个字符`)
-  }
-  return text
 }
 
 /** 读取一组图片路径；格式不对就按图片参数报错，不让空字符串混进加载阶段 */

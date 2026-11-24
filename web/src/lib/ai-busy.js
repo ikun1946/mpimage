@@ -24,17 +24,6 @@ const PHRASES = {
     '正在琢磨构图',
     '快好了，再等等',
   ],
-  refine: [
-    '正在疯狂思考',
-    '正在读你点名的部分',
-    '正在保留其余设定',
-    '正在重写这一栏',
-    '正在收束措辞',
-    '正在核对负面词',
-    '正在防止改过头',
-    '正在对照角色分析',
-    '快好了，再等等',
-  ],
 }
 
 const SPARKLE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.7 4.3 4.3 1.7-4.3 1.7L12 15.5l-1.7-4.3L6 9.5l4.3-1.7z"></path><path d="M18.6 15.4l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"></path></svg>'
@@ -107,7 +96,7 @@ function release(target, state) {
 
 /**
  * @param {Element} target 提示词框的包裹层（position: relative）
- * @param {{ pool?: 'optimize'|'refine', action?: string, still?: boolean }} options
+ * @param {{ pool?: 'optimize', action?: string, still?: boolean }} options
  *   still=true 用于「关闭弹窗后仍在后台跑」：文案变成「AI 仍在改写 · 正在…」
  * @returns {{ stop: () => void }}
  */
