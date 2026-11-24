@@ -7,6 +7,15 @@ function nowIso() {
   return new Date().toISOString()
 }
 
+function shuffled(list, random = Math.random) {
+  const copy = [...list]
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(random() * (index + 1))
+    ;[copy[index], copy[swap]] = [copy[swap], copy[index]]
+  }
+  return copy
+}
+
 export class Store {
   constructor(data) {
     this.data = data
@@ -163,6 +172,83 @@ export class Store {
     const scheme = { ...this.blankScheme(defaults), name }
     this.state.schemes.push(scheme)
     this.state.activeId = scheme.id
+    this.commit()
+    return scheme
+  }
+
+  /** 保留当前方案名称与 ID，只把内容和参数恢复到初始空白状态。 */
+  resetScheme() {
+    const defaults = this.data.negatives.filter((n) => n.default).map((n) => n.id)
+    const blank = this.blankScheme(defaults)
+    const scheme = this.scheme
+    scheme.visualStyle = blank.visualStyle
+    scheme.gender = blank.gender
+    scheme.age = blank.age
+    scheme.role = blank.role
+    scheme.selections = {}
+    scheme.strengths = {}
+    scheme.negatives = blank.negatives
+    scheme.customNotes = blank.customNotes
+    scheme.manual = { full: null, negative: null }
+    this.commit()
+    return scheme
+  }
+
+  /** 按维度的单选/多选规则生成一套完整随机角色，并消除已知冲突。 */
+  randomizeScheme(random = Math.random) {
+    const pick = (list) => list[Math.floor(random() * list.length)]
+    const selections = {}
+    const strengths = {}
+
+    for (const category of this.data.categories) {
+      const pool = (category.items || []).filter((item) => item.visible !== false)
+      if (!pool.length) continue
+      const max = category.select_mode === 'multi'
+        ? Math.min(Number(category.max_select) || 1, 2, pool.length)
+        : 1
+      const count = 1 + Math.floor(random() * Math.max(1, max))
+      const picked = shuffled(pool, random).slice(0, Math.min(count, pool.length))
+      selections[category.key] = picked.map((item) => item.id)
+      if (category.strength_supported) {
+        strengths[category.key] = {}
+        for (const item of picked) {
+          strengths[category.key][item.id] = 2 + Math.floor(random() * 3)
+        }
+      }
+    }
+
+    for (let guard = 0; guard < 100; guard += 1) {
+      const rule = (this.data.conflict_rules || []).find((entry) => {
+        const left = selections[entry.left_category] || []
+        const right = selections[entry.right_category] || []
+        return left.includes(entry.left) && right.includes(entry.right)
+      })
+      if (!rule) break
+      const dropLeft = random() < 0.5
+      const category = dropLeft ? rule.left_category : rule.right_category
+      const id = dropLeft ? rule.left : rule.right
+      selections[category] = (selections[category] || []).filter((value) => value !== id)
+      if (!selections[category].length) delete selections[category]
+      if (strengths[category]) {
+        delete strengths[category][id]
+        if (!Object.keys(strengths[category]).length) delete strengths[category]
+      }
+    }
+
+    const scheme = this.scheme
+    const style = this.data.visual_styles?.length ? pick(this.data.visual_styles) : null
+    scheme.visualStyle = style?.id || scheme.visualStyle
+    scheme.gender = pick(['女性呈现', '男性呈现', '中性呈现'])
+    scheme.age = pick(['青年', '成年', '中年'])
+    scheme.role = ''
+    scheme.selections = selections
+    scheme.strengths = strengths
+    scheme.negatives = this.data.negatives.filter((item) => item.default).map((item) => item.id)
+    scheme.customNotes = ''
+    scheme.manual = { full: null, negative: null }
+    if (!scheme.name || scheme.name === '未命名角色' || scheme.name.startsWith('随机角色')) {
+      scheme.name = '随机角色'
+    }
     this.commit()
     return scheme
   }

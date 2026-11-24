@@ -345,7 +345,6 @@ function currentCompiled() {
 }
 
 function renderPanel() {
-  const scheme = store.scheme
   const ui = store.state.ui
   const compiled = currentCompiled()
   view.compiled = compiled
@@ -381,18 +380,16 @@ function renderPanel() {
 
   if (showFull) {
     const area = $('#prompt-full')
-    const manual = scheme.manual.full
-    if (document.activeElement !== area) area.value = manual === null || manual === undefined ? compiled.full : manual
-    $('#manual-full').hidden = manual === null || manual === undefined
+    area.value = compiled.full
+    $('#manual-full').hidden = true
     $('#char-count').textContent = `${area.value.length} 字`
     $('#neg-count').hidden = true
   }
   if (showNegative) {
     const area = $('#prompt-negative')
-    const manual = scheme.manual.negative
     const autoNegative = ui.lang === 'en' ? compiled.negativeEn : compiled.negative
-    if (document.activeElement !== area) area.value = manual === null || manual === undefined ? autoNegative : manual
-    $('#manual-negative').hidden = manual === null || manual === undefined
+    area.value = autoNegative
+    $('#manual-negative').hidden = true
     $('#neg-count').hidden = false
     $('#neg-count').textContent = `${(area.value || '').split(/[，,]/).filter((s) => s.trim()).length} 项`
     $('#char-count').textContent = `${area.value.length} 字`
@@ -628,14 +625,12 @@ async function copyText(text, label = '已复制') {
 }
 
 function currentFullText() {
-  const manual = store.scheme.manual.full
-  return manual === null || manual === undefined ? view.compiled?.full || '' : manual
+  return view.compiled?.full || ''
 }
 
 function currentNegativeText() {
-  const manual = store.scheme.manual.negative
   const auto = store.state.ui.lang === 'en' ? view.compiled?.negativeEn : view.compiled?.negative
-  return manual === null || manual === undefined ? auto || '' : manual
+  return auto || ''
 }
 
 function handoffToFree() {
@@ -1067,6 +1062,29 @@ function bind() {
     toast(`已清空「${cat.title_zh}」`)
   })
 
+  $('#reset-all').addEventListener('click', async () => {
+    const ok = await confirmModal(
+      '恢复空白方案？',
+      '所有维度已选特征、强度、角色设定、补充描述和负向词都会回到初始空白状态。方案名称和已上传的参考图会保留；这个操作不能撤销。',
+      '恢复空白',
+    )
+    if (!ok) return
+    store.resetScheme()
+    view.quick = ''
+    view.mood = ''
+    view.query = ''
+    view.mobileGroup = 'face'
+    view.expanded.clear()
+    $('#side-search-input').value = ''
+    $$('.quick-chip').forEach((chip) => chip.classList.remove('is-active'))
+    store.state.ui.category = 'face_shape'
+    store.setUi({ category: 'face_shape' })
+    syncSchemeFields()
+    renderAll()
+    $('.cards-wrap').scrollTop = 0
+    toast('已恢复空白方案')
+  })
+
   $('#reset-filter').addEventListener('click', () => {
     view.query = ''
     view.mood = ''
@@ -1109,17 +1127,6 @@ function bind() {
     renderPanel()
   })
 
-  $('#prompt-full').addEventListener('input', (e) => {
-    store.setManual('full', e.target.value)
-    $('#manual-full').hidden = false
-    $('#char-count').textContent = `${e.target.value.length} 字`
-  })
-  $('#prompt-negative').addEventListener('input', (e) => {
-    store.setManual('negative', e.target.value)
-    $('#manual-negative').hidden = false
-    $('#neg-count').textContent = `${(e.target.value || '').split(/[，,]/).filter((s) => s.trim()).length} 项`
-    $('#char-count').textContent = `${e.target.value.length} 字`
-  })
   $$('[data-restore]').forEach((btn) => {
     btn.addEventListener('click', () => {
       store.restoreManual(btn.dataset.restore)
@@ -1128,19 +1135,6 @@ function bind() {
       toast('已恢复自动生成版本')
     })
   })
-  $('#prompt-full').addEventListener('blur', () => {
-    if (store.scheme.manual.full === null || store.scheme.manual.full === undefined) {
-      const value = view.compiled?.full || ''
-      $('#prompt-full').value = value
-      $('#char-count').textContent = `${value.length} 字`
-    }
-  })
-  $('#prompt-negative').addEventListener('blur', () => {
-    if (store.scheme.manual.negative === null || store.scheme.manual.negative === undefined) {
-      $('#prompt-negative').value = store.state.ui.lang === 'en' ? view.compiled?.negativeEn || '' : view.compiled?.negative || ''
-    }
-  })
-
   $('#conflict-box').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-remove-id]')
     if (!btn) return
@@ -1256,6 +1250,31 @@ function bind() {
   })
 
   $('#open-presets').addEventListener('click', openPresets)
+  $('#randomize-btn').addEventListener('click', async () => {
+    const count = countSelections(store.scheme)
+    if (count > 0) {
+      const ok = await confirmModal(
+        '随机生成新角色？',
+        `会替换当前已选的 ${count} 项特征，并重新随机视觉风格、性别、年龄和强度。方案名称与参考图会保留。`,
+        '重新生成',
+      )
+      if (!ok) return
+    }
+    store.randomizeScheme()
+    view.quick = ''
+    view.mood = ''
+    view.query = ''
+    view.mobileGroup = 'face'
+    view.expanded.clear()
+    $('#side-search-input').value = ''
+    $$('.quick-chip').forEach((chip) => chip.classList.remove('is-active'))
+    store.state.ui.category = 'face_shape'
+    store.setUi({ category: 'face_shape' })
+    syncSchemeFields()
+    renderAll()
+    $('.cards-wrap').scrollTop = 0
+    toast('已随机生成新角色')
+  })
   $('#handoff-btn').addEventListener('click', handoffToFree)
   $('#open-search').addEventListener('click', openSearch)
   $('#close-search').addEventListener('click', closeOverlays)

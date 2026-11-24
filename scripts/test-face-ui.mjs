@@ -115,6 +115,37 @@ try {
   assert.equal(catalog.title, '画境 · 捏脸')
   assert.equal(catalog.back, '/batch.html')
   assert.ok(catalog.userId)
+  const readonlyPrompts = await evalJs(`(() => {
+    const full = document.querySelector('#prompt-full')
+    const negative = document.querySelector('#prompt-negative')
+    const before = full.value
+    full.focus()
+    full.setSelectionRange(0, 0)
+    return {
+      full: full.readOnly,
+      negative: negative.readOnly,
+      fullAria: full.getAttribute('aria-readonly'),
+      negativeAria: negative.getAttribute('aria-readonly'),
+      before,
+    }
+  })()`)
+  assert.equal(readonlyPrompts.full, true)
+  assert.equal(readonlyPrompts.negative, true)
+  assert.equal(readonlyPrompts.fullAria, 'true')
+  assert.equal(readonlyPrompts.negativeAria, 'true')
+  await cdp('Input.insertText', { text: '禁止写入' })
+  assert.equal(await evalJs(`document.querySelector('#prompt-full').value`), readonlyPrompts.before)
+  await evalJs(`(() => {
+    document.querySelector('.tab[data-tab="negative"]').click()
+    const area = document.querySelector('#prompt-negative')
+    area.focus()
+    area.setSelectionRange(0, 0)
+    return area.value
+  })()`).then(async before => {
+    await cdp('Input.insertText', { text: '禁止写入' })
+    assert.equal(await evalJs(`document.querySelector('#prompt-negative').value`), before)
+  })
+  await evalJs(`document.querySelector('.tab[data-tab="full"]').click(); true`)
 
   await evalJs(`document.querySelector('#open-presets').click(); true`)
   await waitForPage(() => evalJs(`Boolean(document.querySelector('#modal [data-preset="preset_clear_classic"]'))`))
@@ -126,6 +157,7 @@ try {
   await waitForPage(() => evalJs(`Boolean(document.querySelector('#nav [data-cat="eye_shape"]'))`))
   await evalJs(`document.querySelector('#nav [data-cat="eye_shape"]').click(); true`)
   await waitForPage(() => evalJs(`Boolean(document.querySelector('.card[data-id="eye_almond"]'))`))
+  await waitForPage(() => evalJs(`Boolean(document.querySelector('.card[data-id="eye_almond"] img')?.naturalWidth)`))
   const eyeCard = await evalJs(`(() => {
     const image = document.querySelector('.card[data-id="eye_almond"] img')
     return { src: image?.getAttribute('src') || '', loaded: Boolean(image?.naturalWidth > 0) }
@@ -162,6 +194,143 @@ try {
     '标准鹅蛋脸',
   )
 
+  // 同类卡片关闭状态下必须保持统一宽高比；详情展开后才允许变高。
+  await cdp('Emulation.setDeviceMetricsOverride', {
+    width: 1220,
+    height: 896,
+    deviceScaleFactor: 1,
+    mobile: false,
+  })
+  await cdp('Page.navigate', { url: `${base}/face.html` })
+  await waitForPage(() => evalJs(`Boolean(window.__faceStudio)`), 20_000)
+  await evalJs(`(() => {
+    document.querySelector('[data-group-head="eyes"]')?.click()
+    document.querySelector('#nav [data-cat="eye_spacing"]')?.click()
+    return true
+  })()`)
+  await waitForPage(() => evalJs(`document.querySelectorAll('#cards .card.no-ref').length >= 3`))
+  const noRefRatios = await evalJs(`(() => [...document.querySelectorAll('#cards .card:not(.is-open)')].map(card => {
+    const rect = card.getBoundingClientRect()
+    return { ratio: rect.width / rect.height, width: rect.width, height: rect.height }
+  }))()`)
+  assert.ok(noRefRatios.length >= 3)
+  assert.ok(Math.max(...noRefRatios.map(item => item.ratio)) - Math.min(...noRefRatios.map(item => item.ratio)) < 0.01)
+  assert.ok(noRefRatios.every(item => Math.abs(item.ratio - 0.94) < 0.02))
+  const noRefOverflow = await evalJs(`(() => [...document.querySelectorAll('#cards .card:not(.is-open)')].map(card => {
+    const body = card.querySelector('.card-body')
+    return { id: card.dataset.id, overflow: body.scrollHeight - body.clientHeight }
+  }).filter(item => item.overflow > 1))()`)
+  assert.deepEqual(noRefOverflow, [])
+
+  await evalJs(`(() => {
+    document.querySelector('#nav [data-cat="eye_shape"]')?.click()
+    return true
+  })()`)
+  await waitForPage(() => evalJs(`document.querySelectorAll('#cards .card:not(.no-ref)').length >= 16`))
+  const imageRatios = await evalJs(`(() => [...document.querySelectorAll('#cards .card:not(.is-open):not(.no-ref)')].map(card => {
+    const rect = card.getBoundingClientRect()
+    return rect.width / rect.height
+  }))()`)
+  assert.ok(Math.max(...imageRatios) - Math.min(...imageRatios) < 0.01)
+  assert.ok(imageRatios.every(ratio => Math.abs(ratio - 0.52) < 0.02))
+  const imageOverflow = await evalJs(`(() => [...document.querySelectorAll('#cards .card:not(.is-open):not(.no-ref)')].map(card => {
+    const body = card.querySelector('.card-body')
+    return { id: card.dataset.id, overflow: body.scrollHeight - body.clientHeight }
+  }).filter(item => item.overflow > 1))()`)
+  assert.deepEqual(imageOverflow, [])
+
+  const allNoRefOverflow = await evalJs(`(async () => {
+    const failures = []
+    for (const category of window.__faceStudio.data.categories) {
+      document.querySelector('[data-group-head="' + category.group + '"]')?.click()
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      document.querySelector('#nav [data-cat="' + category.key + '"]')?.click()
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      for (const card of document.querySelectorAll('#cards .card.no-ref:not(.is-open)')) {
+        const body = card.querySelector('.card-body')
+        const overflow = body.scrollHeight - body.clientHeight
+        if (overflow > 1) failures.push({ category: category.key, id: card.dataset.id, overflow })
+      }
+    }
+    return failures
+  })()`)
+  assert.deepEqual(allNoRefOverflow, [])
+
+  const shotDir = join(ROOT, 'release', 'face-tests')
+  await mkdir(shotDir, { recursive: true })
+  await evalJs(`(() => {
+    document.querySelector('[data-group-head="eyes"]')?.click()
+    document.querySelector('#nav [data-cat="eye_spacing"]')?.click()
+    return true
+  })()`)
+  await waitForPage(() => evalJs(`document.querySelectorAll('#cards .card.no-ref').length >= 3`))
+  const ratioShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(shotDir, 'face-card-ratios.png'), Buffer.from(ratioShot.data, 'base64'))
+
+  // 大屏会被页面自动放大到 1.25 倍；工作区高度必须换算回真实可视高度，
+  // 否则底部页脚和最后一行卡片会滚出屏幕，永远到不了。
+  await cdp('Emulation.setDeviceMetricsOverride', {
+    width: 1920,
+    height: 1080,
+    deviceScaleFactor: 1,
+    mobile: false,
+  })
+  await cdp('Page.navigate', { url: `${base}/face.html` })
+  await waitForPage(() => evalJs(`Boolean(window.__faceStudio)`), 20_000)
+  await evalJs(`(() => {
+    document.querySelector('[data-group-head="eyes"]')?.click()
+    document.querySelector('#nav [data-cat="eye_shape"]')?.click()
+    return true
+  })()`)
+  await waitForPage(() => evalJs(`document.querySelectorAll('#cards .card').length >= 16`))
+  const scrollLayout = await evalJs(`(() => {
+    const workspace = document.querySelector('.workspace').getBoundingClientRect()
+    const wrap = document.querySelector('.cards-wrap')
+    const foot = document.querySelector('.stage-foot').getBoundingClientRect()
+    wrap.scrollTop = wrap.scrollHeight
+    return new Promise(resolve => requestAnimationFrame(() => {
+      const last = [...document.querySelectorAll('#cards .card')].at(-1).getBoundingClientRect()
+      resolve({
+        workspaceBottom: workspace.bottom,
+        innerHeight,
+        headerHeight: document.querySelector('.topbar').getBoundingClientRect().height,
+        footerBottom: foot.bottom,
+        lastCardBottom: last.bottom,
+        wrapBottom: wrap.getBoundingClientRect().bottom,
+        atBottom: wrap.scrollTop >= wrap.scrollHeight - wrap.clientHeight - 2,
+      })
+    }))
+  })()`)
+  assert.ok(scrollLayout.workspaceBottom <= scrollLayout.innerHeight + 1)
+  assert.ok(scrollLayout.footerBottom <= scrollLayout.innerHeight + 1)
+  assert.ok(scrollLayout.lastCardBottom <= scrollLayout.wrapBottom + 1)
+  assert.equal(scrollLayout.atBottom, true)
+  assert.ok(scrollLayout.headerHeight < 80)
+
+  // 46 个维度共用同一个滚动区，逐个切过去，确认没有哪一页把底部卡住。
+  const dimensionScroll = await evalJs(`(async () => {
+    const failures = []
+    const categories = window.__faceStudio.data.categories
+    for (const category of categories) {
+      document.querySelector('[data-group-head="' + category.group + '"]')?.click()
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      document.querySelector('#nav [data-cat="' + category.key + '"]')?.click()
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      const wrap = document.querySelector('.cards-wrap')
+      const foot = document.querySelector('.stage-foot').getBoundingClientRect()
+      wrap.scrollTop = wrap.scrollHeight
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      const card = [...document.querySelectorAll('#cards .card')].at(-1)
+      const last = card?.getBoundingClientRect()
+      if (foot.bottom > innerHeight + 1 || (last && last.bottom > wrap.getBoundingClientRect().bottom + 1)) {
+        failures.push({ key: category.key, footBottom: foot.bottom, lastBottom: last?.bottom || 0 })
+      }
+    }
+    return { count: categories.length, failures }
+  })()`)
+  assert.equal(dimensionScroll.count, 46)
+  assert.deepEqual(dimensionScroll.failures, [])
+
   await evalJs(`document.querySelector('#handoff-btn').click(); true`)
   await waitForPage(() => evalJs(`location.pathname === '/batch.html' && location.search.includes('from=face')`), 20_000)
   await waitForPage(() => evalJs(`document.querySelector('#free-prompt')?.value.includes('瑞凤眼')`), 20_000)
@@ -172,6 +341,82 @@ try {
   assert.match(handoff.prompt, /瑞凤眼/)
   assert.match(handoff.prompt, /【不要出现】/)
   assert.equal(handoff.tab, 'true')
+
+  await cdp('Page.navigate', { url: `${base}/face.html` })
+  await waitForPage(() => evalJs(`Boolean(window.__faceStudio)`), 20_000)
+  const beforeReset = await evalJs(`({
+    name: window.__faceStudio.store.scheme.name,
+    selected: Object.values(window.__faceStudio.store.scheme.selections).reduce((sum, ids) => sum + ids.length, 0),
+  })`)
+  assert.ok(beforeReset.selected > 0)
+  await evalJs(`document.querySelector('#reset-all').click(); true`)
+  await waitForPage(() => evalJs(`!document.querySelector('#modal-overlay').hidden && Boolean(document.querySelector('#modal [data-confirm]'))`))
+  await evalJs(`document.querySelector('#modal [data-confirm]').click(); true`)
+  await waitForPage(() => evalJs(`document.querySelector('#panel-toggle-count')?.textContent === '0'`))
+  const afterReset = await evalJs(`({
+    name: window.__faceStudio.store.scheme.name,
+    selections: window.__faceStudio.store.scheme.selections,
+    strengths: window.__faceStudio.store.scheme.strengths,
+    role: window.__faceStudio.store.scheme.role,
+    notes: window.__faceStudio.store.scheme.customNotes,
+    category: window.__faceStudio.store.state.ui.category,
+    title: document.querySelector('#cat-title').textContent,
+    prompt: document.querySelector('#prompt-full').value,
+  })`)
+  assert.equal(afterReset.name, beforeReset.name)
+  assert.deepEqual(afterReset.selections, {})
+  assert.deepEqual(afterReset.strengths, {})
+  assert.equal(afterReset.role, '')
+  assert.equal(afterReset.notes, '')
+  assert.equal(afterReset.category, 'face_shape')
+  assert.equal(afterReset.title, '整体脸型')
+  assert.equal(afterReset.prompt.includes('瑞凤眼'), false)
+
+  await evalJs(`document.querySelector('#randomize-btn').click(); true`)
+  await waitForPage(() => evalJs(`Number(document.querySelector('#panel-toggle-count')?.textContent || 0) > 30`))
+  const randomized = await evalJs(`(() => {
+    const studio = window.__faceStudio
+    const scheme = studio.store.scheme
+    const selected = Object.values(scheme.selections).reduce((sum, ids) => sum + ids.length, 0)
+    const singleViolations = studio.data.categories.filter(category =>
+      category.select_mode === 'single' && (scheme.selections[category.key] || []).length > 1
+    ).map(category => category.key)
+    const maxViolations = studio.data.categories.filter(category =>
+      (scheme.selections[category.key] || []).length > Number(category.max_select || 1)
+    ).map(category => category.key)
+    const conflicts = studio.data.conflict_rules.filter(rule =>
+      (scheme.selections[rule.left_category] || []).includes(rule.left) &&
+      (scheme.selections[rule.right_category] || []).includes(rule.right)
+    ).map(rule => [rule.left, rule.right])
+    const badStrengths = Object.values(scheme.strengths).flatMap(group => Object.values(group))
+      .filter(value => value < 2 || value > 4)
+    return {
+      selected,
+      singleViolations,
+      maxViolations,
+      conflicts,
+      badStrengths,
+      style: scheme.visualStyle,
+      styleExists: studio.data.visual_styles.some(style => style.id === scheme.visualStyle),
+      prompt: document.querySelector('#prompt-full').value,
+      promptReadonly: document.querySelector('#prompt-full').readOnly,
+      buttonVisible: document.querySelector('#randomize-btn').getBoundingClientRect().right <= innerWidth,
+    }
+  })()`)
+  assert.ok(randomized.selected > 30)
+  assert.deepEqual(randomized.singleViolations, [])
+  assert.deepEqual(randomized.maxViolations, [])
+  assert.deepEqual(randomized.conflicts, [])
+  assert.deepEqual(randomized.badStrengths, [])
+  assert.equal(randomized.styleExists, true)
+  assert.ok(randomized.prompt.length > 40)
+  assert.equal(randomized.promptReadonly, true)
+  assert.equal(randomized.buttonVisible, true)
+
+  await evalJs(`document.querySelector('#randomize-btn').click(); true`)
+  await waitForPage(() => evalJs(`!document.querySelector('#modal-overlay').hidden && Boolean(document.querySelector('#modal [data-confirm]'))`))
+  await evalJs(`document.querySelector('#modal [data-confirm]').click(); true`)
+  await waitForPage(() => evalJs(`document.querySelector('#modal-overlay').hidden && Number(document.querySelector('#panel-toggle-count')?.textContent || 0) > 30`))
 
   await cdp('Emulation.setDeviceMetricsOverride', {
     width: 390,
@@ -185,20 +430,36 @@ try {
     scrollWidth: document.documentElement.scrollWidth,
     innerWidth,
     toggle: Boolean(document.querySelector('#panel-toggle')),
+    resetVisible: (() => {
+      const button = document.querySelector('#reset-all')
+      const rect = button?.getBoundingClientRect()
+      return Boolean(button && rect && rect.width > 0 && rect.height > 0 && getComputedStyle(button).display !== 'none')
+    })(),
+    randomVisible: (() => {
+      const button = document.querySelector('#randomize-btn')
+      const rect = button?.getBoundingClientRect()
+      return Boolean(button && rect && rect.width > 0 && rect.height > 0 && getComputedStyle(button).display !== 'none')
+    })(),
   })`)
   assert.ok(mobile.scrollWidth <= mobile.innerWidth + 2)
   assert.equal(mobile.toggle, true)
+  assert.equal(mobile.resetVisible, true)
+  assert.equal(mobile.randomVisible, true)
 
-  const shotDir = join(ROOT, 'release', 'face-tests')
-  await mkdir(shotDir, { recursive: true })
   const shot = await cdp('Page.captureScreenshot', { format: 'png' })
   await writeFile(join(shotDir, 'face-page-mobile.png'), Buffer.from(shot.data, 'base64'))
 
   console.log('✓ 捏脸页：服务端目录 484 条特征 / 46 维度 / 14 预设 / 16 张内置图')
   console.log('✓ 预设与提示词：载入清冷古典美人后实时生成完整提示词')
+  console.log('✓ 提示词只读：完整提示词和负向词都无法用键盘增删改')
   console.log('✓ 服务端资产：参考图从 /face-assets/ 正常加载')
   console.log('✓ 账号隔离：本地状态键包含当前 userId')
   console.log('✓ 服务端修改：改名后客户端重新加载可见，恢复默认后还原')
+  console.log('✓ 卡片比例：同类卡片宽高比一致，详情展开时才变高')
+  console.log('✓ 大屏滚动：1.25 倍缩放下工作区不超出视口，最后一行和页脚都能滚到')
+  console.log('✓ 全维度滚动：46 个维度逐页检查，最后一行都没有被底部截断')
+  console.log('✓ 恢复空白：清空全部选择与设定、保留方案名称，移动端按钮仍可见')
+  console.log('✓ 随机生成：符合单选/多选上限、无冲突、提示词只读，并支持确认后重新生成')
   console.log('✓ 带入自由创作：提示词和负向约束成功写入自由创作')
   console.log('✓ 移动端：390px 无横向溢出，提示词抽屉入口存在')
 } finally {

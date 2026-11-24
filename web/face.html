@@ -60,6 +60,7 @@
     <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></symbol>
     <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 15v4h14v-4"/></symbol>
     <symbol id="i-wand" viewBox="0 0 24 24"><path d="M5 19L16 8M14 4l1 3 3 1-3 1-1 3-1-3-3-1 3-1zM19 12l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M16 4h4v4M20 4l-6 6M4 20l6-6M16 20h4v-4M20 20l-6-6M4 4l6 6"/></symbol>
   </svg>
 
   <header class="topbar">
@@ -88,6 +89,7 @@
         <select id="visual-style" aria-label="视觉风格"></select>
       </label>
       <button class="btn ghost" id="open-presets" type="button"><svg><use href="#i-spark"/></svg>预设</button>
+      <button class="btn ghost random-btn" id="randomize-btn" type="button" title="随机生成一套角色参数"><svg><use href="#i-shuffle"/></svg><span>随机</span></button>
       <button class="btn ghost" id="new-scheme" type="button"><svg><use href="#i-plus"/></svg>新建</button>
       <div class="menu-wrap">
         <button class="btn ghost" id="more-btn" type="button" aria-haspopup="menu"><svg><use href="#i-menu"/></svg>方案</button>
@@ -174,6 +176,7 @@
           </div>
           <div class="head-side">
             <span class="mode-badge" id="cat-mode">单选</span>
+            <button class="text-btn reset-blank" id="reset-all" type="button">恢复空白</button>
             <button class="text-btn" id="clear-category" type="button">清空本维度</button>
           </div>
         </div>
@@ -201,7 +204,7 @@
       <div class="panel-head">
         <div>
           <h2>提示词</h2>
-          <p>选择后实时更新，也可以手动改。</p>
+          <p>内容随选择自动生成，只读；可以滚动、全选和复制。</p>
         </div>
         <button class="icon-btn panel-close" id="panel-close" type="button" aria-label="收起提示词"><svg><use href="#i-close"/></svg></button>
       </div>
@@ -233,7 +236,8 @@
       </div>
 
       <div class="editor" id="editor-full">
-        <textarea id="prompt-full" spellcheck="false" aria-label="完整提示词"></textarea>
+        <textarea id="prompt-full" spellcheck="false" readonly aria-readonly="true"
+          title="由所选特征自动生成，不能直接编辑" aria-label="完整提示词，只读"></textarea>
         <div class="manual-badge" id="manual-full" hidden>
           已手动编辑
           <button type="button" data-restore="full"><svg><use href="#i-undo"/></svg>恢复自动生成</button>
@@ -241,7 +245,8 @@
       </div>
 
       <div class="editor" id="editor-negative" hidden>
-        <textarea id="prompt-negative" spellcheck="false" aria-label="负向提示词"></textarea>
+        <textarea id="prompt-negative" spellcheck="false" readonly aria-readonly="true"
+          title="由所选特征自动生成，不能直接编辑" aria-label="负向提示词，只读"></textarea>
         <div class="manual-badge" id="manual-negative" hidden>
           已手动编辑
           <button type="button" data-restore="negative"><svg><use href="#i-undo"/></svg>恢复自动生成</button>

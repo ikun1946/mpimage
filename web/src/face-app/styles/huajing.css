@@ -14,7 +14,7 @@ body {
 
 .back-link {
   display: inline-flex;
-  height: 36px;
+  height: 32px;
   align-items: center;
   gap: 5px;
   padding: 0 10px;
@@ -420,6 +420,10 @@ body {
 .card.no-ref .thumb {
   aspect-ratio: auto;
   height: 64px;
+}
+
+.card.no-ref {
+  --card-ratio: 0.94;
 }
 
 .card.no-ref .thumb-empty {

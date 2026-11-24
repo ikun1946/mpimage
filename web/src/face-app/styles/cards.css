@@ -6,6 +6,7 @@
 }
 
 .card {
+  --card-ratio: 0.52;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -16,6 +17,7 @@
   overflow: hidden;
   transition: border-color .16s, background .16s, transform .16s, box-shadow .16s;
 }
+.card:not(.is-open) { aspect-ratio: var(--card-ratio); }
 .card:hover { border-color: #443c31; background: #1d1b17; transform: translateY(-2px); box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28); }
 .card:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .card.is-selected {
@@ -26,6 +28,7 @@
 
 .thumb {
   position: relative;
+  flex: none;
   aspect-ratio: 4 / 5;
   background: #efe7da;
   overflow: hidden;
@@ -100,7 +103,7 @@
 .fav-btn.is-fav { color: #b8874a; }
 .fav-btn.is-fav svg { fill: #d2a765; stroke: #a97a3d; }
 
-.card-body { padding: 10px 12px 11px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.card-body { min-height: 0; overflow: hidden; padding: 10px 12px 11px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
 .card-title { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .card-title h3 { margin: 0; font-size: 13.5px; font-weight: 600; letter-spacing: .3px; color: var(--ink); }
 .card.is-selected .card-title h3 { color: var(--gold-2); }
@@ -128,6 +131,7 @@
 .card.is-selected .tag { border-color: rgba(201, 163, 95, 0.22); color: #b6a78f; }
 
 .card-more {
+  flex: none;
   border: 0;
   border-top: 1px solid var(--line-soft);
   background: transparent;
@@ -274,6 +278,8 @@
 }
 
 @media (max-width: 720px) {
+  .card { --card-ratio: 0.61; }
+  .card.no-ref { --card-ratio: 0.82; }
   .cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
   .thumb { aspect-ratio: 1 / 1; }
   .card-body { padding: 9px 10px; }
