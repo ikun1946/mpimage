@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src * data: blob:; font-src data:" />
+<title>画境 · 捏脸卡片</title>
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #f3f1eb;
+    --paper-deep: #e9e6de;
+    --surface: #fcfbf7;
+    --surface-raised: #ffffff;
+    --surface-subtle: #f5f3ed;
+    --ink: #202722;
+    --ink-soft: #59645c;
+    --ink-faint: #727b73;
+    --line: rgba(32, 39, 34, 0.14);
+    --line-soft: rgba(32, 39, 34, 0.08);
+    --line-strong: rgba(32, 39, 34, 0.24);
+    --moss: #365445;
+    --moss-soft: #66836e;
+    --moss-tint: rgba(54, 84, 69, 0.12);
+    --on-moss: #fffdf8;
+    --accent: #a54c31;
+    --accent-tint: rgba(165, 76, 49, 0.1);
+    --danger: #a74331;
+    --danger-tint: rgba(167, 67, 49, 0.1);
+    --success: #3f6b4b;
+    --success-tint: rgba(63, 107, 75, 0.12);
+    --radius-sm: 9px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --shadow: 0 12px 40px rgba(40, 43, 36, 0.06);
+    --font: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    --mono: "Cascadia Mono", "Consolas", "Microsoft YaHei", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --paper: #151915;
+      --paper-deep: #11150f;
+      --surface: #1c211d;
+      --surface-raised: #242a25;
+      --surface-subtle: #202520;
+      --ink: #e8e6df;
+      --ink-soft: #adb5ab;
+      --ink-faint: #939c91;
+      --line: rgba(232, 230, 223, 0.14);
+      --line-soft: rgba(232, 230, 223, 0.08);
+      --line-strong: rgba(232, 230, 223, 0.26);
+      --moss: #8aaa8f;
+      --moss-soft: #a3bfa7;
+      --moss-tint: rgba(138, 170, 143, 0.14);
+      --on-moss: #12180f;
+      --accent: #cf8574;
+      --accent-tint: rgba(207, 133, 116, 0.14);
+      --danger: #cf8574;
+      --danger-tint: rgba(207, 133, 116, 0.14);
+      --success: #8fbd97;
+      --success-tint: rgba(143, 189, 151, 0.14);
+      --shadow: 0 16px 44px rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 13px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, textarea, select { font: inherit; }
+  button { cursor: pointer; }
+
+  .app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: 100%;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 58px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 218px;
+  }
+  .brand strong { font-size: 15px; letter-spacing: 0.06em; }
+  .brand span { color: var(--ink-faint); font-size: 11.5px; }
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: var(--ink-faint);
+    font-size: 11.5px;
+  }
+  .meta code {
+    padding: 2px 7px;
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    background: var(--surface-subtle);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .top-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 5px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-raised);
+    color: var(--ink);
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+  }
+  .button:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-subtle); }
+  .button:disabled { cursor: default; opacity: 0.45; }
+  .button.primary {
+    border-color: var(--moss);
+    background: var(--moss);
+    color: var(--on-moss);
+  }
+  .button.primary:hover:not(:disabled) { background: var(--moss-soft); border-color: var(--moss-soft); }
+  .button.danger { color: var(--danger); }
+  .button.mini { min-height: 27px; padding: 4px 9px; font-size: 11.5px; }
+  .button.icon { width: 30px; padding: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 236px 330px minmax(420px, 1fr);
+    min-height: 0;
+  }
+  .workspace.is-advanced {
+    grid-template-columns: 236px minmax(0, 1fr);
+  }
+  .workspace.is-advanced .list-pane { display: none; }
+  .workspace.is-advanced .editor-pane { grid-column: 2; }
+
+  .side,
+  .list-pane,
+  .editor-pane {
+    min-height: 0;
+    border-right: 1px solid var(--line);
+  }
+  .side {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+  }
+  .mode-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 10px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .mode-tabs button {
+    min-width: 0;
+    padding: 7px 4px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+  .mode-tabs button:hover { background: var(--surface-subtle); color: var(--ink); }
+  .mode-tabs button.is-active {
+    background: var(--moss-tint);
+    color: var(--moss);
+  }
+  .side-search { padding: 9px 10px 4px; }
+  .side-search input,
+  .list-search input {
+    width: 100%;
+    height: 30px;
+    padding: 0 9px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-raised);
+    color: var(--ink);
+    outline: none;
+  }
+  .side-search input:focus,
+  .list-search input:focus { border-color: var(--moss-soft); box-shadow: 0 0 0 3px var(--moss-tint); }
+
+  .tree {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 6px 8px 16px;
+  }
+  .tree-group { margin-top: 8px; }
+  .tree-group-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 7px;
+    color: var(--ink-faint);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .tree-group-head em {
+    margin-left: auto;
+    font-style: normal;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+  .tree-cat {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    min-height: 32px;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-soft);
+    text-align: left;
+  }
+  .tree-cat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tree-cat em {
+    margin-left: auto;
+    color: var(--ink-faint);
+    font-size: 10.5px;
+    font-style: normal;
+  }
+  .tree-cat:hover { background: var(--surface-subtle); color: var(--ink); }
+  .tree-cat.is-active {
+    background: var(--moss-tint);
+    color: var(--moss);
+    font-weight: 600;
+  }
+  .tree-cat.is-hidden { opacity: 0.5; }
+
+  .side-foot {
+    padding: 10px 12px;
+    border-top: 1px solid var(--line-soft);
+    color: var(--ink-faint);
+    font-size: 11px;
+    line-height: 1.65;
+  }
+
+  .list-pane {
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+  }
+  .pane-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-height: 62px;
+    padding: 11px 12px 9px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .pane-head h2 {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.45;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pane-head p {
+    margin: 2px 0 0;
+    overflow: hidden;
+    color: var(--ink-faint);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pane-head > div:first-child { min-width: 0; }
+  .pane-head-actions {
+    display: flex;
+    flex: none;
+    gap: 5px;
+    margin-left: auto;
+  }
+  .list-search { padding: 9px 10px 4px; background: var(--paper); }
+  .list-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 7px 8px 20px;
+  }
+  .card-row {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 9px;
+    width: 100%;
+    margin: 3px 0;
+    padding: 8px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ink);
+    text-align: left;
+  }
+  .card-row:hover { border-color: var(--line); background: var(--surface); }
+  .card-row.is-active {
+    border-color: var(--moss-soft);
+    background: var(--surface-raised);
+    box-shadow: 0 3px 12px rgba(40, 43, 36, 0.05);
+  }
+  .card-row.is-hidden { opacity: 0.54; }
+  .card-thumb {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    border: 1px solid var(--line-soft);
+    border-radius: 9px;
+    background: var(--surface-subtle);
+    color: var(--ink-faint);
+    font-size: 15px;
+  }
+  .card-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .card-main { min-width: 0; }
+  .card-name {
+    overflow: hidden;
+    font-size: 12.5px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .card-sub {
+    overflow: hidden;
+    color: var(--ink-faint);
+    font-family: var(--mono);
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .card-tag {
+    align-self: center;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--surface-subtle);
+    color: var(--ink-faint);
+    font-size: 9.5px;
+    white-space: nowrap;
+  }
+  .card-tag.custom { background: var(--accent-tint); color: var(--accent); }
+  .empty-list {
+    padding: 38px 16px;
+    color: var(--ink-faint);
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .editor-pane {
+    min-width: 0;
+    overflow: auto;
+    border-right: 0;
+    background: var(--surface);
+  }
+  .editor-empty {
+    display: grid;
+    min-height: 100%;
+    place-items: center;
+    padding: 30px;
+    color: var(--ink-faint);
+    text-align: center;
+  }
+  .editor-head {
+    position: sticky;
+    z-index: 5;
+    top: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    backdrop-filter: blur(10px);
+  }
+  .editor-head h1 {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.4;
+  }
+  .editor-head p {
+    margin: 2px 0 0;
+    color: var(--ink-faint);
+    font-size: 11.5px;
+  }
+  .editor-head-actions {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .editor-body { padding: 4px 18px 40px; }
+  .section {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .section:last-child { border-bottom: 0; }
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 11px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .section-title span {
+    color: var(--ink-faint);
+    font-size: 10.5px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+  .field { display: block; min-width: 0; }
+  .field > span {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--ink-soft);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .field small {
+    display: block;
+    margin-top: 4px;
+    color: var(--ink-faint);
+    font-size: 10.5px;
+  }
+  .field input,
+  .field textarea,
+  .field select {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-raised);
+    color: var(--ink);
+    outline: none;
+  }
+  .field input,
+  .field select { height: 32px; padding: 0 9px; }
+  .field textarea { min-height: 74px; padding: 7px 9px; resize: vertical; line-height: 1.6; }
+  .field textarea.tall { min-height: 112px; }
+  .field input:focus,
+  .field textarea:focus,
+  .field select:focus {
+    border-color: var(--moss-soft);
+    box-shadow: 0 0 0 3px var(--moss-tint);
+  }
+  .field input:disabled {
+    background: var(--surface-subtle);
+    color: var(--ink-faint);
+  }
+  .check-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 18px;
+    min-height: 32px;
+  }
+  .check-line label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-soft);
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+  .check-line input[type="checkbox"] {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    min-height: 16px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--moss);
+  }
+  .reference-box {
+    display: grid;
+    grid-template-columns: 116px minmax(0, 1fr);
+    gap: 11px;
+    align-items: start;
+  }
+  .reference-preview {
+    display: grid;
+    width: 116px;
+    height: 106px;
+    overflow: hidden;
+    place-items: center;
+    border: 1px dashed var(--line-strong);
+    border-radius: 10px;
+    background: var(--surface-subtle);
+    color: var(--ink-faint);
+    font-size: 10.5px;
+    text-align: center;
+  }
+  .reference-preview img { width: 100%; height: 100%; object-fit: cover; }
+  .reference-tools { display: grid; gap: 7px; }
+  .reference-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .hint-line { color: var(--ink-faint); font-size: 10.5px; line-height: 1.6; }
+  .preset-selected {
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--line-soft);
+    border-radius: 9px;
+    background: var(--surface-subtle);
+    color: var(--ink-soft);
+    font-size: 11px;
+  }
+  .preset-group { margin: 14px 0 4px; }
+  .preset-group h3 {
+    margin: 0 0 6px;
+    color: var(--ink-faint);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+  }
+  .preset-cat {
+    margin: 8px 0;
+    padding: 8px 9px;
+    border: 1px solid var(--line-soft);
+    border-radius: 9px;
+    background: var(--paper);
+  }
+  .preset-cat-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 6px;
+    color: var(--ink-soft);
+    font-size: 11px;
+    font-weight: 650;
+  }
+  .preset-cat-head em {
+    margin-left: auto;
+    color: var(--ink-faint);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 400;
+  }
+  .preset-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .preset-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 7px;
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    background: var(--surface-raised);
+    color: var(--ink-soft);
+    font-size: 10.5px;
+  }
+  .preset-option:has(input:checked) {
+    border-color: var(--moss-soft);
+    background: var(--moss-tint);
+    color: var(--moss);
+  }
+  .preset-option input { margin: 0; accent-color: var(--moss); }
+  .adv-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 13px;
+  }
+  .stat {
+    padding: 10px 12px;
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    background: var(--surface-subtle);
+  }
+  .stat strong { display: block; font-size: 18px; line-height: 1.25; }
+  .stat span { color: var(--ink-faint); font-size: 10.5px; }
+  .json-editor {
+    width: 100%;
+    min-height: calc(100vh - 300px);
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--paper-deep);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+  }
+  .json-editor:focus { border-color: var(--moss-soft); box-shadow: 0 0 0 3px var(--moss-tint); }
+
+  .statusbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 31px;
+    padding: 4px 14px;
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-faint);
+    font-size: 10.5px;
+  }
+  .statusbar strong {
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+  }
+  .status-dot.dirty { background: var(--accent); }
+  .status-msg {
+    min-width: 0;
+    overflow: hidden;
+    margin-left: auto;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .status-msg.error { color: var(--danger); }
+  .status-msg.ok { color: var(--success); }
+
+  .boot-error {
+    display: grid;
+    height: 100%;
+    place-items: center;
+    padding: 30px;
+  }
+  .boot-error > div {
+    width: min(540px, 100%);
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow);
+  }
+  .boot-error h1 { margin: 0 0 8px; font-size: 20px; }
+  .boot-error p { margin: 0 0 16px; color: var(--ink-soft); }
+
+  @media (max-width: 1050px) {
+    .workspace { grid-template-columns: 210px 300px minmax(360px, 1fr); }
+    .brand { min-width: 0; }
+    .brand span { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app" hidden>
+  <header class="topbar">
+    <div class="brand">
+      <strong>画境 · 捏脸卡片</strong>
+      <span>服务端目录</span>
+    </div>
+    <div class="meta">
+      <code id="meta-revision">r0</code>
+      <span id="meta-summary">正在读取…</span>
+    </div>
+    <div class="top-actions">
+      <button class="button mini" type="button" id="btn-reload">重新加载</button>
+      <button class="button mini" type="button" id="btn-import">导入 JSON</button>
+      <button class="button mini" type="button" id="btn-export">导出 JSON</button>
+      <button class="button mini" type="button" id="btn-restore">恢复上一版</button>
+      <button class="button mini" type="button" id="btn-reset">恢复默认</button>
+      <button class="button primary" type="button" id="btn-save" disabled>保存</button>
+      <input type="file" id="import-file" accept="application/json,.json" hidden />
+    </div>
+  </header>
+
+  <main class="workspace" id="workspace">
+    <aside class="side">
+      <div class="mode-tabs" role="tablist" aria-label="编辑模式">
+        <button type="button" data-mode="cards" class="is-active">维度卡片</button>
+        <button type="button" data-mode="presets">预设方案</button>
+        <button type="button" data-mode="advanced">高级 JSON</button>
+      </div>
+      <div class="side-search">
+        <input type="search" id="nav-search" placeholder="筛选维度…" autocomplete="off" />
+      </div>
+      <div class="tree" id="tree"></div>
+      <div class="side-foot">
+        内置卡片只隐藏不删除；新增和复制出的卡片可以删除。保存会自动留一份上一版备份。
+      </div>
+    </aside>
+
+    <section class="list-pane">
+      <div class="pane-head">
+        <div>
+          <h2 id="list-title">卡片</h2>
+          <p id="list-subtitle">选择一个维度</p>
+        </div>
+        <div class="pane-head-actions" id="list-actions"></div>
+      </div>
+      <div class="list-search">
+        <input type="search" id="list-search" placeholder="搜索当前列表…" autocomplete="off" />
+      </div>
+      <div class="list-scroll" id="list"></div>
+    </section>
+
+    <section class="editor-pane" id="editor"></section>
+  </main>
+
+  <footer class="statusbar">
+    <span class="status-dot" id="status-dot"></span>
+    <strong id="status-state">已读取</strong>
+    <span id="status-count"></span>
+    <span class="status-msg" id="status-msg" role="status" aria-live="polite"></span>
+  </footer>
+</div>
+
+<div class="boot-error" id="boot-error" hidden>
+  <div>
+    <h1>捏脸卡片窗口没能打开</h1>
+    <p id="boot-error-message">正在连接本机服务…</p>
+    <button class="button primary" type="button" id="btn-retry">重试</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const bridge = window.faceCardsApi
+  const $ = (selector, root = document) => root.querySelector(selector)
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)]
+  const esc = (value = '') => String(value).replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[char]))
+  const lines = value => String(value || '').split(/\r?\n/).map(item => item.trim()).filter(Boolean)
+  const words = value => String(value || '').split(/[\n,，、]+/).map(item => item.trim()).filter(Boolean)
+  const clone = value => JSON.parse(JSON.stringify(value))
+  const sameCatalog = (left, right) => JSON.stringify(left) === JSON.stringify(right)
+  const sortCards = (left, right) =>
+    Number(left.sort_order || 9999) - Number(right.sort_order || 9999) ||
+    String(left.name_zh || left.id).localeCompare(String(right.name_zh || right.id), 'zh-CN')
+
+  const state = {
+    catalog: null,
+    saved: '',
+    mode: 'cards',
+    category: '',
+    cardId: '',
+    presetId: '',
+    navSearch: '',
+    listSearch: '',
+    presetSearch: '',
+    saving: false,
+    loading: false,
+    advancedDraft: '',
+    advancedDirty: false,
+    referenceUrls: new Map(),
+    noticeTimer: 0,
+  }
+
+  const dom = {
+    app: $('#app'),
+    bootError: $('#boot-error'),
+    bootErrorText: $('#boot-error-message'),
+    retry: $('#btn-retry'),
+    workspace: $('#workspace'),
+    tree: $('#tree'),
+    navSearch: $('#nav-search'),
+    listTitle: $('#list-title'),
+    listSubtitle: $('#list-subtitle'),
+    listActions: $('#list-actions'),
+    listSearch: $('#list-search'),
+    list: $('#list'),
+    editor: $('#editor'),
+    metaRevision: $('#meta-revision'),
+    metaSummary: $('#meta-summary'),
+    save: $('#btn-save'),
+    reload: $('#btn-reload'),
+    importButton: $('#btn-import'),
+    importFile: $('#import-file'),
+    exportButton: $('#btn-export'),
+    restore: $('#btn-restore'),
+    reset: $('#btn-reset'),
+    statusDot: $('#status-dot'),
+    statusState: $('#status-state'),
+    statusCount: $('#status-count'),
+    statusMsg: $('#status-msg'),
+  }
+
+  function categoryMap() {
+    return new Map((state.catalog?.categories || []).map(category => [category.key, category]))
+  }
+
+  function currentCategory() {
+    return categoryMap().get(state.category) || null
+  }
+
+  function currentCard() {
+    return currentCategory()?.items?.find(item => item.id === state.cardId) || null
+  }
+
+  function currentPreset() {
+    return (state.catalog?.presets || []).find(preset => preset.id === state.presetId) || null
+  }
+
+  function allCards() {
+    return (state.catalog?.categories || []).flatMap(category => category.items || [])
+  }
+
+  function cardById(id) {
+    return allCards().find(item => item.id === id) || null
+  }
+
+  function isDirty() {
+    return Boolean(state.catalog) && (
+      !sameCatalog(state.catalog, JSON.parse(state.saved || 'null')) ||
+      state.advancedDirty
+    )
+  }
+
+  function renderDirty() {
+    const dirty = isDirty()
+    dom.save.disabled = !dirty || state.saving || state.loading
+    dom.statusDot.classList.toggle('dirty', dirty)
+    dom.statusState.textContent = state.saving ? '正在保存…' : dirty ? '有未保存修改' : '已保存'
+    const total = (state.catalog?.categories || []).reduce((sum, category) => sum + category.items.length, 0)
+    dom.statusCount.textContent = state.catalog
+      ? `${(state.catalog.categories || []).length} 个维度 · ${total} 张卡片 · ${(state.catalog.presets || []).length} 套预设`
+      : ''
+  }
+
+  function notice(message, type = '') {
+    clearTimeout(state.noticeTimer)
+    dom.statusMsg.textContent = message || ''
+    dom.statusMsg.className = `status-msg ${type}`.trim()
+    if (message) {
+      state.noticeTimer = setTimeout(() => {
+        dom.statusMsg.textContent = ''
+        dom.statusMsg.className = 'status-msg'
+      }, type === 'error' ? 9000 : 4500)
+    }
+  }
+
+  function apiError(result) {
+    const details = Array.isArray(result?.data?.details) ? result.data.details : []
+    const suffix = details.length
+      ? `：${details.slice(0, 3).map(item => `${item.path || '目录'} ${item.message}`).join('；')}`
+      : ''
+    return `${result?.data?.error || result?.error || '请求失败'}${suffix}`
+  }
+
+  async function api(path, init = {}) {
+    if (!bridge) throw new Error('桌面端接口没有加载，请从画境控制台重新打开')
+    const result = await bridge.api(path, init)
+    if (!result?.ok) throw new Error(apiError(result))
+    return result.data
+  }
+
+  async function boot() {
+    if (!bridge) {
+      showBootError('桌面端接口没有加载。请关闭这个窗口，从画境控制台重新打开「捏脸卡片」。')
+      return
+    }
+    state.loading = true
+    dom.app.hidden = true
+    dom.bootError.hidden = true
+    try {
+      const data = await api('/api/admin/face/catalog')
+      state.catalog = data.catalog
+      state.saved = JSON.stringify(data.catalog)
+      state.category = firstCategoryKey()
+      state.cardId = firstCardId(state.category)
+      state.presetId = state.catalog.presets?.[0]?.id || ''
+      state.advancedDraft = JSON.stringify(state.catalog, null, 2)
+      dom.app.hidden = false
+      renderAll()
+      notice('目录已读取，修改后按 Ctrl+S 保存')
+    } catch (error) {
+      showBootError(error.message || String(error))
+    } finally {
+      state.loading = false
+      renderDirty()
+    }
+  }
+
+  function showBootError(message) {
+    dom.bootError.hidden = false
+    dom.app.hidden = true
+    dom.bootErrorText.textContent = message
+  }
+
+  function firstCategoryKey() {
+    const categories = state.catalog?.categories || []
+    return categories.find(category => category.visible !== false)?.key || categories[0]?.key || ''
+  }
+
+  function firstCardId(categoryKey) {
+    const category = (state.catalog?.categories || []).find(item => item.key === categoryKey)
+    return [...(category?.items || [])].sort(sortCards)[0]?.id || ''
+  }
+
+  function renderAll() {
+    dom.workspace.classList.toggle('is-advanced', state.mode === 'advanced')
+    $$('.mode-tabs button').forEach(button => button.classList.toggle('is-active', button.dataset.mode === state.mode))
+    renderMeta()
+    renderTree()
+    renderList()
+    renderEditor()
+    renderDirty()
+  }
+
+  function renderMeta() {
+    if (!state.catalog) return
+    const total = (state.catalog.categories || []).reduce((sum, category) => sum + category.items.length, 0)
+    dom.metaRevision.textContent = `r${state.catalog.revision || 0}`
+    dom.metaSummary.textContent =
+      `${(state.catalog.categories || []).length} 维度 · ${total} 卡片 · ${(state.catalog.presets || []).length} 预设`
+  }
+
+  function renderTree() {
+    if (!state.catalog) return
+    const query = state.navSearch.trim().toLowerCase()
+    const categories = categoryMap()
+    dom.tree.innerHTML = (state.catalog.groups || []).map(group => {
+      const items = (group.categories || [])
+        .map(key => categories.get(key))
+        .filter(Boolean)
+        .filter(category => !query || [
+          category.key, category.title_zh, category.title_en,
+        ].some(value => String(value || '').toLowerCase().includes(query)))
+      if (!items.length) return ''
+      return `<div class="tree-group">
+        <div class="tree-group-head">${esc(group.title_zh || group.key)} <em>${items.length}</em></div>
+        ${items.map(category => `<button type="button" class="tree-cat ${category.key === state.category ? 'is-active' : ''} ${category.visible === false ? 'is-hidden' : ''}" data-category="${esc(category.key)}">
+          <span>${esc(category.title_zh || category.key)}</span>
+          <em>${(category.items || []).length}${category.visible === false ? ' · 隐' : ''}</em>
+        </button>`).join('')}
+      </div>`
+    }).join('') || '<div class="empty-list">没有匹配的维度</div>'
+  }
+
+  function renderList() {
+    if (state.mode === 'advanced') return
+    if (state.mode === 'presets') return renderPresetList()
+    const category = currentCategory()
+    if (!category) {
+      dom.listTitle.textContent = '卡片'
+      dom.listSubtitle.textContent = '先选择左侧维度'
+      dom.listActions.innerHTML = ''
+      dom.list.innerHTML = '<div class="empty-list">没有可编辑的维度</div>'
+      return
+    }
+    const query = state.listSearch.trim().toLowerCase()
+    const items = [...(category.items || [])]
+      .sort(sortCards)
+      .filter(item => !query || [
+        item.id, item.name_zh, item.name_en, ...(item.aliases || []), ...(item.mood_tags || []),
+      ].some(value => String(value || '').toLowerCase().includes(query)))
+    dom.listTitle.textContent = category.title_zh || category.key
+    dom.listSubtitle.textContent = `${category.select_mode === 'multi' ? `多选，最多 ${category.max_select} 个` : '单选'} · ${category.items.length} 张`
+    dom.listActions.innerHTML = `
+      <button class="button mini" type="button" data-action="duplicate-card" ${currentCard() ? '' : 'disabled'}>复制</button>
+      <button class="button mini primary" type="button" data-action="add-card">新增</button>`
+    dom.list.innerHTML = items.length ? items.map(item => {
+      const ref = state.catalog.references?.[item.id] || ''
+      return `<button type="button" class="card-row ${item.id === state.cardId ? 'is-active' : ''} ${item.visible === false ? 'is-hidden' : ''}" data-card="${esc(item.id)}">
+        <span class="card-thumb">${ref ? `<img data-ref-path="${esc(ref)}" alt="" />` : esc((item.name_zh || '?').slice(0, 1))}</span>
+        <span class="card-main">
+          <span class="card-name">${esc(item.name_zh || item.id)}</span>
+          <span class="card-sub">${esc(item.id)}</span>
+        </span>
+        <span class="card-tag ${item.is_custom ? 'custom' : ''}">${item.is_custom ? '自定义' : item.visible === false ? '隐藏' : '内置'}</span>
+      </button>`
+    }).join('') : '<div class="empty-list">这个维度还没有卡片</div>'
+    hydrateReferenceImages(dom.list)
+  }
+
+  function renderPresetList() {
+    const query = state.listSearch.trim().toLowerCase()
+    const presets = (state.catalog.presets || []).filter(preset =>
+      !query || [preset.id, preset.name, preset.note].some(value =>
+        String(value || '').toLowerCase().includes(query)))
+    dom.listTitle.textContent = '预设方案'
+    dom.listSubtitle.textContent = `${state.catalog.presets.length} 套 · 修改后立即同步到客户端`
+    dom.listActions.innerHTML = '<button class="button mini primary" type="button" data-action="add-preset">新增</button>'
+    dom.list.innerHTML = presets.length ? presets.map(preset => `
+      <button type="button" class="card-row ${preset.id === state.presetId ? 'is-active' : ''} ${preset.visible === false ? 'is-hidden' : ''}" data-preset="${esc(preset.id)}">
+        <span class="card-thumb">${preset.visible === false ? '隐' : '预'}</span>
+        <span class="card-main">
+          <span class="card-name">${esc(preset.name || preset.id)}</span>
+          <span class="card-sub">${esc(preset.id)}</span>
+        </span>
+        <span class="card-tag">${Object.values(preset.selections || {}).reduce((sum, ids) => sum + (ids?.length || 0), 0)} 项</span>
+      </button>`).join('') : '<div class="empty-list">没有预设方案</div>'
+  }
+
+  function renderEditor() {
+    if (!state.catalog) return
+    if (state.mode === 'advanced') return renderAdvanced()
+    if (state.mode === 'presets') return renderPresetEditor()
+    renderCardEditor()
+  }
+
+  function editorEmpty(text) {
+    dom.editor.innerHTML = `<div class="editor-empty">${esc(text)}</div>`
+  }
+
+  function renderCardEditor() {
+    const category = currentCategory()
+    const card = currentCard()
+    if (!category) return editorEmpty('左侧还没有可编辑的维度')
+    if (!card) return editorEmpty('这个维度还没有卡片。点中间的「新增」建一张。')
+    const ref = state.catalog.references?.[card.id] || ''
+    dom.editor.innerHTML = `
+      <div class="editor-head">
+        <div>
+          <h1>${esc(card.name_zh || card.id)}</h1>
+          <p>${esc(category.title_zh)} · ${card.is_custom ? '管理员新增卡片' : '内置卡片'} · ID ${esc(card.id)}</p>
+        </div>
+        <div class="editor-head-actions">
+          <button class="button mini danger" type="button" data-action="delete-card" ${card.is_custom ? '' : 'disabled title="内置卡片只能隐藏，不能删除"'}>删除</button>
+        </div>
+      </div>
+      <div class="editor-body">
+        <section class="section">
+          <h2 class="section-title">维度设置 <span>影响整个维度在客户端的显示和选择方式</span></h2>
+          <div class="grid-2">
+            <label class="field"><span>中文标题</span><input data-cat-field="title_zh" value="${esc(category.title_zh)}" /></label>
+            <label class="field"><span>英文标题</span><input data-cat-field="title_en" value="${esc(category.title_en)}" /></label>
+          </div>
+          <label class="field" style="margin-top:11px"><span>维度说明</span><textarea data-cat-field="blurb">${esc(category.blurb)}</textarea></label>
+          <div class="grid-3" style="margin-top:11px">
+            <label class="field"><span>选择方式</span><select data-cat-field="select_mode">
+              <option value="single" ${category.select_mode !== 'multi' ? 'selected' : ''}>单选</option>
+              <option value="multi" ${category.select_mode === 'multi' ? 'selected' : ''}>多选</option>
+            </select></label>
+            <label class="field"><span>最多可选</span><input type="number" min="1" max="100" data-cat-field="max_select" value="${Number(category.max_select) || 1}" /></label>
+            <div class="field"><span>状态</span><div class="check-line">
+              <label><input type="checkbox" data-cat-field="strength_supported" ${category.strength_supported ? 'checked' : ''} />支持强弱</label>
+              <label><input type="checkbox" data-cat-field="visible" ${category.visible !== false ? 'checked' : ''} />客户端可见</label>
+            </div></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">卡片内容 <span>中文是客户端主文案，英文用于英文提示词</span></h2>
+          <div class="grid-2">
+            <label class="field"><span>中文名</span><input data-card-field="name_zh" value="${esc(card.name_zh)}" /></label>
+            <label class="field"><span>英文名</span><input data-card-field="name_en" value="${esc(card.name_en)}" /></label>
+          </div>
+          <div class="grid-3" style="margin-top:11px">
+            <label class="field"><span>卡片 ID</span><input value="${esc(card.id)}" disabled /><small>创建后不可改，避免旧方案失效</small></label>
+            <label class="field"><span>排序</span><input type="number" data-card-field="sort_order" value="${Number(card.sort_order ?? 9999)}" /></label>
+            <div class="field"><span>状态</span><div class="check-line">
+              <label><input type="checkbox" data-card-field="visible" ${card.visible !== false ? 'checked' : ''} />客户端可见</label>
+            </div></div>
+          </div>
+          <label class="field" style="margin-top:11px"><span>结构定义</span><textarea data-card-field="definition">${esc(card.definition)}</textarea><small>给自己看的说明，帮助后续判断哪些特征属于同一类。</small></label>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">提示词 <span>真正写进客户端生成提示词的内容</span></h2>
+          <div class="grid-2">
+            <label class="field"><span>中文提示词</span><textarea class="tall" data-card-field="prompt_zh">${esc(card.prompt_zh)}</textarea></label>
+            <label class="field"><span>英文提示词</span><textarea class="tall" data-card-field="prompt_en">${esc(card.prompt_en)}</textarea></label>
+          </div>
+          <div class="grid-2" style="margin-top:11px">
+            <label class="field"><span>视觉特征</span><textarea data-card-field="visual_features">${esc((card.visual_features || []).join('\n'))}</textarea><small>一行一项</small></label>
+            <label class="field"><span>气质标签</span><textarea data-card-field="mood_tags">${esc((card.mood_tags || []).join('\n'))}</textarea><small>一行一项</small></label>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">索引与冲突 <span>每行一项，或用逗号分隔</span></h2>
+          <div class="grid-2">
+            <label class="field"><span>别名</span><textarea data-card-field="aliases">${esc((card.aliases || []).join('\n'))}</textarea></label>
+            <label class="field"><span>兼容卡片 ID</span><textarea data-card-field="compatibility">${esc((card.compatibility || []).join('\n'))}</textarea></label>
+            <label class="field"><span>冲突卡片 ID</span><textarea data-card-field="conflicts">${esc((card.conflicts || []).join('\n'))}</textarea></label>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">参考图 <span>只保存服务端路径，不上传远程链接</span></h2>
+          <div class="reference-box">
+            <div class="reference-preview">${ref ? `<img data-ref-path="${esc(ref)}" alt="参考图预览" />` : '暂无参考图'}</div>
+            <div class="reference-tools">
+              <label class="field"><span>服务端路径</span><input data-card-field="reference" value="${esc(ref)}" placeholder="/face-assets/... 或 参考图/..." /></label>
+              <div class="reference-actions">
+                <button class="button mini" type="button" data-action="upload-reference">上传图片</button>
+                <button class="button mini" type="button" data-action="clear-reference" ${ref ? '' : 'disabled'}>清除</button>
+                <input type="file" data-reference-file accept="image/png,image/jpeg,image/webp" hidden />
+              </div>
+              <span class="hint-line">上传图会进入运行数据目录，不会写进安装包。PNG / JPEG / WebP，最大 8 MB。</span>
+            </div>
+          </div>
+        </section>
+      </div>`
+    hydrateReferenceImages(dom.editor)
+  }
+
+  function renderPresetEditor() {
+    const preset = currentPreset()
+    if (!preset) return editorEmpty('还没有预设。点中间的「新增」建一套。')
+    const selectedCount = Object.values(preset.selections || {}).reduce((sum, ids) => sum + (ids?.length || 0), 0)
+    const categories = categoryMap()
+    const query = state.presetSearch.trim().toLowerCase()
+    const groups = (state.catalog.groups || []).map(group => {
+      const cats = (group.categories || []).map(key => categories.get(key)).filter(Boolean).filter(category => {
+        if (!query) return true
+        if (String(category.title_zh || '').toLowerCase().includes(query)) return true
+        return (category.items || []).some(item =>
+          [item.name_zh, item.id].some(value => String(value || '').toLowerCase().includes(query)))
+      })
+      if (!cats.length) return ''
+      return `<div class="preset-group"><h3>${esc(group.title_zh || group.key)}</h3>
+        ${cats.map(category => {
+          const selected = new Set(preset.selections?.[category.key] || [])
+          const items = [...(category.items || [])]
+            .filter(item => item.visible !== false)
+            .filter(item => !query ||
+              String(category.title_zh || '').toLowerCase().includes(query) ||
+              [item.name_zh, item.id].some(value => String(value || '').toLowerCase().includes(query)))
+            .sort(sortCards)
+          if (!items.length) return ''
+          return `<div class="preset-cat">
+            <div class="preset-cat-head">${esc(category.title_zh)} <em>${selected.size} 已选 · ${category.select_mode === 'multi' ? `最多 ${category.max_select}` : '单选'}</em></div>
+            <div class="preset-options">
+              ${items.map(item => `<label class="preset-option">
+                <input type="checkbox" data-preset-cat="${esc(category.key)}" data-preset-item="${esc(item.id)}" ${selected.has(item.id) ? 'checked' : ''} />
+                ${esc(item.name_zh || item.id)}
+              </label>`).join('')}
+            </div>
+          </div>`
+        }).join('')}
+      </div>`
+    }).join('')
+    dom.editor.innerHTML = `
+      <div class="editor-head">
+        <div>
+          <h1>${esc(preset.name || preset.id)}</h1>
+          <p>预设方案 · ${selectedCount} 项 · ID ${esc(preset.id)}</p>
+        </div>
+        <div class="editor-head-actions">
+          <button class="button mini" type="button" data-action="duplicate-preset">复制</button>
+          <button class="button mini danger" type="button" data-action="delete-preset">删除</button>
+        </div>
+      </div>
+      <div class="editor-body">
+        <section class="section">
+          <h2 class="section-title">基础信息</h2>
+          <div class="grid-2">
+            <label class="field"><span>预设名称</span><input data-preset-field="name" value="${esc(preset.name)}" /></label>
+            <div class="field"><span>状态</span><div class="check-line">
+              <label><input type="checkbox" data-preset-field="visible" ${preset.visible !== false ? 'checked' : ''} />客户端可见</label>
+            </div></div>
+          </div>
+          <label class="field" style="margin-top:11px"><span>预设说明</span><textarea data-preset-field="note">${esc(preset.note)}</textarea></label>
+        </section>
+        <section class="section">
+          <h2 class="section-title">选择卡片 <span>${selectedCount} 项</span></h2>
+          <div class="preset-selected">预设只是把卡片组合起来，不会改动卡片本身。隐藏的卡片不会出现在这里。</div>
+          <div class="list-search" style="padding:0 0 10px">
+            <input type="search" id="preset-search" placeholder="搜索预设里的卡片…" value="${esc(state.presetSearch)}" autocomplete="off" />
+          </div>
+          ${groups || '<div class="empty-list">没有匹配的卡片</div>'}
+        </section>
+      </div>`
+  }
+
+  function renderAdvanced() {
+    if (!state.advancedDirty) state.advancedDraft = JSON.stringify(state.catalog, null, 2)
+    const total = (state.catalog.categories || []).reduce((sum, category) => sum + category.items.length, 0)
+    dom.editor.innerHTML = `
+      <div class="editor-head">
+        <div>
+          <h1>高级 JSON</h1>
+          <p>整份目录都可以在这里改：负向词、冲突规则、视觉风格、分组结构都在下面的 JSON 里。</p>
+        </div>
+        <div class="editor-head-actions">
+          <button class="button mini" type="button" data-action="format-json">格式化</button>
+          <button class="button mini primary" type="button" data-action="apply-json">应用修改</button>
+        </div>
+      </div>
+      <div class="editor-body">
+        <div class="adv-grid">
+          <div class="stat"><strong>${state.catalog.groups.length}</strong><span>分组</span></div>
+          <div class="stat"><strong>${state.catalog.categories.length}</strong><span>维度</span></div>
+          <div class="stat"><strong>${total}</strong><span>卡片</span></div>
+        </div>
+        <textarea class="json-editor" id="advanced-json" spellcheck="false">${esc(state.advancedDraft)}</textarea>
+        <p class="hint-line">应用修改后会先做本地 JSON 校验，再交给服务端做完整结构校验。保存前仍然可以继续切换页面。</p>
+      </div>`
+  }
+
+  async function hydrateReferenceImages(root) {
+    for (const image of $$('img[data-ref-path]', root)) {
+      const path = image.dataset.refPath
+      if (!path || image.dataset.loaded === '1') continue
+      image.dataset.loaded = '1'
+      try {
+        let url = state.referenceUrls.get(path)
+        if (!url) {
+          url = await bridge.fileUrl(path)
+          if (url) state.referenceUrls.set(path, url)
+        }
+        if (url) image.src = url
+        else image.removeAttribute('src')
+      } catch {
+        image.removeAttribute('src')
+      }
+    }
+  }
+
+  function updateCardField(field, element) {
+    const card = currentCard()
+    if (!card) return
+    if (field === 'sort_order') card.sort_order = Number(element.value) || 9999
+    else if (field === 'visible') card.visible = element.checked
+    else if (['visual_features', 'mood_tags'].includes(field)) card[field] = lines(element.value).slice(0, 40)
+    else if (['aliases', 'mood_tags'].includes(field)) card[field] = words(element.value).slice(0, 40)
+    else if (['compatibility', 'conflicts'].includes(field)) card[field] = words(element.value).slice(0, 60)
+    else if (field === 'reference') {
+      const path = element.value.trim()
+      if (path) state.catalog.references[card.id] = path
+      else delete state.catalog.references[card.id]
+    } else card[field] = element.value
+    renderDirty()
+    renderList()
+    if (['name_zh', 'sort_order', 'visible', 'reference'].includes(field)) renderMeta()
+  }
+
+  function updateCategoryField(field, element) {
+    const category = currentCategory()
+    if (!category) return
+    if (field === 'max_select') category.max_select = Math.max(1, Math.min(100, Number(element.value) || 1))
+    else if (field === 'select_mode') category.select_mode = element.value === 'multi' ? 'multi' : 'single'
+    else if (field === 'strength_supported') category.strength_supported = element.checked
+    else if (field === 'visible') category.visible = element.checked
+    else category[field] = element.value
+    renderDirty()
+    renderTree()
+    renderList()
+  }
+
+  function updatePresetField(field, element) {
+    const preset = currentPreset()
+    if (!preset) return
+    if (field === 'visible') preset.visible = element.checked
+    else preset[field] = element.value
+    renderDirty()
+    renderList()
+  }
+
+  function nextId(prefix) {
+    const existing = new Set(allCards().map(item => item.id))
+    let index = 1
+    let id = ''
+    do {
+      id = `${prefix}_${Date.now().toString(36)}_${index++}`
+    } while (existing.has(id))
+    return id
+  }
+
+  function addCard() {
+    const category = currentCategory()
+    if (!category) return
+    const id = nextId(`${category.key}_custom`)
+    const maxSort = Math.max(0, ...category.items.map(item => Number(item.sort_order) || 0))
+    const card = {
+      id,
+      category: category.key,
+      name_zh: '新卡片',
+      name_en: 'New card',
+      definition: '',
+      prompt_zh: '',
+      prompt_en: '',
+      aliases: [],
+      mood_tags: [],
+      visual_features: [],
+      compatibility: [],
+      conflicts: [],
+      sort_order: maxSort + 10,
+      visible: true,
+      is_custom: true,
+    }
+    category.items.push(card)
+    state.cardId = id
+    state.listSearch = ''
+    dom.listSearch.value = ''
+    renderTree()
+    renderList()
+    renderEditor()
+    renderDirty()
+    const input = $('[data-card-field="name_zh"]', dom.editor)
+    input?.focus()
+    input?.select()
+  }
+
+  function duplicateCard() {
+    const category = currentCategory()
+    const card = currentCard()
+    if (!category || !card) return
+    const copy = clone(card)
+    copy.id = nextId(`${card.id}_copy`)
+    copy.name_zh = `${card.name_zh || card.id} 副本`
+    copy.name_en = `${card.name_en || card.id} copy`
+    copy.is_custom = true
+    copy.sort_order = Number(card.sort_order || 9999) + 5
+    category.items.push(copy)
+    state.cardId = copy.id
+    renderTree()
+    renderList()
+    renderEditor()
+    renderDirty()
+    notice('已复制成一张自定义卡片')
+  }
+
+  function deleteCard() {
+    const category = currentCategory()
+    const card = currentCard()
+    if (!category || !card) return
+    if (!card.is_custom) {
+      notice('内置卡片不能删除，可以取消「客户端可见」来隐藏', 'error')
+      return
+    }
+    if (!confirm(`删除卡片「${card.name_zh || card.id}」？\n预设、参考图和冲突规则里的引用会一起清掉。`)) return
+    category.items = category.items.filter(item => item.id !== card.id)
+    delete state.catalog.references[card.id]
+    state.catalog.presets = (state.catalog.presets || []).map(preset => {
+      for (const key of Object.keys(preset.selections || {})) {
+        preset.selections[key] = (preset.selections[key] || []).filter(id => id !== card.id)
+        if (!preset.selections[key].length) delete preset.selections[key]
+      }
+      return preset
+    })
+    state.catalog.conflict_rules = (state.catalog.conflict_rules || []).filter(rule =>
+      rule.left !== card.id && rule.right !== card.id)
+    state.cardId = firstCardId(category.key)
+    renderAll()
+    notice('卡片已从当前草稿移除，保存后生效')
+  }
+
+  async function uploadReference(file) {
+    const card = currentCard()
+    if (!card || !file) return
+    if (file.size > 8 * 1024 * 1024) {
+      notice('参考图不能超过 8 MB', 'error')
+      return
+    }
+    try {
+      notice('正在上传参考图…')
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(new Error('读取图片失败'))
+        reader.readAsDataURL(file)
+      })
+      const result = await api('/api/reference-images', {
+        method: 'POST',
+        body: { name: card.id, dataUrl },
+      })
+      if (!result?.path) throw new Error('服务端没有返回图片路径')
+      state.catalog.references[card.id] = result.path
+      state.referenceUrls.delete(result.path)
+      renderCardEditor()
+      renderList()
+      renderDirty()
+      notice('参考图已上传，保存目录后客户端生效', 'ok')
+    } catch (error) {
+      notice(`参考图上传失败：${error.message || error}`, 'error')
+    }
+  }
+
+  function addPreset() {
+    const existing = new Set((state.catalog.presets || []).map(preset => preset.id))
+    let id = ''
+    let index = 1
+    do { id = `preset_custom_${Date.now().toString(36)}_${index++}` } while (existing.has(id))
+    const preset = { id, name: '新预设', note: '', visible: true, selections: {} }
+    state.catalog.presets.push(preset)
+    state.presetId = id
+    state.listSearch = ''
+    dom.listSearch.value = ''
+    renderList()
+    renderEditor()
+    renderDirty()
+    const input = $('[data-preset-field="name"]', dom.editor)
+    input?.focus()
+    input?.select()
+  }
+
+  function duplicatePreset() {
+    const preset = currentPreset()
+    if (!preset) return
+    const copy = clone(preset)
+    const existing = new Set(state.catalog.presets.map(item => item.id))
+    let id = ''
+    let index = 1
+    do { id = `${preset.id}_copy_${Date.now().toString(36)}_${index++}` } while (existing.has(id))
+    copy.id = id
+    copy.name = `${preset.name || preset.id} 副本`
+    state.catalog.presets.push(copy)
+    state.presetId = id
+    renderList()
+    renderEditor()
+    renderDirty()
+  }
+
+  function deletePreset() {
+    const preset = currentPreset()
+    if (!preset) return
+    if (!confirm(`删除预设「${preset.name || preset.id}」？`)) return
+    state.catalog.presets = state.catalog.presets.filter(item => item.id !== preset.id)
+    state.presetId = state.catalog.presets[0]?.id || ''
+    renderList()
+    renderEditor()
+    renderDirty()
+  }
+
+  function togglePresetItem(input) {
+    const preset = currentPreset()
+    const category = categoryMap().get(input.dataset.presetCat)
+    if (!preset || !category) return
+    const ids = [...(preset.selections[category.key] || [])]
+    const id = input.dataset.presetItem
+    if (!input.checked) {
+      preset.selections[category.key] = ids.filter(item => item !== id)
+      if (!preset.selections[category.key].length) delete preset.selections[category.key]
+    } else if (category.select_mode === 'single') {
+      preset.selections[category.key] = [id]
+      $$('input[data-preset-cat]', dom.editor)
+        .filter(other => other.dataset.presetCat === category.key && other.dataset.presetItem !== id)
+        .forEach(other => { other.checked = false })
+    } else if (ids.length >= Number(category.max_select || 1)) {
+      input.checked = false
+      notice(`「${category.title_zh}」最多选 ${category.max_select} 个`, 'error')
+      return
+    } else {
+      preset.selections[category.key] = [...ids, id]
+    }
+    renderDirty()
+    renderList()
+    const count = Object.values(preset.selections).reduce((sum, list) => sum + (list?.length || 0), 0)
+    const title = $('.editor-head p', dom.editor)
+    if (title) title.textContent = `预设方案 · ${count} 项 · ID ${preset.id}`
+  }
+
+  function flushAdvanced() {
+    if (state.mode !== 'advanced' || !state.advancedDirty) return true
+    return applyAdvancedDraft()
+  }
+
+  function applyAdvancedDraft() {
+    const textarea = $('#advanced-json', dom.editor)
+    if (textarea) state.advancedDraft = textarea.value
+    try {
+      const parsed = JSON.parse(state.advancedDraft)
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.categories) || !Array.isArray(parsed.groups)) {
+        throw new Error('JSON 里至少要有 groups 和 categories 两个数组')
+      }
+      state.catalog = parsed
+      state.advancedDirty = false
+      if (!categoryMap().has(state.category)) state.category = firstCategoryKey()
+      if (!cardById(state.cardId)) state.cardId = firstCardId(state.category)
+      if (!currentPreset()) state.presetId = state.catalog.presets?.[0]?.id || ''
+      renderTree()
+      renderList()
+      renderDirty()
+      notice('JSON 已应用，按 Ctrl+S 保存到服务端', 'ok')
+      return true
+    } catch (error) {
+      notice(`JSON 格式不对：${error.message || error}`, 'error')
+      return false
+    }
+  }
+
+  async function saveCatalog() {
+    if (state.saving || !state.catalog) return
+    if (!flushAdvanced()) return
+    state.saving = true
+    renderDirty()
+    try {
+      const data = await api('/api/admin/face/catalog', {
+        method: 'PUT',
+        body: {
+          catalog: state.catalog,
+          baseRevision: Number(state.catalog.revision) || 0,
+        },
+      })
+      state.catalog = data.catalog
+      state.saved = JSON.stringify(data.catalog)
+      state.advancedDraft = JSON.stringify(data.catalog, null, 2)
+      state.advancedDirty = false
+      if (!categoryMap().has(state.category)) state.category = firstCategoryKey()
+      if (!cardById(state.cardId)) state.cardId = firstCardId(state.category)
+      renderAll()
+      notice(`已保存，目录版本升到 r${state.catalog.revision}`, 'ok')
+    } catch (error) {
+      notice(`保存失败：${error.message || error}`, 'error')
+    } finally {
+      state.saving = false
+      renderDirty()
+    }
+  }
+
+  async function reloadCatalog(force = false) {
+    if (!force && !confirmDiscard('重新读取服务端目录')) return
+    state.loading = true
+    renderDirty()
+    try {
+      const data = await api('/api/admin/face/catalog')
+      state.catalog = data.catalog
+      state.saved = JSON.stringify(data.catalog)
+      state.advancedDraft = JSON.stringify(data.catalog, null, 2)
+      state.advancedDirty = false
+      state.referenceUrls.clear()
+      state.category = categoryMap().has(state.category) ? state.category : firstCategoryKey()
+      state.cardId = cardById(state.cardId) ? state.cardId : firstCardId(state.category)
+      state.presetId = currentPreset() ? state.presetId : state.catalog.presets?.[0]?.id || ''
+      renderAll()
+      notice('已从服务端重新读取', 'ok')
+    } catch (error) {
+      notice(`读取失败：${error.message || error}`, 'error')
+    } finally {
+      state.loading = false
+      renderDirty()
+    }
+  }
+
+  async function restore(kind) {
+    const label = kind === 'reset' ? '恢复默认目录' : '恢复上一版'
+    const detail = kind === 'reset'
+      ? '会把所有卡片、预设和参考图映射恢复为安装包自带版本。'
+      : '会把目录恢复到上一次保存前的状态。'
+    if (!confirm(`${label}？\n${detail}\n\n当前未保存的修改会丢失。`)) return
+    try {
+      const data = await api(`/api/admin/face/catalog/${kind === 'reset' ? 'reset' : 'restore'}`, { method: 'POST' })
+      state.catalog = data.catalog
+      state.saved = JSON.stringify(data.catalog)
+      state.advancedDraft = JSON.stringify(data.catalog, null, 2)
+      state.advancedDirty = false
+      state.referenceUrls.clear()
+      state.category = firstCategoryKey()
+      state.cardId = firstCardId(state.category)
+      state.presetId = state.catalog.presets?.[0]?.id || ''
+      renderAll()
+      notice(`${label}完成，版本 r${state.catalog.revision}`, 'ok')
+    } catch (error) {
+      notice(`${label}失败：${error.message || error}`, 'error')
+    }
+  }
+
+  function confirmDiscard(action) {
+    if (!isDirty()) return true
+    return confirm(`还有未保存的修改，继续${action}会丢掉这些修改。确定继续？`)
+  }
+
+  function importCatalog(file) {
+    if (!file) return
+    if (!confirmDiscard('导入 JSON')) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result || ''))
+        if (!parsed || !Array.isArray(parsed.categories) || !Array.isArray(parsed.groups)) {
+          throw new Error('文件里没有有效的 groups / categories')
+        }
+        state.catalog = parsed
+        state.advancedDraft = JSON.stringify(parsed, null, 2)
+        state.advancedDirty = false
+        state.category = firstCategoryKey()
+        state.cardId = firstCardId(state.category)
+        state.presetId = parsed.presets?.[0]?.id || ''
+        state.referenceUrls.clear()
+        renderAll()
+        notice('JSON 已导入到当前草稿，检查后按 Ctrl+S 保存', 'ok')
+      } catch (error) {
+        notice(`导入失败：${error.message || error}`, 'error')
+      }
+    }
+    reader.readAsText(file, 'utf-8')
+  }
+
+  function exportCatalog() {
+    if (state.mode === 'advanced' && state.advancedDirty && !applyAdvancedDraft()) return
+    const text = `${JSON.stringify(state.catalog, null, 2)}\n`
+    const blob = new Blob([text], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `face-cards-r${state.catalog.revision || 0}.json`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 3000)
+    notice('目录 JSON 已导出', 'ok')
+  }
+
+  function switchMode(mode) {
+    if (mode === state.mode) return
+    if (!flushAdvanced()) return
+    state.mode = mode
+    state.listSearch = ''
+    dom.listSearch.value = ''
+    if (mode === 'presets' && !currentPreset()) state.presetId = state.catalog.presets?.[0]?.id || ''
+    renderAll()
+  }
+
+  function selectCategory(key) {
+    state.category = key
+    state.cardId = firstCardId(key)
+    state.listSearch = ''
+    dom.listSearch.value = ''
+    renderTree()
+    renderList()
+    renderEditor()
+  }
+
+  function selectCard(id) {
+    state.cardId = id
+    renderList()
+    renderEditor()
+  }
+
+  function selectPreset(id) {
+    state.presetId = id
+    state.presetSearch = ''
+    renderList()
+    renderEditor()
+  }
+
+  function bindEvents() {
+    $$('.mode-tabs button').forEach(button => button.addEventListener('click', () => switchMode(button.dataset.mode)))
+    dom.navSearch.addEventListener('input', () => {
+      state.navSearch = dom.navSearch.value
+      renderTree()
+    })
+    dom.listSearch.addEventListener('input', () => {
+      state.listSearch = dom.listSearch.value
+      renderList()
+    })
+    dom.save.addEventListener('click', saveCatalog)
+    dom.reload.addEventListener('click', () => reloadCatalog())
+    dom.importButton.addEventListener('click', () => dom.importFile.click())
+    dom.importFile.addEventListener('change', () => {
+      const file = dom.importFile.files?.[0]
+      dom.importFile.value = ''
+      importCatalog(file)
+    })
+    dom.exportButton.addEventListener('click', exportCatalog)
+    dom.restore.addEventListener('click', () => restore('restore'))
+    dom.reset.addEventListener('click', () => restore('reset'))
+    dom.retry.addEventListener('click', boot)
+
+    dom.tree.addEventListener('click', event => {
+      const button = event.target.closest('[data-category]')
+      if (button) selectCategory(button.dataset.category)
+    })
+
+    dom.list.addEventListener('click', event => {
+      const card = event.target.closest('[data-card]')
+      if (card) return selectCard(card.dataset.card)
+      const preset = event.target.closest('[data-preset]')
+      if (preset) selectPreset(preset.dataset.preset)
+    })
+
+    dom.listActions.addEventListener('click', event => {
+      const button = event.target.closest('[data-action]')
+      if (!button) return
+      if (button.dataset.action === 'add-card') addCard()
+      else if (button.dataset.action === 'duplicate-card') duplicateCard()
+      else if (button.dataset.action === 'add-preset') addPreset()
+    })
+
+    dom.editor.addEventListener('input', event => {
+      const cardField = event.target.closest('[data-card-field]')
+      if (cardField) return updateCardField(cardField.dataset.cardField, cardField)
+      const catField = event.target.closest('[data-cat-field]')
+      if (catField) return updateCategoryField(catField.dataset.catField, catField)
+      const presetField = event.target.closest('[data-preset-field]')
+      if (presetField) return updatePresetField(presetField.dataset.presetField, presetField)
+      if (event.target.id === 'preset-search') {
+        state.presetSearch = event.target.value
+        const selection = event.target.selectionStart
+        renderEditor()
+        const next = $('#preset-search', dom.editor)
+        next?.focus()
+        if (next && selection !== null) next.setSelectionRange(selection, selection)
+        return
+      }
+      if (event.target.id === 'advanced-json') {
+        state.advancedDraft = event.target.value
+        state.advancedDirty = true
+        renderDirty()
+      }
+    })
+
+    dom.editor.addEventListener('change', event => {
+      const cardField = event.target.closest('[data-card-field]')
+      if (cardField) return updateCardField(cardField.dataset.cardField, cardField)
+      const catField = event.target.closest('[data-cat-field]')
+      if (catField) return updateCategoryField(catField.dataset.catField, catField)
+      const presetField = event.target.closest('[data-preset-field]')
+      if (presetField) return updatePresetField(presetField.dataset.presetField, presetField)
+      if (event.target.matches('[data-preset-cat]')) return togglePresetItem(event.target)
+      const fileInput = event.target.closest('[data-reference-file]')
+      if (fileInput) uploadReference(fileInput.files?.[0])
+    })
+
+    dom.editor.addEventListener('click', event => {
+      const button = event.target.closest('[data-action]')
+      if (!button) return
+      switch (button.dataset.action) {
+        case 'delete-card': deleteCard(); break
+        case 'upload-reference': $('[data-reference-file]', dom.editor)?.click(); break
+        case 'clear-reference': {
+          const card = currentCard()
+          if (!card) break
+          delete state.catalog.references[card.id]
+          renderCardEditor()
+          renderList()
+          renderDirty()
+          break
+        }
+        case 'duplicate-preset': duplicatePreset(); break
+        case 'delete-preset': deletePreset(); break
+        case 'format-json': {
+          const textarea = $('#advanced-json', dom.editor)
+          if (!textarea) break
+          try {
+            state.advancedDraft = JSON.stringify(JSON.parse(textarea.value), null, 2)
+            state.advancedDirty = true
+            renderEditor()
+            renderDirty()
+            notice('JSON 已格式化')
+          } catch (error) {
+            notice(`JSON 格式不对：${error.message || error}`, 'error')
+          }
+          break
+        }
+        case 'apply-json': applyAdvancedDraft(); break
+      }
+    })
+
+    window.addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        void saveCatalog()
+      }
+    })
+    window.addEventListener('beforeunload', event => {
+      if (!isDirty()) return
+      event.preventDefault()
+      event.returnValue = ''
+    })
+  }
+
+  bindEvents()
+  void boot()
+})()
+</script>
+</body>
+</html>

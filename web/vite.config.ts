@@ -37,6 +37,7 @@ export default defineConfig({
       input: {
         batch: 'batch.html',
         login: 'login.html',
+        face: 'face.html',
       },
     },
   },

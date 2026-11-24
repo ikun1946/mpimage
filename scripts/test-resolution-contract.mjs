@@ -50,6 +50,7 @@ const ratios = {
 
 assert.deepEqual(resolutionSupportForModel('codex/gpt-image-2').tiers, ['auto'])
 assert.match(resolutionSupportForModel('codex/gpt-image-2').note, /原生尺寸/)
+assert.equal(resolutionSupportForModel('codex/gpt-image-2').uiNote, '')
 
 const mappedComfy = {
   mapping: {
@@ -231,7 +232,7 @@ try {
   const gemini = config.imageModels.find(model => model.id === 'ai-studio/gemini-3-pro-image')
   const lite = config.imageModels.find(model => model.id === 'ai-studio/gemini-3.1-flash-lite-image')
   assert.deepEqual(codex?.resolutionTiers, ['auto'])
-  assert.match(codex?.resolutionNote || '', /原生尺寸/)
+  assert.equal(codex?.resolutionNote, '')
   assert.deepEqual(gemini?.resolutionTiers, ['auto', '1K', '2K', '4K'])
   assert.deepEqual(lite?.resolutionTiers, ['auto', '1K'])
 

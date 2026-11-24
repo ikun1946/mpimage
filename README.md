@@ -22,6 +22,7 @@ mpimage/
 │   │   │   ├── projects.ts    项目增删改查（按账号隔离）
 │   │   │   ├── styles.ts      风格库读写（按账号隔离）
 │   │   │   ├── history.ts     当前账号的生成记录
+│   │   │   ├── face.ts        捏脸卡片目录读取与管理
 │   │   │   ├── update.ts      GET /api/update/status（本机请求免登录）
 │   │   │   └── upstream.ts    上游、自定义供应商与模型改名（管理员）
 │   │   ├── app/
@@ -46,17 +47,21 @@ mpimage/
 │   │   │   │   └── rate-limiter.ts      请求限流
 │   │   │   └── products/      业务能力
 │   │   │       ├── images/    magpie / imaging / reference-images / image-title
+│   │   │       ├── face/      捏脸卡片目录存储、校验、备份与恢复
 │   │   │       ├── prompts/   prompt-optimizer / rulebook / constraints / chat-completion / image-analysis
 │   │   │       ├── styles/    style-library
 │   │   │       └── projects/  project-store
 │   │   ├── services/          持久化与外部集成：user-store / usage-store / feedback-store / traffic-store / storage / update-checker
 │   │   └── utils/             filename / password / url
+│   ├── assets/face/           捏脸种子目录与内置眼型参考图（随服务端打包）
 │   ├── package.json
 │   └── .env.example
 ├── web/                       前端：只在浏览器里跑的客户端
 │   ├── batch.html             客户端主页面（资产批量 + 自由创作）
+│   ├── face.html              捏脸工作台（复用客户端登录态）
 │   ├── login.html             登录页（登录 / 申请账号 / 首次初始化）
 │   ├── src/
+│   │   ├── face-app/          捏脸卡片、预设、提示词与带入自由创作
 │   │   ├── ui/                共享设计层：tokens.css（令牌 + 暗色）/ base.css / components.css
 │   │   ├── lib/               api.js / config.js / dom.js / guard.js / history-panel.js / prompt-tools.css
 │   │   │   ├── asset-groups.js 角色/场景分组（同一主体的不同状态/区域）
@@ -72,6 +77,7 @@ mpimage/
 ├── desktop/                   Electron：服务控制台 + 主服务进程
 │   ├── main.mjs               窗口、菜单 / 托盘、控制台状态推送、优雅退出
 │   ├── panel.html / panel-preload.cjs    服务控制台（单页：服务状态与启停、账号、上游、限流、反馈、统计）
+│   ├── face-cards.html / face-cards-preload.cjs  捏脸卡片目录编辑器
 │   ├── server.mjs             启停 server/dist/main.js（ELECTRON_RUN_AS_NODE=1），8787 探测与接管
 │   ├── updater.mjs            检查更新、解析直链后按链路自适应单流/并发下载
 │   ├── logs.html / logs-preload.cjs    运行日志窗口（读本地 logs/*.log）
@@ -84,7 +90,7 @@ mpimage/
 ├── usage.json                 生图统计与生成记录
 ├── styles/                    风格库目录（每个账号一份 <userId>.json）
 ├── logs/                      后端运行日志（按天 YYYY-MM-DD.log）
-├── data/                      运行数据（traffic.json 流量、rate-limit.json 限流、quotas.json 额度、concurrency.json 并发上限、feedback.json 意见反馈、settings.json 上游地址、sessions.json 会话）
+├── data/                      运行数据（traffic.json 流量、rate-limit.json 限流、quotas.json 额度、concurrency.json 并发上限、feedback.json 意见反馈、settings.json 上游地址、sessions.json 会话、face-cards.json 捏脸目录）
 └── generated/                 生成的图片（按资产类型分文件夹）
     ├── 角色/                   角色资产图，文件名为资产名
     ├── 场景/                   场景资产图
@@ -263,6 +269,45 @@ npm start              # 直接启动主服务
 桌面端不读 `server/.env`，改 `<数据目录>/config.env`。
 
 旧的 `启动后端.bat` / `停止服务.bat` 已移除；启动、停止、重启在桌面端菜单里做。
+
+## 捏脸工作台
+
+捏脸入口在客户端创作侧栏的「捏脸」，地址是 `/face.html`，旧地址 `/face` 会跳到新页面。
+页面沿用当前客户端登录态，角色方案和本地参考图按账号隔离保存。
+
+- **卡片目录由服务端提供**：客户端通过 `GET /api/face/catalog` 读取，不再读前端静态 JSON。
+  默认种子有 484 张特征卡片、46 个维度、14 套预设和 16 张眼型参考图。
+- **服务端资产随安装包走**：`server/assets/face/` 会复制到 `server/dist/assets/face/`，
+  打包时随 `server/dist` 一起进入安装包；内置参考图通过 `/face-assets/*` 提供。
+- **桌面端直接编辑**：控制台「统计与维护」里的「捏脸卡片…」或应用菜单打开独立编辑窗口。
+  可以改维度、卡片、提示词、预设、参考图、显隐和排序；高级 JSON 页可以改负向词、
+  冲突规则、视觉风格和整份结构。
+- **保存即生效**：目录写到运行数据目录的 `data/face-cards.json`，客户端下次读取或聚焦页面时更新。
+  每次保存前先校验并自动保留最近 5 份备份，可以「恢复上一版」或「恢复默认」。
+- **内置卡片只隐藏不删除**：避免旧方案里的卡片 ID 失效；管理员新增或复制出来的卡片可以删除，
+  删除时会同步清理预设、参考图和冲突规则里的引用。
+- **带入自由创作**：捏脸页只负责组合提示词，不会直接生图；点「带入自由创作」后回到批量页，
+  自动切到自由创作并挂上正面提示词、负向词和参考图。
+- **参考图上传属于运行数据**：管理员在编辑窗口上传的图片走 `/api/reference-images`，
+  只把 `参考图/...` 相对路径写进目录，不会打进全新安装包。
+
+目录接口：
+
+```text
+GET  /api/face/catalog               登录用户：可见卡片、预设和参考图映射
+GET  /api/face/catalog/meta          登录用户：revision 与数量，客户端用来判断是否刷新
+GET  /api/admin/face/catalog         管理员：完整目录（含隐藏项）
+PUT  /api/admin/face/catalog         管理员：保存整份目录，body 带 baseRevision 防覆盖
+POST /api/admin/face/catalog/reset   管理员：恢复安装包自带目录
+POST /api/admin/face/catalog/restore 管理员：恢复上一份保存前备份
+```
+
+验证命令：
+
+```powershell
+npm run test:face
+npm run test:face:ui
+```
 
 ## 接口契约
 

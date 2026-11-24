@@ -3204,6 +3204,7 @@
 
   <div class="tools page" data-page-panel="stats" role="group" aria-labelledby="maint-title">
     <span class="sr-only" id="maint-title">维护</span>
+    <button class="button mini" type="button" id="btn-face-cards">捏脸卡片…</button>
     <button class="button mini" type="button" id="btn-logs">运行日志…</button>
     <button class="button mini" type="button" id="btn-update">检查更新…</button>
     <button class="button mini" type="button" id="btn-open-data">打开数据目录</button>
@@ -3440,6 +3441,7 @@
     trendToggle: $('trend-toggle'),
     trendToggleText: $('trend-toggle-text'),
     btnLogs: $('btn-logs'),
+    btnFaceCards: $('btn-face-cards'),
     btnUpdate: $('btn-update'),
     btnData: $('btn-open-data'),
     btnLogDir: $('btn-open-logs'),
@@ -3522,6 +3524,8 @@
   // ---------- 上游模型下拉 ----------
   /** 下拉里代表「手填模型 ID」的哨兵值，真正的模型 ID 不可能撞上它 */
   const CUSTOM_MODEL_VALUE = '__custom__'
+  /** 标题模型下拉里的「关闭」：不调用模型，卡片标题改用本地短名 */
+  const TITLE_MODEL_DISABLED = '__off__'
   /** 上游返回的模型列表，每项 { id, capabilities } */
   let upstreamModels = []
   /** 已保存的模型覆写值；下拉里找不到它时补一条「xxx · 已保存」 */
@@ -4715,7 +4719,9 @@
     dom.upstreamUrl.value = data.baseUrl || ''
     upstreamSavedTextModel = String(data.textModelOverride || '').trim()
     upstreamEffectiveTextModel = String(data.textModel || '').trim()
-    upstreamSavedTitleModel = String(data.titleModelOverride || '').trim()
+    upstreamSavedTitleModel = data.titleModelDisabled
+      ? TITLE_MODEL_DISABLED
+      : String(data.titleModelOverride || '').trim()
     upstreamSavedImageModel = String(data.imageModelOverride || '').trim()
     upstreamEffectiveImageModel = String(data.imageModel || data.model || '').trim()
     upstreamImageModels = Array.isArray(data.imageModels) ? data.imageModels : []
@@ -4822,7 +4828,7 @@
     return selected.trim()
   }
 
-  /** 重画「卡片标题模型」下拉：跟随优化模型 → 上游模型 → 已保存 → 自定义 */
+  /** 重画「卡片标题模型」下拉：跟随优化模型 → 关闭 → 上游模型 → 已保存 → 自定义 */
   function renderUpstreamTitleModelOptions() {
     const definitions = [{
       value: '',
@@ -4832,6 +4838,12 @@
       short: '跟随提示词优化模型',
       badge: '默认',
     }]
+    definitions.push({
+      value: TITLE_MODEL_DISABLED,
+      label: '关闭（不调用 AI 命名）',
+      short: '关闭自动命名',
+      badge: '省 token',
+    })
 
     for (const model of upstreamModels) {
       const vision = model.capabilities ? model.capabilities.vision : null
@@ -4843,7 +4855,11 @@
       })
     }
 
-    if (upstreamSavedTitleModel && !upstreamModels.some(model => model.id === upstreamSavedTitleModel)) {
+    if (
+      upstreamSavedTitleModel &&
+      upstreamSavedTitleModel !== TITLE_MODEL_DISABLED &&
+      !upstreamModels.some(model => model.id === upstreamSavedTitleModel)
+    ) {
       definitions.push({
         value: upstreamSavedTitleModel,
         label: upstreamSavedTitleModel,
@@ -4856,7 +4872,12 @@
     const wanted = upstreamTitleModelSelection === null ? upstreamSavedTitleModel : upstreamTitleModelSelection
     writeModelOptions(dom.upstreamTitleModel, definitions, wanted)
     if (dom.upstreamTitleSource) {
-      dom.upstreamTitleSource.textContent = upstreamSavedTitleModel ? '独立设置' : '跟随优化模型'
+      dom.upstreamTitleSource.textContent =
+        upstreamSavedTitleModel === TITLE_MODEL_DISABLED
+          ? '已关闭'
+          : upstreamSavedTitleModel
+            ? '独立设置'
+            : '跟随优化模型'
     }
     syncTitleModelInput()
     renderUpstreamTitleModelStatus()
@@ -4881,9 +4902,11 @@
     const chosen = currentTitleModelValue()
     setCurrent(
       dom.upstreamTitleModelStatus,
-      chosen
-        ? `标题将使用 ${chosen}`
-        : `跟随提示词优化模型：${upstreamEffectiveTextModel || '未设置'}`,
+      chosen === TITLE_MODEL_DISABLED
+        ? '已关闭：卡片标题直接用提示词生成短名，不调用模型'
+        : chosen
+          ? `标题将使用 ${chosen}`
+          : `跟随提示词优化模型：${upstreamEffectiveTextModel || '未设置'}`,
     )
   }
 
@@ -7094,6 +7117,7 @@
       })
     }
 
+    dom.btnFaceCards.addEventListener('click', () => runMaintAction('open-face-cards', '打开捏脸卡片', dom.btnFaceCards))
     dom.btnLogs.addEventListener('click', () => runMaintAction('open-log-window', '打开日志窗口', dom.btnLogs))
     dom.btnUpdate.addEventListener('click', () => runMaintAction('check-update', '检查更新', dom.btnUpdate))
     dom.btnData.addEventListener('click', () => runMaintAction('open-data', '打开数据目录', dom.btnData))

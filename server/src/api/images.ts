@@ -21,7 +21,11 @@ import { comfyGate, requestComfyImage } from '../app/products/images/comfyui.js'
 import { comfyLifecycle } from '../app/products/images/comfy-lifecycle.js'
 import type { RealtimeMonitor } from '../services/realtime-monitor.js'
 import { detectImageType, readImageSize } from '../app/products/images/imaging.js'
-import { generateImageTitle, titleForImage } from '../app/products/images/image-title.js'
+import {
+  fallbackImageTitle,
+  generateImageTitle,
+  titleForImage,
+} from '../app/products/images/image-title.js'
 import type { RequestLogStore } from '../services/request-log-store.js'
 import { MAX_REFERENCE_IMAGES, loadReferenceImages } from '../app/products/images/reference-images.js'
 import { REFERENCE_CATEGORY, type ImageStorage } from '../services/storage.js'
@@ -360,6 +364,7 @@ export function registerImageRoutes(
           typeof body.titlePrompt === 'string' && body.titlePrompt.trim()
             ? body.titlePrompt.trim()
             : prompt
+        if (deps.settings.isTitleModelDisabled()) return fallbackImageTitle(titleSource)
         return await generateImageTitle(
           {
             baseUrl: await deps.settings.getBaseUrl(),

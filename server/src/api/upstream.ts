@@ -244,6 +244,7 @@ export function registerUpstreamRoutes(
       titleModel: await deps.settings.getTitleModel(),
       titleModelOverride: deps.settings.getTitleModelOverride(),
       titleModelFromSettings: deps.settings.isTitleModelFromSettings(),
+      titleModelDisabled: deps.settings.isTitleModelDisabled(),
       /** 生效中的生图模型（可能是 MAGPIE_IMAGE_MODEL 默认值） */
       imageModel: deps.settings.getImageModel(),
       imageModelOverride: deps.settings.getImageModelOverride(),
@@ -395,6 +396,7 @@ export function registerUpstreamRoutes(
       titleModel: await deps.settings.getTitleModel(),
       titleModelOverride: deps.settings.getTitleModelOverride(),
       titleModelFromSettings: deps.settings.isTitleModelFromSettings(),
+      titleModelDisabled: deps.settings.isTitleModelDisabled(),
       imageModel: deps.settings.getImageModel(),
       imageModelOverride: deps.settings.getImageModelOverride(),
       imageModelFromSettings: deps.settings.isImageModelFromSettings(),

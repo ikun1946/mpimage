@@ -11,10 +11,26 @@ import type { FastifyInstance } from 'fastify'
 export async function registerStaticRoutes(
   app: FastifyInstance,
   webDirectory: string,
+  faceAssetsDirectory?: string,
 ): Promise<void> {
   let registered = false
 
   try {
+    if (faceAssetsDirectory) {
+      try {
+        await access(faceAssetsDirectory)
+        await app.register(fastifyStatic, {
+          root: faceAssetsDirectory,
+          prefix: '/face-assets/',
+          decorateReply: false,
+          cacheControl: true,
+          maxAge: '1d',
+        })
+      } catch {
+        app.log.warn(`未找到捏脸服务端资产 ${faceAssetsDirectory}，内置参考图将不可用`)
+      }
+    }
+
     await access(join(webDirectory, 'batch.html'))
     await app.register(fastifyStatic, {
       root: webDirectory,
@@ -29,6 +45,7 @@ export async function registerStaticRoutes(
     app.get('/studio', async (_request, reply) => reply.redirect('/batch.html'))
     app.get('/index.html', async (_request, reply) => reply.redirect('/batch.html'))
     app.get('/login', async (_request, reply) => reply.redirect('/login.html'))
+    app.get('/face', async (_request, reply) => reply.redirect('/face.html'))
     app.get('/admin', async (_request, reply) => reply.redirect('/admin.html'))
   } catch (error) {
     app.log.warn(
@@ -44,6 +61,6 @@ export async function registerStaticRoutes(
     return
   }
 
-  // 根路径即批量工作台（唯一客户端）
+  // 根路径即创作工作台；捏脸是同一客户端里的独立页面
   app.get('/', async (_request, reply) => reply.redirect('/batch.html'))
 }

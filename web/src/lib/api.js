@@ -73,6 +73,16 @@ export function fetchServerConfig() {
   return request('/api/config', { method: 'GET' })
 }
 
+// ---------- 捏脸卡片目录 ----------
+
+export function fetchFaceCatalog() {
+  return request('/api/face/catalog', { method: 'GET' })
+}
+
+export function fetchFaceCatalogMeta() {
+  return request('/api/face/catalog/meta', { method: 'GET' })
+}
+
 export function fetchHealth() {
   return request('/api/health', { method: 'GET' })
 }

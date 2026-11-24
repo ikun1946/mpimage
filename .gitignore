@@ -20,6 +20,10 @@ styles.json
 styles/
 data/
 
+# 捏脸工作台的 CSS 是源码，不是每账号风格库
+!web/src/face-app/styles/
+!web/src/face-app/styles/**
+
 # 本地工具产物（钩子状态、扫描报告等）
 .mimosa/
 

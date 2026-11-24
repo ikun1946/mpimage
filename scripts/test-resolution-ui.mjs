@@ -143,6 +143,12 @@ try {
     return true
   })()`)
   await waitForPage(() => evalJs(`location.pathname === '/batch.html' && document.querySelectorAll('#free-model option').length > 1`))
+  assert.equal(await fetch(`${base}/face.html`).then(response => response.status), 200)
+  assert.equal(
+    await fetch(`${base}/face`, { redirect: 'manual' }).then(response => response.status),
+    302,
+  )
+  assert.equal(await evalJs(`Boolean(document.querySelector('#tab-face'))`), true)
   await evalJs(`document.querySelector('#tab-free')?.click(); true`)
   await waitForPage(() => evalJs(`document.querySelector('#free-resolution') && !document.querySelector('#free-resolution').closest('[hidden]')`))
 
@@ -152,11 +158,13 @@ try {
       options: [...select.options].map(option => option.textContent),
       value: select.value,
       note: document.querySelector('#free-resolution-note')?.textContent || '',
+      noteHidden: document.querySelector('#free-resolution-note')?.hidden ?? false,
     }
   })()`)
   assert.deepEqual(codexUi.options, ['自动（仅模型原生尺寸）'])
   assert.equal(codexUi.value, 'auto')
-  assert.match(codexUi.note, /原生尺寸/)
+  assert.equal(codexUi.note, '')
+  assert.equal(codexUi.noteHidden, true)
 
   await evalJs(`(() => {
     const select = document.querySelector('#free-model')
@@ -223,6 +231,88 @@ try {
   await setSelect('#free-ratio', '1:1')
   await clickSubmit()
   await waitForPage(() => evalJs(`document.querySelector('#free-status').textContent.includes('1254 × 1254')`), 20_000)
+
+  // 多图单视图：右上角工具栏和左右切换控件必须始终在牌堆/切图动画之上
+  await setSelect('#free-image-count', '4')
+  await clickSubmit()
+  await waitForPage(
+    () => evalJs(`document.querySelector('#free-status').textContent.includes('4 张')`),
+    30_000,
+  )
+  await new Promise(resolve => setTimeout(resolve, 800))
+  await evalJs(`document.querySelector('[data-result-view="single"]').click(); true`)
+  await waitForPage(() => evalJs(`!document.querySelector('#free-single').hidden`))
+
+  const singleLayer = await evalJs(`(() => {
+    const preview = document.querySelector('#free-preview')
+    preview.classList.add('tools-near')
+    document.querySelector('#free-single').classList.add('show-right')
+    const button = document.querySelector('#free-maximize')
+    const arrow = document.querySelector('.free-single-flip.right')
+    const buttonRect = button.getBoundingClientRect()
+    const arrowRect = arrow.getBoundingClientRect()
+    const buttonHit = document.elementFromPoint(
+      buttonRect.left + buttonRect.width / 2,
+      buttonRect.top + buttonRect.height / 2,
+    )
+    const arrowHit = document.elementFromPoint(
+      arrowRect.left + arrowRect.width / 2,
+      arrowRect.top + arrowRect.height / 2,
+    )
+    return {
+      cards: document.querySelectorAll('.free-single-card').length,
+      count: document.querySelector('#free-single-count')?.textContent || '',
+      buttonOnTop: Boolean(buttonHit?.closest('#free-maximize')),
+      arrowOnTop: Boolean(arrowHit?.closest('[data-single-step="1"]')),
+      buttonLayer: getComputedStyle(button.closest('.image-tools')).zIndex,
+      arrowLayer: getComputedStyle(arrow).zIndex,
+    }
+  })()`)
+  assert.equal(singleLayer.cards, 4)
+  assert.equal(singleLayer.count, '1 / 4')
+  assert.equal(singleLayer.buttonOnTop, true)
+  assert.equal(singleLayer.arrowOnTop, true)
+  assert.ok(Number(singleLayer.buttonLayer) > 30)
+  assert.ok(Number(singleLayer.arrowLayer) > 30)
+  await new Promise(resolve => setTimeout(resolve, 250))
+  const singleLayerShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(
+    join(runDir, 'free-single-multi.png'),
+    Buffer.from(singleLayerShot.data, 'base64'),
+  )
+
+  await evalJs(`document.querySelector('#free-single-deck [data-single-step="1"]').click(); true`)
+  const switchingLayer = await evalJs(`(() => {
+    const preview = document.querySelector('#free-preview')
+    preview.classList.add('tools-near')
+    document.querySelector('#free-single').classList.add('show-right')
+    const button = document.querySelector('#free-maximize')
+    const arrow = document.querySelector('.free-single-flip.right')
+    const buttonRect = button.getBoundingClientRect()
+    const arrowRect = arrow.getBoundingClientRect()
+    const buttonHit = document.elementFromPoint(
+      buttonRect.left + buttonRect.width / 2,
+      buttonRect.top + buttonRect.height / 2,
+    )
+    const arrowHit = document.elementFromPoint(
+      arrowRect.left + arrowRect.width / 2,
+      arrowRect.top + arrowRect.height / 2,
+    )
+    return {
+      animating: [...document.querySelectorAll('.free-single-card')].some(
+        card => Number(getComputedStyle(card).zIndex) >= 29,
+      ),
+      buttonOnTop: Boolean(buttonHit?.closest('#free-maximize')),
+      arrowOnTop: Boolean(arrowHit?.closest('[data-single-step="1"]')),
+    }
+  })()`)
+  assert.equal(switchingLayer.animating, true)
+  assert.equal(switchingLayer.buttonOnTop, true)
+  assert.equal(switchingLayer.arrowOnTop, true)
+  await waitForPage(
+    () => evalJs(`document.querySelector('#free-single-count')?.textContent === '2 / 4'`),
+    3_000,
+  )
 
   // 批量入口：用同一个服务端能力表，不应该给 Codex 显示 1K/2K/4K
   const project = await evalJs(`fetch('/api/projects', {
@@ -294,11 +384,13 @@ try {
   assert.equal(upstreamRequests.at(-1)?.resolution, '1K')
 
   console.log('✓ 页面默认 Codex：分辨率下拉只有“自动（仅模型原生尺寸）”')
+  console.log('✓ 捏脸入口、独立页面与旧地址跳转均正常')
   console.log('✓ 切到 Gemini：1K/2K/4K 正常出现，并显示目标像素')
   console.log('✓ 16:9 1K → 1024×576、4K → 4096×2304、2K → 2048×1152')
   console.log('✓ 上游回落时页面显示“分辨率未按请求生效”并弹明确提示')
   console.log('✓ 切回 Codex：明确提示不支持 1K，自动落到 auto')
   console.log('✓ Codex 自动：页面收到并显示 1254×1254')
+  console.log('✓ 多图单视图：右上角工具栏与切图箭头在牌堆和动画之上')
   console.log('✓ 批量入口与自由创作使用同一套分辨率白名单')
   console.log('✓ 批量生成 16:9 1K：上游收到 size=16:9、resolution=1K，页面显示 1024×576')
   console.log(`测试日志：${runDir}`)

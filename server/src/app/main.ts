@@ -1,5 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
@@ -16,6 +17,7 @@ import { registerAdminRoutes } from '../api/admin.js'
 import { registerAuthRoutes, resolveAuth } from '../api/auth.js'
 import { registerComfyRoutes } from '../api/comfy.js'
 import { registerFeedbackRoutes } from '../api/feedback.js'
+import { registerFaceRoutes } from '../api/face.js'
 import { registerFileRoutes } from '../api/files.js'
 import { registerUploadRoutes } from '../api/uploads.js'
 import { registerHistoryRoutes } from '../api/history.js'
@@ -34,6 +36,7 @@ import { registerStyleRoutes } from '../api/styles.js'
 import { registerUpstreamRoutes } from '../api/upstream.js'
 import { registerUpdateRoutes } from '../api/update.js'
 import { ProjectStore } from './products/projects/project-store.js'
+import { FaceCatalogStore } from './products/face/catalog-store.js'
 import { LocalFileStorage } from '../services/storage.js'
 import { SettingsStore } from './control/settings-store.js'
 import { StyleLibraryStore } from './products/styles/style-library.js'
@@ -81,6 +84,10 @@ const styleLibraryRoot = config.styleLibraryPath
 const webDirectory = config.webDistDir
   ? resolvePath(config.webDistDir)
   : join(projectRoot, 'web', 'dist')
+const faceAssetsDirectory = [
+  join(projectRoot, 'server', 'dist', 'assets', 'face'),
+  join(projectRoot, 'server', 'assets', 'face'),
+].find(candidate => existsSync(candidate)) || join(projectRoot, 'server', 'assets', 'face')
 
 await mkdir(storageDirectory, { recursive: true })
 
@@ -158,6 +165,8 @@ const users = new UserStore(userDatabasePath)
 const usage = new UsageStore(usageDatabasePath)
 // 运行期数据目录：流量、限流、额度、登录会话都放这里
 const dataDir = config.dataDir ? resolvePath(config.dataDir) : join(projectRoot, 'data')
+const faceCatalog = new FaceCatalogStore(dataDir, join(faceAssetsDirectory, 'catalog-seed.json'))
+await faceCatalog.init()
 // 会话落盘：重启服务、停用后再启动都保持登录状态
 const sessions = new SessionStore(
   config.sessionSecret || randomBytes(32).toString('hex'),
@@ -288,6 +297,7 @@ registerMonitorRoutes(app, {
   requestLog,
 })
 registerFeedbackRoutes(app, { feedback })
+registerFaceRoutes(app, { store: faceCatalog })
 registerUpstreamRoutes(app, { settings })
 registerComfyRoutes(app, { settings })
 registerUpdateRoutes(app, { checker: updateChecker })
@@ -339,7 +349,7 @@ app.setErrorHandler((error, request, reply) => {
     .send({ error: '服务内部错误，请查看后端日志', code: 'INTERNAL_ERROR' })
 })
 
-await registerStaticRoutes(app, webDirectory)
+await registerStaticRoutes(app, webDirectory, faceAssetsDirectory)
 
 // Fastify 关闭时同步关掉日志流，保证最后几行不丢（addHook 必须在 listen 之前注册）
 app.addHook('onClose', async () => {

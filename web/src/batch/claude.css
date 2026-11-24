@@ -476,7 +476,8 @@ body[data-mode="create"] .app-main main {
   position: absolute;
   top: 0;
   bottom: 0;
-  z-index: 7;
+  /* 始终压在牌堆和切图动画（29/30）之上，悬停和点击才不会被卡片截走 */
+  z-index: 39;
   width: 96px;
   padding: 0;
   border: 0;
@@ -507,7 +508,8 @@ body[data-mode="create"] .app-main main {
 #panel-free .free-single-flip {
   position: absolute;
   top: 50%;
-  z-index: 6;
+  /* 切图时当前卡会临时升到 30，箭头必须留在它上面，避免闪一下被盖住 */
+  z-index: 38;
   display: grid;
   width: 54px;
   height: 54px;
@@ -577,7 +579,7 @@ body[data-mode="create"] .app-main main {
   position: absolute;
   top: 18px;
   left: 18px;
-  z-index: 5;
+  z-index: 37;
   display: inline-flex;
   height: 26px;
   align-items: center;
@@ -596,7 +598,7 @@ body[data-mode="create"] .app-main main {
   position: absolute;
   bottom: 14px;
   left: 50%;
-  z-index: 5;
+  z-index: 37;
   display: flex;
   height: 30px;
   align-items: center;

@@ -96,6 +96,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
     let currentUserId = ''
     const storageKey = () => `moying.assetStudio.v2.${currentUserId}`
     const pendingJobKey = () => `moying.pendingJob.v2.${currentUserId}`
+    const FACE_HANDOFF_PREFIX = 'huajing.faceStudio.handoff.v1.'
     /* 断线恢复相关的定时器必须在初始化调用之前声明，
        否则函数被提前调用时会撞上暂时性死区（TDZ）而静默失败 */
     let resumeTimer = 0
@@ -455,7 +456,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
         }
         // 自由创作/风格设定不依赖资产，刷新后停留在用户离开的页签；
         // 资产类页签在无资产时回落到导入页
-        // 旧快照可能停在已下线的捏脸页，统一回落到自由创作
+        // 旧快照里的 face 是已下线的嵌入页，统一回落到自由创作
         const restoredTab = saved.activeTab === 'face' ? 'free' : saved.activeTab
         if (['free', 'style'].includes(restoredTab)) {
           state.activeTab = restoredTab
@@ -3866,6 +3867,49 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       }
     }
 
+    /** 从捏脸页回来：只接提示词，不把卡片或图片参数带进生图请求。 */
+    function adoptFaceStudioHandoff() {
+      if (!currentUserId) return false
+      const key = `${FACE_HANDOFF_PREFIX}${currentUserId}`
+      let raw = ''
+      try {
+        raw = localStorage.getItem(key) || ''
+        if (raw) localStorage.removeItem(key)
+      } catch {}
+      if (!raw) return false
+
+      try {
+        const payload = JSON.parse(raw)
+        const prompt = typeof payload?.prompt === 'string' ? payload.prompt.trim() : ''
+        if (!prompt) return false
+        const negative = typeof payload?.negative === 'string' ? payload.negative.trim() : ''
+        const negativeBlock = negative
+          ? `\n\n${/[\u4e00-\u9fff]/.test(negative) ? '【不要出现】' : 'Do not include:'}\n${negative}`
+          : ''
+        const next = `${prompt}${negativeBlock}`
+        if (next.length > 12000) {
+          showToast('捏脸提示词超过当前上限，已保留在捏脸页，请精简后再带入', true)
+          return false
+        }
+        const previous = state.freePrompt
+        state.activeTab = 'free'
+        applyFreePrompt(next)
+        persistSoon()
+        showToast(
+          `${payload?.schemeName ? `已带入「${payload.schemeName}」` : '已带入捏脸提示词'}${negative ? '（负向约束附在末尾）' : ''}`,
+          false,
+          {
+            label: '撤销',
+            onClick: () => applyFreePrompt(previous),
+          },
+        )
+        return true
+      } catch (error) {
+        console.warn('捏脸提示词交接失败', error)
+        return false
+      }
+    }
+
     /* ===== 改写提示词 =====
        用户说一句「把夜景改成清晨」，模型输出整条新提示词。
        可以带上当前参考图和上一次生成的结果图，让改动接得上画面现状。 */
@@ -6096,6 +6140,26 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
 
       dom.freeForm.addEventListener('submit', generateFreeImage)
 
+      // 捏脸是独立页面：离开前先落本地快照和当前项目，刚打的字不留在防抖定时器里。
+      document.getElementById('tab-face')?.addEventListener('click', event => {
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        ) return
+        event.preventDefault()
+        persist()
+        const href = event.currentTarget.href
+        void saveCurrentProject()
+          .catch(() => {})
+          .finally(() => {
+            window.location.href = href
+          })
+      })
+
       // 自由创作风格：编辑当前风格、弹窗保存/删除/关闭
       dom.freeStyleEdit.addEventListener('click', () => {
         if (state.freeStyleId) openFreeStyleModal(state.freeStyleId)
@@ -6686,6 +6750,7 @@ import { enhanceMenuSelect, refreshMenuSelect } from '../lib/menu-select.js'
       await adoptLegacySnapshotIfOwned()
       await adoptLegacyPendingJobIfOwned()
       restoreState()
+      adoptFaceStudioHandoff()
       // 外观偏好存在独立键里；首屏脚本已经定过一次，这里同步设置里的选中态
       initTheme()
       // 比例下拉先按本地选择渲染；服务端配置到达后再刷一次

@@ -9,6 +9,10 @@
   scrollbar-width: none;
 }
 
+.tabs a.tab {
+  text-decoration: none;
+}
+
 .tabs::-webkit-scrollbar {
   display: none;
 }

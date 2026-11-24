@@ -28,10 +28,13 @@ const TITLE_SYSTEM_PROMPT = [
   '3. 不要用「一位」「一个」「一名」「这幅」「这张」「画面」「图中」开头。',
   '4. 不要写纯风格词（高清、超清、写实、电影感、唯美、高级感、壁纸、插画）。',
   '5. 名字要具体：宁可写「竹筏渔火」，也不要写「美丽夜景」。',
+  '6. 不要把操作说明当名字：「保持不变」「改为」「参考图」「图片1」「其余不变」都不是名字。',
+  '7. 名字必须能让人想到具体主体、场景或状态，不能只写「不变」「修改」「调整」「参考」这类抽象词。',
 ].join('\n')
 
 const TITLE_REPAIR_PROMPT = [
   '上一个名字不合格：它要么照抄了提示词，要么太长/太短，要么只是风格词，总之不像名字。',
+  '如果它写成了「不变」「保持」「修改」「图片1」这类操作说明，也不算名字。',
   '请重新起名：先在心里找出「主体」和「场景/动作」，再把它们合成 2 到 6 个汉字。',
   '只输出这个名字，不要任何解释、编号或标点。',
 ].join('\n')
@@ -84,6 +87,9 @@ const TITLE_COUNTER_LEAD =
 const BAD_TITLE_ENDINGS = /[站坐卧倚立在的着了是和与而并把被从向于]/
 /** 标题里出现这些词，说明写成了句子 */
 const BAD_TITLE_WORDS = /(正在|已经|然后|并且|以及|同时|这是|那是)/
+/** 操作说明、参考关系、状态约束不是画面名 */
+const INSTRUCTION_TITLE_PATTERN =
+  /^(?:图|图片|参考|保持|修改|调整|其余|其他|将|把|不变|按|按照|根据|基于|使用|提示词)|(?:不变|保持|相同|一致|原样|改为|改成)$/
 
 const GENERIC_LEADS = [
   '一位', '一个', '一名', '一幅', '一张', '这只', '这位',
@@ -95,6 +101,8 @@ const STYLE_ONLY_TITLES = new Set([
   '高清', '超清', '超高清', '高清壁纸', '写实', '写实风', '唯美', '唯美风',
   '电影感', '高级感', '质感', '画质', '壁纸', '插画', '摄影', '特写',
   '纯色背景', '白色背景', '人像', '人物', '美女', '帅哥', '风景', '画面',
+  '服装', '衣服', '服饰', '发型', '头发', '光影', '背景', '场景', '角色',
+  '面部', '五官', '面容', '效果', '修改', '调整', '参考',
 ])
 
 /** 标题是否真的像名字：长度 2–7（英文 16）、不是提示词句首、不是泛泛的开头 */
@@ -110,6 +118,7 @@ export function isUsableImageTitle(
   if (TITLE_COUNTER_LEAD.test(title)) return false
   if (BAD_TITLE_WORDS.test(title)) return false
   if (BAD_TITLE_ENDINGS.test(title)) return false
+  if (INSTRUCTION_TITLE_PATTERN.test(title)) return false
   // 兜底本来就是从提示词里切的，「是提示词前缀」不算错；模型输出才算抄
   if (!options.allowPromptPrefix && looksCopiedFromPrompt(title, prompt)) return false
   return true
@@ -118,6 +127,10 @@ export function isUsableImageTitle(
 /** 提示词里的技术参数、风格套话：这些分句不适合拿来命名 */
 const TECHNICAL_CLAUSE =
   /(分辨率|像素|画质|镜头|视角|景深|焦段|构图|光线|光影|色调|色彩|饱和度|风格|材质|渲染|笔刷|比例|横版|竖版|方图|正方形|纯色|无缝|背景色|留白|不要|禁止|要求|参考图|提示词|尺寸|画面底部|画幅|画面主体|中轴线)/
+
+/** 修改要求、参考图坐标与“保持不变”的约束，不适合拿来当标题 */
+const INSTRUCTION_CLAUSE =
+  /(严格参考|只参考|参考图|图片\s*[一二三四五六七八九十\d]|图\s*[一二三四五六七八九十\d]|改为|改成|换成|替换|去掉|删除|保持.{0,8}不变|其余.{0,4}不变|其他.{0,4}不变|按以下|按照|根据|基于|提示词|修改图片|调整图片)/
 
 /** 分句开头的套话：「画面是一位」「图中」「描绘了」… */
 const CLAUSE_LEAD =
@@ -131,6 +144,33 @@ const PLACE_MARK =
   /(?:独立在|行走在|漫步在|站立在|站在|立在|坐在|卧在|躺在|趴在|蹲在|走在|立于|位于|置身于?|停在|飘在|浮在|悬在)/
 /** 地点说到哪儿为止：园林的/窗台上/荷塘里 */
 const PLACE_TAIL = /(?:的|之|里|中|间|旁|前|后|下|上)/
+
+/** 整条提示词都在讲怎么改图时，用被修改的对象生成一个明确的短名 */
+const INSTRUCTION_TITLE_HINTS: Array<{ pattern: RegExp; title: string }> = [
+  { pattern: /脸型|五官|面部|长相|容貌/, title: '面部调整' },
+  { pattern: /服装|衣服|服饰|穿搭|衣裙|裙子|旗袍|外套/, title: '服装调整' },
+  { pattern: /发型|头发|发髻|发饰|刘海|马尾/, title: '发型调整' },
+  { pattern: /光影|光线|灯光|色调|氛围/, title: '光影调整' },
+  { pattern: /背景|场景|环境|空间/, title: '场景调整' },
+  { pattern: /姿势|动作|站姿|坐姿/, title: '姿态调整' },
+  { pattern: /画幅|比例|构图|视角/, title: '构图调整' },
+]
+
+function instructionFallbackTitle(prompt: string): string {
+  if (!INSTRUCTION_CLAUSE.test(prompt)) return ''
+  let best: { title: string; index: number; targeted: boolean } | null = null
+  for (const item of INSTRUCTION_TITLE_HINTS) {
+    const match = item.pattern.exec(prompt)
+    if (!match || match.index === undefined) continue
+    // “将衣服改成…”里的衣服是本次修改对象；“脸型保持不变”只是附带约束。
+    const nearby = prompt.slice(Math.max(0, match.index - 20), match.index)
+    const targeted = /(?:将|把|给|为|修改|调整|更换|换|改)[^，。；\n]{0,20}$/.test(nearby)
+    if (!best || (targeted && !best.targeted) || (targeted === best.targeted && match.index < best.index)) {
+      best = { title: item.title, index: match.index, targeted }
+    }
+  }
+  return best?.title || '画面修改'
+}
 
 /** 剥掉套话与量词，长修饰语只留中心词：「月下的白鹿」→「月下白鹿」 */
 function normalizeSubject(raw: string): string {
@@ -190,11 +230,13 @@ export function fallbackImageTitle(prompt: string): string {
     return latinTitle(clauses[0] ?? '') || '未命名'
   }
 
-  const useful = clauses
+  const cleanedClauses = clauses
     .map(part => part.replace(/^(?:\d+[kK]|\d+:\d+)\s*/, ''))
     .filter(Boolean)
-    .filter(part => !TECHNICAL_CLAUSE.test(part))
-  const pool = useful.length ? useful : clauses
+  const useful = cleanedClauses.filter(
+    part => !TECHNICAL_CLAUSE.test(part) && !INSTRUCTION_CLAUSE.test(part),
+  )
+  const pool = useful.length ? useful : cleanedClauses
 
   for (const clause of pool.slice(0, 5)) {
     const mark = clause.match(PLACE_MARK)
@@ -226,16 +268,22 @@ export function fallbackImageTitle(prompt: string): string {
     }
   }
 
-  const cleaned = pool
+  // 改图类提示词经常通篇都是“参考图片 / 改成 / 其余不变”，
+  // 这种没有主体句时按被修改的对象命名，避免切出「不变」「其他不变」。
+  const instructionTitle = instructionFallbackTitle(source)
+  if (instructionTitle) return instructionTitle
+
+  const cleaned = (useful.length ? useful : clauses)
     .map(part => part.replace(CLAUSE_LEAD, '').replace(TITLE_COUNTER_LEAD, '').replace(FALLBACK_STOPWORDS, ''))
     .map(part => part.trim())
     .find(part => part.length >= 2)
 
   const short = sanitizeImageTitle(cleaned || '')
-  if (short) return short
+  if (short && isUsableImageTitle(short, source, { allowPromptPrefix: true })) return short
   // 提示词本身只有一个字（猫、鹤）：用它比「未命名」强
-  const single = [...cleanImageTitle(source)].slice(0, IMAGE_TITLE_MAX_CHARS).join('')
-  return single || '未命名'
+  const single = sanitizeImageTitle(source)
+  if (single && isUsableImageTitle(single, source, { allowPromptPrefix: true })) return single
+  return '未命名'
 }
 
 const TITLE_MARKS = '①②③④⑤⑥⑦⑧⑨⑩'

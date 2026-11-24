@@ -263,6 +263,9 @@ ipcMain.handle('panel:action', async (_event, name, payload) => {
     case 'open-log-window':
       openLogWindow()
       return { ok: true, message: '' }
+    case 'open-face-cards':
+      openFaceCardsWindow()
+      return { ok: true, message: '' }
     case 'check-update':
       void checkUpdates()
       return { ok: true, message: '正在检查更新…' }
@@ -316,6 +319,7 @@ async function pushPanelState(force = false) {
 
 /* ===== 运行日志窗口：直接读 LOG_DIR 下的 .log，不经服务端 ===== */
 let logWindow = null
+let faceCardsWindow = null
 
 function resolveLogFile(name) {
   if (typeof name !== 'string' || !name) return ''
@@ -390,6 +394,13 @@ ipcMain.handle('logs:export', async (event, content, suggestedName) => {
   }
 })
 
+ipcMain.handle('face-cards:file-url', async (_event, input) => {
+  const path = typeof input === 'string' ? input.trim() : ''
+  if (!path || /^https?:\/\//i.test(path) || path.includes('..')) return ''
+  if (path.startsWith('/')) return `${SERVER_ORIGIN}${path}`
+  return `${SERVER_ORIGIN}/api/files/${path.split('/').map(encodeURIComponent).join('/')}`
+})
+
 function openLogWindow() {
   if (logWindow) {
     if (logWindow.isMinimized()) logWindow.restore()
@@ -416,6 +427,38 @@ function openLogWindow() {
 
   logWindow.loadFile(join(app.getAppPath(), 'desktop', 'logs.html'))
   logWindow.on('closed', () => { logWindow = null })
+}
+
+function openFaceCardsWindow() {
+  if (faceCardsWindow) {
+    if (faceCardsWindow.isMinimized()) faceCardsWindow.restore()
+    faceCardsWindow.show()
+    faceCardsWindow.focus()
+    return
+  }
+
+  faceCardsWindow = new BrowserWindow({
+    width: 1320,
+    height: 900,
+    minWidth: 1000,
+    minHeight: 640,
+    title: '画境 · 捏脸卡片',
+    backgroundColor: '#f3f1eb',
+    icon: iconPath(),
+    show: false,
+    webPreferences: {
+      preload: join(app.getAppPath(), 'desktop', 'face-cards-preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  })
+
+  faceCardsWindow.loadFile(join(app.getAppPath(), 'desktop', 'face-cards.html'))
+  faceCardsWindow.once('ready-to-show', () => faceCardsWindow?.show())
+  faceCardsWindow.on('closed', () => { faceCardsWindow = null })
+  faceCardsWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  faceCardsWindow.webContents.on('will-navigate', event => event.preventDefault())
 }
 
 /* ===== 更新窗口：检查、下载、安装都在这一个窗口里 ===== */
@@ -1194,6 +1237,7 @@ function buildMenu() {
         { type: 'separator' },
         { label: '打开数据目录', click: () => shell.openPath(DATA) },
         { label: '运行日志…', click: openLogWindow },
+        { label: '捏脸卡片…', click: openFaceCardsWindow },
         { label: '打开日志目录', click: () => shell.openPath(LOG_DIR) },
         { label: '复制管理密钥', click: showAdminKey },
         { type: 'separator' },
@@ -1239,6 +1283,7 @@ function buildTrayMenu() {
     { type: 'separator' },
     { label: '检查更新…', click: () => { void checkUpdates() } },
     { label: '运行日志…', click: openLogWindow },
+    { label: '捏脸卡片…', click: openFaceCardsWindow },
     { label: '打开数据目录', click: () => shell.openPath(DATA) },
     { type: 'separator' },
     { label: '退出', click: () => { void quitApp() } },

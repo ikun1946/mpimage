@@ -23,6 +23,8 @@ export interface ResolutionSupport {
   tiers: ImageResolution[]
   /** 客户端展示的支持范围与限制说明 */
   note: string
+  /** 客户端界面提示；不填时沿用 note，设为空串则不在界面展示 */
+  uiNote?: string
   /** 非 auto 档位是否真的能改变上游输出尺寸 */
   honorsTiers: boolean
 }
@@ -73,6 +75,7 @@ export function resolutionSupportForModel(
     return {
       tiers: AUTO,
       note: 'Codex 通道只按画幅输出原生尺寸，1K/2K/4K 不会生效；1:1 约 1254×1254，16:9 约 1672×941。',
+      uiNote: '',
       honorsTiers: false,
     }
   }

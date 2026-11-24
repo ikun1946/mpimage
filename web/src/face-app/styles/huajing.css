@@ -1,0 +1,529 @@
+/* 画境外壳：保留面容工坊的三栏结构，只替换颜色、表面和控件观感。 */
+
+body {
+  zoom: var(--ui-zoom, 1);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.topbar {
+  background: color-mix(in srgb, var(--surface-solid) 92%, transparent);
+  border-bottom-color: var(--line);
+  box-shadow: var(--shadow-soft);
+}
+
+.back-link {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.back-link:hover {
+  color: var(--moss);
+  border-color: var(--moss-light);
+  background: var(--moss-tint);
+}
+
+.back-link svg {
+  width: 16px;
+  height: 16px;
+}
+
+.brand-mark {
+  color: var(--moss);
+}
+
+.brand-text strong {
+  color: var(--ink);
+}
+
+.brand-text small,
+.save-state {
+  color: var(--ink-faint);
+}
+
+.scheme-name {
+  color: var(--ink);
+}
+
+.scheme-name:hover {
+  background: var(--surface-subtle);
+}
+
+.scheme-name:focus {
+  border-color: var(--moss);
+  background: var(--moss-tint);
+}
+
+.style-select {
+  background: var(--surface-raised);
+  border-color: var(--line);
+  color: var(--ink-faint);
+}
+
+.style-select select {
+  color: var(--ink);
+}
+
+.style-select select option,
+.select option {
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+
+.btn {
+  color: var(--ink-soft);
+}
+
+.btn.ghost {
+  border-color: var(--line);
+}
+
+.btn.ghost:hover {
+  color: var(--ink);
+  border-color: var(--moss-light);
+  background: var(--surface-subtle);
+}
+
+.btn.gold,
+.btn.moss {
+  background: var(--moss);
+  border-color: var(--moss);
+  color: var(--on-moss);
+  font-weight: 600;
+}
+
+.btn.gold:hover,
+.btn.moss:hover {
+  background: var(--moss-light);
+  border-color: var(--moss-light);
+}
+
+.icon-btn {
+  border-color: var(--line);
+  color: var(--ink-faint);
+}
+
+.icon-btn:hover {
+  color: var(--moss);
+  border-color: var(--moss-light);
+  background: var(--surface-subtle);
+}
+
+.menu {
+  background: var(--surface-raised);
+  border-color: var(--line);
+  box-shadow: var(--shadow);
+}
+
+.menu button {
+  color: var(--ink-soft);
+}
+
+.menu button:hover {
+  color: var(--ink);
+  background: var(--surface-subtle);
+}
+
+.sidebar {
+  background: var(--surface-solid);
+  border-right-color: var(--line);
+}
+
+.side-search input,
+.role-card select,
+.role-card input,
+.role-card textarea,
+.owner-search input {
+  background: var(--surface-raised);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.side-search input:focus,
+.role-card select:focus,
+.role-card input:focus,
+.role-card textarea:focus {
+  border-color: var(--moss);
+  box-shadow: 0 0 0 3px var(--moss-tint);
+}
+
+.quick-chip,
+.nav-group-head,
+.nav-item {
+  color: var(--ink-soft);
+}
+
+.quick-chip:hover,
+.nav-group-head:hover,
+.nav-item:hover {
+  color: var(--moss);
+  background: var(--surface-subtle);
+}
+
+.nav-item.is-active,
+.quick-chip.is-active {
+  color: var(--moss);
+  background: var(--moss-tint);
+  border-color: var(--moss-light);
+}
+
+.role-card {
+  border-color: var(--line);
+  background: var(--surface-subtle);
+}
+
+.role-card header,
+.nav-group-head {
+  border-color: var(--line-soft);
+}
+
+.stage {
+  background: var(--paper);
+}
+
+.stage-head {
+  border-bottom-color: var(--line);
+}
+
+.stage-head h1,
+.panel-head h2 {
+  color: var(--ink);
+}
+
+.stage-head p,
+.panel-head p,
+.card-def,
+.muted {
+  color: var(--ink-faint);
+}
+
+.mode-badge {
+  color: var(--moss);
+  border-color: var(--moss-light);
+  background: var(--moss-tint);
+}
+
+.text-btn {
+  color: var(--moss);
+}
+
+.card {
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+.card:hover {
+  background: var(--panel-2);
+  border-color: var(--moss-light);
+  box-shadow: var(--shadow-soft);
+}
+
+.card:focus-visible {
+  outline-color: var(--moss);
+}
+
+.card.is-selected {
+  border-color: var(--moss);
+  background: linear-gradient(180deg, var(--moss-tint), transparent 65%), var(--panel);
+  box-shadow: 0 0 0 1px var(--moss-tint), var(--shadow-soft);
+}
+
+.thumb-empty {
+  color: var(--ink-faint);
+  background:
+    repeating-linear-gradient(135deg, var(--line-soft) 0 1px, transparent 1px 9px),
+    var(--surface-subtle);
+}
+
+.picked-badge,
+.ref-custom-badge {
+  color: var(--on-moss);
+  border-color: var(--moss);
+  background: var(--moss);
+}
+
+.fav-btn {
+  color: var(--ink-faint);
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+}
+
+.fav-btn:hover,
+.fav-btn.is-fav {
+  color: var(--accent);
+}
+
+.fav-btn.is-fav svg {
+  fill: var(--accent);
+  stroke: var(--accent-dark);
+}
+
+.card.is-selected .card-title h3,
+.strength-head b {
+  color: var(--moss);
+}
+
+.card-title em,
+.card-more {
+  color: var(--ink-faint);
+}
+
+.card-more:hover {
+  color: var(--moss);
+  background: var(--surface-subtle);
+}
+
+.tag {
+  color: var(--ink-faint);
+  border-color: var(--line);
+}
+
+.card.is-selected .tag {
+  color: var(--moss);
+  border-color: var(--moss-light);
+}
+
+.card-detail {
+  background: var(--surface-subtle);
+}
+
+.feature-list,
+.detail-prompt {
+  color: var(--ink-soft);
+}
+
+.detail-prompt {
+  border-color: var(--moss-light);
+  background: var(--moss-tint);
+}
+
+.feature-list li::marker {
+  color: var(--moss-light);
+}
+
+.ref-upload {
+  background: var(--surface-raised);
+  border-color: var(--line);
+}
+
+.ref-upload-head strong {
+  color: var(--ink-soft);
+}
+
+.ref-upload-head span,
+.ref-upload small {
+  color: var(--ink-faint);
+}
+
+.strength input[type="range"] {
+  background: linear-gradient(90deg, var(--moss) var(--fill, 50%), var(--line) var(--fill, 50%));
+}
+
+.strength input[type="range"]::-webkit-slider-thumb {
+  background: var(--moss);
+  border-color: var(--surface-raised);
+}
+
+.panel {
+  background: var(--surface-solid);
+  border-left-color: var(--line);
+}
+
+.panel-head,
+.panel-foot,
+.tabs {
+  border-color: var(--line);
+}
+
+.conflict-box {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+
+.tab.is-active {
+  color: var(--moss);
+  border-color: var(--moss);
+}
+
+.seg {
+  background: var(--surface-subtle);
+  border-color: var(--line);
+}
+
+.seg button {
+  color: var(--ink-soft);
+}
+
+.seg button.is-active {
+  color: var(--on-moss);
+  background: var(--moss);
+}
+
+.editor textarea,
+.search-modal,
+.modal,
+.search-top {
+  background: var(--surface-raised);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.editor textarea:focus,
+.search-top:focus-within {
+  border-color: var(--moss);
+}
+
+.manual-badge {
+  color: var(--accent-dark);
+  background: var(--accent-tint);
+}
+
+.panel-toggle {
+  color: var(--on-moss);
+  background: var(--moss);
+  box-shadow: var(--shadow);
+}
+
+.panel-toggle b {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.overlay {
+  background: rgba(20, 24, 21, 0.45);
+}
+
+.toast {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-color: var(--bg);
+}
+
+::selection {
+  background: var(--moss-tint);
+}
+
+/* 无参考图的卡片不再占一整块 4:5 空白 */
+.card.no-ref .thumb {
+  aspect-ratio: auto;
+  height: 64px;
+}
+
+.card.no-ref .thumb-empty {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 13px;
+}
+
+.card.no-ref .thumb-empty svg {
+  width: 20px;
+  height: 20px;
+}
+
+.card.no-ref .thumb-empty span {
+  letter-spacing: 0.4px;
+}
+
+.card.no-ref .thumb-empty em {
+  display: none;
+}
+
+.cards {
+  align-items: start;
+}
+
+.card {
+  align-self: start;
+}
+
+/* 登录确认前的加载层 */
+body.is-booting .topbar,
+body.is-booting .workspace,
+body.is-booting .panel-toggle {
+  visibility: hidden;
+}
+
+.face-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+}
+
+body:not(.is-booting) .face-loading {
+  display: none;
+}
+
+.face-loading-card {
+  display: flex;
+  width: min(360px, calc(100vw - 32px));
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 30px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.face-loading-mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 6px;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--moss);
+  color: var(--on-moss);
+  font-family: var(--serif);
+  font-size: 24px;
+}
+
+.face-loading-card strong {
+  font-size: 16px;
+}
+
+.face-loading-card p {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+@media (max-width: 1120px) {
+  .topbar {
+    overflow-x: auto;
+  }
+
+  .back-link span {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .back-link {
+    padding: 0 8px;
+  }
+
+  #handoff-btn {
+    padding: 0 10px;
+    font-size: 12px;
+  }
+}

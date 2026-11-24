@@ -426,7 +426,9 @@
   position: absolute;
   top: 16px;
   right: 16px;
-  z-index: 2;
+  /* 单图牌堆的卡片是 1~4，切换动画会临时升到 29/30；
+     工具栏必须压在这些卡片之上，否则多图叠放的右上角会盖住按钮。 */
+  z-index: 45;
   display: flex;
   gap: 7px;
   opacity: 0;

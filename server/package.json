@@ -1,13 +1,13 @@
 {
   "name": "mpimage-server",
-  "version": "1.0.75",
+  "version": "1.0.76",
   "private": true,
   "type": "module",
   "description": "画境生图后端：Fastify API，代理 Magpie 生图并按比例裁切",
   "main": "dist/main.js",
   "scripts": {
     "dev": "tsx watch src/main.ts",
-    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json && node ../scripts/copy-server-assets.mjs",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

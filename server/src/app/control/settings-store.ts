@@ -9,6 +9,9 @@ import { dirname, join } from 'node:path'
 import { config } from '../platform/config.js'
 import { normalizeComfyConfig, type ComfyConfig } from './comfy-config.js'
 
+/** 标题模型下拉里的“关闭”哨兵：不调用任何模型，直接用本地兜底短名 */
+export const TITLE_MODEL_DISABLED = '__off__'
+
 export interface ProviderModelConfig {
   id: string
   /** 客户端下拉里显示的名字；留空用模型 ID */
@@ -29,7 +32,7 @@ export interface ProviderConfig {
 interface SettingsFile {
   magpieBaseUrl?: unknown
   magpieTextModel?: unknown
-  /** 拼图卡片标题模型；留空跟随提示词优化模型 */
+  /** 拼图卡片标题模型；留空跟随提示词优化模型，__off__ 表示关闭 */
   magpieTitleModel?: unknown
   magpieImageModel?: unknown
   /** 客户端可选生图模型 id 列表；缺省表示全部可用 */
@@ -143,7 +146,7 @@ export class SettingsStore {
     return typeof stored === 'string' && stored.trim().length > 0
   }
 
-  /** 卡片标题模型的后台覆写值；空串表示跟随提示词优化模型 */
+  /** 卡片标题模型的后台覆写值；空串跟随优化模型，TITLE_MODEL_DISABLED 表示关闭 */
   getTitleModelOverride(): string {
     const stored = this.cache.magpieTitleModel
     return typeof stored === 'string' ? stored.trim() : ''
@@ -152,8 +155,13 @@ export class SettingsStore {
   /** 拼图卡片标题模型：后台单独选过就用它，否则跟随提示词优化模型 */
   async getTitleModel(): Promise<string> {
     const override = this.getTitleModelOverride()
+    if (override === TITLE_MODEL_DISABLED) return ''
     if (override) return override
     return this.getTextModel()
+  }
+
+  isTitleModelDisabled(): boolean {
+    return this.getTitleModelOverride() === TITLE_MODEL_DISABLED
   }
 
   isTitleModelFromSettings(): boolean {

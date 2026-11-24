@@ -79,7 +79,7 @@ export async function listClientImageModels(
         label,
         provider: 'magpie',
         resolutionTiers: resolution.tiers,
-        resolutionNote: resolution.note,
+        resolutionNote: resolution.uiNote ?? resolution.note,
         description: modelDescription(model.id, label),
       }
     })
@@ -97,7 +97,7 @@ export async function listClientImageModels(
         label,
         provider: provider.id,
         resolutionTiers: resolution.tiers,
-        resolutionNote: resolution.note,
+        resolutionNote: resolution.uiNote ?? resolution.note,
         description: modelDescription(publicId, label),
       })
     }
@@ -114,7 +114,7 @@ export async function listClientImageModels(
       label,
       provider: 'comfyui',
       resolutionTiers: resolution.tiers,
-      resolutionNote: resolution.note,
+      resolutionNote: resolution.uiNote ?? resolution.note,
       description: modelDescription(publicId, label),
     })
   }
