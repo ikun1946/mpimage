@@ -38,7 +38,10 @@ const SLOT_ORDER = [
   'brow', 'brow_eye', 'eye_shape', 'eye_corner', 'eyelid', 'eye_size', 'eye_spacing',
   'eye_position', 'iris', 'lash', 'undereye', 'gaze',
   'nose', 'lip', 'skin',
-  'hair_length', 'hair_part', 'bangs', 'hair_cut', 'hair_style', 'updo', 'braid', 'ancient_bun',
+  'hair_length', 'hair_part', 'bangs', 'hair_male_modern', 'hair_female_short', 'hair_cut',
+  'hair_style', 'hair_curl_form', 'hair_curl_pattern', 'updo', 'hair_updo_detail', 'braid',
+  'hair_braid_cultural', 'ancient_bun', 'hair_history', 'hairline_sideburn', 'hair_silhouette',
+  'hair_state',
   'hair_color', 'hair_texture', 'hair_accessory',
   'makeup_base', 'brow_makeup', 'eyeshadow', 'eyeliner', 'lash_makeup', 'aegyo',
   'blush', 'contour', 'highlight', 'lip_makeup', 'makeup_style', 'special_makeup',
@@ -50,14 +53,22 @@ const SECTION_SLOTS = {
   nose: ['nose'],
   lip: ['lip'],
   skin: ['skin'],
-  hair: ['hair_length', 'hair_part', 'bangs', 'hair_cut', 'hair_style', 'updo', 'braid', 'ancient_bun'],
+  hair: [
+    'hair_length', 'hair_part', 'bangs', 'hair_male_modern', 'hair_female_short', 'hair_cut',
+    'hair_style', 'hair_curl_form', 'hair_curl_pattern', 'updo', 'hair_updo_detail', 'braid',
+    'hair_braid_cultural', 'ancient_bun', 'hair_history', 'hairline_sideburn', 'hair_silhouette',
+    'hair_state',
+  ],
   hairExtra: ['hair_color', 'hair_texture', 'hair_accessory'],
   makeup: ['makeup_base', 'brow_makeup', 'eyeshadow', 'eyeliner', 'lash_makeup', 'aegyo', 'blush', 'contour', 'highlight', 'lip_makeup', 'makeup_style', 'special_makeup'],
 }
 
 const COMPACT_SLOTS = [
   'face_shape', 'bone_structure', 'eye_shape', 'eye_corner', 'iris', 'nose', 'lip', 'skin',
-  'hair_length', 'bangs', 'hair_style', 'hair_color', 'hair_texture', 'makeup_style', 'lip_makeup',
+  'hair_length', 'bangs', 'hair_male_modern', 'hair_female_short', 'hair_cut', 'hair_style',
+  'hair_curl_form', 'hair_curl_pattern', 'updo', 'hair_updo_detail', 'braid', 'hair_braid_cultural',
+  'ancient_bun', 'hair_history', 'hairline_sideburn', 'hair_silhouette', 'hair_state',
+  'hair_color', 'hair_texture', 'makeup_style', 'lip_makeup',
 ]
 
 export function createCompiler(data) {

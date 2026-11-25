@@ -37,6 +37,7 @@ import { registerUpstreamRoutes } from '../api/upstream.js'
 import { registerUpdateRoutes } from '../api/update.js'
 import { ProjectStore } from './products/projects/project-store.js'
 import { FaceCatalogStore } from './products/face/catalog-store.js'
+import { FaceSubmissionStore } from './products/face/submission-store.js'
 import { LocalFileStorage } from '../services/storage.js'
 import { SettingsStore } from './control/settings-store.js'
 import { StyleLibraryStore } from './products/styles/style-library.js'
@@ -167,6 +168,8 @@ const usage = new UsageStore(usageDatabasePath)
 const dataDir = config.dataDir ? resolvePath(config.dataDir) : join(projectRoot, 'data')
 const faceCatalog = new FaceCatalogStore(dataDir, join(faceAssetsDirectory, 'catalog-seed.json'))
 await faceCatalog.init()
+const faceSubmissions = new FaceSubmissionStore(dataDir)
+await faceSubmissions.init()
 // 会话落盘：重启服务、停用后再启动都保持登录状态
 const sessions = new SessionStore(
   config.sessionSecret || randomBytes(32).toString('hex'),
@@ -297,7 +300,7 @@ registerMonitorRoutes(app, {
   requestLog,
 })
 registerFeedbackRoutes(app, { feedback })
-registerFaceRoutes(app, { store: faceCatalog })
+registerFaceRoutes(app, { store: faceCatalog, submissions: faceSubmissions, storage })
 registerUpstreamRoutes(app, { settings })
 registerComfyRoutes(app, { settings })
 registerUpdateRoutes(app, { checker: updateChecker })

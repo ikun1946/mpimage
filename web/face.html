@@ -61,6 +61,7 @@
     <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 15v4h14v-4"/></symbol>
     <symbol id="i-wand" viewBox="0 0 24 24"><path d="M5 19L16 8M14 4l1 3 3 1-3 1-1 3-1-3-3-1 3-1zM19 12l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
     <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M16 4h4v4M20 4l-6 6M4 20l6-6M16 20h4v-4M20 20l-6-6M4 4l6 6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-2.6V20a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-1.8-1.8.1-.1A1.7 1.7 0 0 0 8 15a1.7 1.7 0 0 0-1.6-1H6v-2.6h.4A1.7 1.7 0 0 0 8 10a1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.8-1.8.1.1A1.7 1.7 0 0 0 11.4 6 1.7 1.7 0 0 0 12.4 4.4V4h2.6v.4a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v2.6H21a1.7 1.7 0 0 0-1.6 1z"/></symbol>
   </svg>
 
   <header class="topbar">
@@ -89,7 +90,26 @@
         <select id="visual-style" aria-label="视觉风格"></select>
       </label>
       <button class="btn ghost" id="open-presets" type="button"><svg><use href="#i-spark"/></svg>预设</button>
-      <button class="btn ghost random-btn" id="randomize-btn" type="button" title="随机生成一套角色参数"><svg><use href="#i-shuffle"/></svg><span>随机</span></button>
+      <div class="random-control">
+        <button class="btn ghost random-btn" id="randomize-btn" type="button" title="随机生成一套角色参数"><svg><use href="#i-shuffle"/></svg><span>随机</span></button>
+        <button class="icon-btn random-settings-btn" id="random-settings-btn" type="button"
+          aria-label="随机设置" aria-haspopup="dialog" aria-expanded="false" title="随机设置"><svg><use href="#i-settings"/></svg></button>
+        <div class="random-popover" id="random-settings" role="dialog" aria-label="随机设置" hidden>
+          <div class="random-popover-head">
+            <strong>随机设置</strong>
+            <span>只影响特征参数</span>
+          </div>
+          <label class="random-switch">
+            <span>
+              <b>按已选性别优化</b>
+              <small>优先同性向和中性特征</small>
+            </span>
+            <input type="checkbox" id="random-gender-aware" />
+            <i aria-hidden="true"></i>
+          </label>
+          <p id="random-gender-hint">当前：女性呈现</p>
+        </div>
+      </div>
       <button class="btn ghost" id="new-scheme" type="button"><svg><use href="#i-plus"/></svg>新建</button>
       <div class="menu-wrap">
         <button class="btn ghost" id="more-btn" type="button" aria-haspopup="menu"><svg><use href="#i-menu"/></svg>方案</button>
@@ -196,7 +216,7 @@
       <footer class="stage-foot">
         <span id="selection-summary">尚未选择</span>
         <span class="dot"></span>
-        <span id="coverage">参考图 0 / 484</span>
+        <span id="coverage">参考图 0 / 592</span>
       </footer>
     </main>
 

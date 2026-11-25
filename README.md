@@ -53,7 +53,7 @@ mpimage/
 │   │   │       └── projects/  project-store
 │   │   ├── services/          持久化与外部集成：user-store / usage-store / feedback-store / traffic-store / storage / update-checker
 │   │   └── utils/             filename / password / url
-│   ├── assets/face/           捏脸种子目录与内置眼型参考图（随服务端打包）
+│   ├── assets/face/           捏脸种子目录、发型扩展源与内置眼型参考图（随服务端打包）
 │   ├── package.json
 │   └── .env.example
 ├── web/                       前端：只在浏览器里跑的客户端
@@ -90,7 +90,7 @@ mpimage/
 ├── usage.json                 生图统计与生成记录
 ├── styles/                    风格库目录（每个账号一份 <userId>.json）
 ├── logs/                      后端运行日志（按天 YYYY-MM-DD.log）
-├── data/                      运行数据（traffic.json 流量、rate-limit.json 限流、quotas.json 额度、concurrency.json 并发上限、feedback.json 意见反馈、settings.json 上游地址、sessions.json 会话、face-cards.json 捏脸目录）
+├── data/                      运行数据（traffic.json 流量、rate-limit.json 限流、quotas.json 额度、concurrency.json 并发上限、feedback.json 意见反馈、settings.json 上游地址、sessions.json 会话、face-cards.json 捏脸目录、face-submissions.json 社区审核）
 └── generated/                 生成的图片（按资产类型分文件夹）
     ├── 角色/                   角色资产图，文件名为资产名
     ├── 场景/                   场景资产图
@@ -276,9 +276,21 @@ npm start              # 直接启动主服务
 页面沿用当前客户端登录态，角色方案和本地参考图按账号隔离保存。
 
 - **卡片目录由服务端提供**：客户端通过 `GET /api/face/catalog` 读取，不再读前端静态 JSON。
-  默认种子有 484 张特征卡片、46 个维度、14 套预设和 16 张眼型参考图。
-- **随机生成**：按每个维度的单选/多选上限随机组合角色，自动规避冲突，并随机视觉风格、
-  性别、年龄和强度；已有选择时会先确认再替换。
+  默认种子有 592 张特征卡片、56 个维度、14 套预设和 16 张眼型参考图。
+- **发型扩展 V1.1**：在原发型数据库上新增 108 张卡片和 10 个分类，包括现代男发、女性短发、
+  特殊卷发形态、2A–4C 卷曲程度、特色编发、马尾盘发细分、发际线与鬓角、整体轮廓、
+  发型状态和历史时期发型。C14 的卷曲形态与卷曲程度拆成两个可组合维度。
+- **发型扩展无参考图**：新增卡片全部标记“待补参考图”，继续使用统一占位图；现有 16 张眼型
+  参考图不变。已有 `data/face-cards.json` 启动时会自动补齐缺失的新分类、卡片和冲突规则，
+  不覆盖管理员已有改名、隐藏和自定义内容。
+- **随机主发型**：随机生成只会从剪裁、卷度、扎发、编发、古风发髻和新增发型结构中选择一个
+  主发型分类，再抽一张主卡；发长、刘海、发际线、轮廓、状态、发色、发质和发饰仍可独立组合。
+- **随机生成**：按每个维度的单选/多选上限随机组合角色和强度，自动规避冲突；性别、年龄、
+  角色定位、补充描述、画风与方案名称保持不变，已有选择时会先确认再替换。
+- **按性别优化随机**：随机按钮旁的小设置可以开关“按已选性别优化”，开启后优先同性向和
+  中性卡片，反向特征少量保留；中性呈现优先中性，不指定性别时不加权。
+- **性别适配标签**：每张卡片可标注男性、女性或中性，桌面卡片编辑器可以随时修正；
+  旧目录升级时会按卡片 ID 从新种子补齐缺失标签，不覆盖管理员已有修改。
 - **恢复空白**：清空当前方案的全部选择、强度、角色设定、补充描述和负向词，回到空白默认；
   方案名称和参考图保留。
 - **提示词只读**：完整提示词和负向词由当前选择自动生成，只能滚动、全选和复制，不能用键盘改写。
@@ -295,6 +307,17 @@ npm start              # 直接启动主服务
   自动切到自由创作并挂上正面提示词、负向词和参考图。
 - **参考图上传属于运行数据**：管理员在编辑窗口上传的图片走 `/api/reference-images`，
   只把 `参考图/...` 相对路径写进目录，不会打进全新安装包。
+- **社区提交先审后发**：客户端新增自定义卡片后自动提交审核，提交人本人立即能用，其他账号
+  看不到；上传卡片参考图也走同一套审核，不会直接覆盖公共图。已有本地自定义卡片会标记
+  「仅本地」，在卡片详情里手动「提交审核」。
+- **审核状态可见**：客户端卡片会显示「仅本地 / 审核中 / 未通过 / 已公开」；驳回后保留本地
+  内容并显示原因，可以重新提交或撤回。待审核图片存放在 `参考图-待审核/`，通过后才复制到
+  `参考图/` 并写入公共目录。
+- **桌面端审核页**：捏脸卡片窗口新增「待审核」页签，可以查看提交人、卡片或参考图、图片尺寸，
+  修改名称、分类、提示词、性别适配和待审图片，然后驳回或通过发布。发布前如果目录还有未保存
+  修改，会要求先保存或重新加载，避免审核结果覆盖目录草稿。
+- **发布冲突检查**：发布新卡片时会重新检查卡片 ID、同分类同名卡片和目标参考图是否存在；
+  冲突会返回明确错误，不会带着重复项写入公共目录。每个账号最多保留 20 条待审核记录。
 
 目录接口：
 
@@ -307,10 +330,24 @@ POST /api/admin/face/catalog/reset   管理员：恢复安装包自带目录
 POST /api/admin/face/catalog/restore 管理员：恢复上一份保存前备份
 ```
 
+社区审核接口：
+
+```text
+POST   /api/face/submissions                  登录用户：提交新卡片或参考图
+GET    /api/face/submissions/mine             登录用户：自己的提交和审核状态
+POST   /api/face/submissions/:id/resubmit     登录用户：驳回后重新提交
+DELETE /api/face/submissions/:id              登录用户：撤回未发布的提交
+GET    /api/admin/face/submissions            管理员：审核列表（status=pending/rejected/approved/all）
+PATCH  /api/admin/face/submissions/:id        管理员：修改待审卡片、目标或图片
+POST   /api/admin/face/submissions/:id/approve 管理员：通过并发布到公共目录
+POST   /api/admin/face/submissions/:id/reject  管理员：驳回并填写原因
+```
+
 验证命令：
 
 ```powershell
 npm run test:face
+npm run test:face:submissions
 npm run test:face:ui
 ```
 

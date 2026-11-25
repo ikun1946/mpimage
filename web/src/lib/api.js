@@ -83,6 +83,45 @@ export function fetchFaceCatalogMeta() {
   return request('/api/face/catalog/meta', { method: 'GET' })
 }
 
+export function submitFaceCard(card, imageDataUrl = '', removeImage = false) {
+  return request('/api/face/submissions', {
+    method: 'POST',
+    body: JSON.stringify({
+      kind: 'card',
+      category: card.category,
+      targetId: card.id,
+      card,
+      dataUrl: imageDataUrl || undefined,
+      removeImage: removeImage || undefined,
+    }),
+  })
+}
+
+export function submitFaceReference({ targetId, category, name, imageDataUrl }) {
+  return request('/api/face/submissions', {
+    method: 'POST',
+    body: JSON.stringify({
+      kind: 'reference',
+      targetId,
+      category,
+      name,
+      dataUrl: imageDataUrl,
+    }),
+  })
+}
+
+export function fetchMyFaceSubmissions() {
+  return request('/api/face/submissions/mine', { method: 'GET' })
+}
+
+export function resubmitFaceSubmission(id) {
+  return request(`/api/face/submissions/${encodeURIComponent(id)}/resubmit`, { method: 'POST' })
+}
+
+export function withdrawFaceSubmission(id) {
+  return request(`/api/face/submissions/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
 export function fetchHealth() {
   return request('/api/health', { method: 'GET' })
 }

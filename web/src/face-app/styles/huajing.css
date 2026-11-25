@@ -324,6 +324,50 @@ body {
   color: var(--ink-faint);
 }
 
+.review-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
+  color: var(--ink-soft);
+  font-size: 9.5px;
+  letter-spacing: .4px;
+  backdrop-filter: blur(4px);
+}
+
+.review-badge.pending {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent-tint) 85%, var(--surface-raised));
+  color: var(--accent-dark);
+}
+
+.review-badge.rejected {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface-raised));
+  color: var(--danger);
+}
+
+.review-badge.local {
+  color: var(--ink-faint);
+}
+
+.review-note {
+  margin: 0;
+  padding: 6px 7px;
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--ink-faint);
+  font-size: 9.5px;
+  line-height: 1.55;
+}
+
 .strength input[type="range"] {
   background: linear-gradient(90deg, var(--moss) var(--fill, 50%), var(--line) var(--fill, 50%));
 }

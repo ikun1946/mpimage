@@ -54,6 +54,7 @@ export class FaceCatalogError extends Error {
 
 const KEEP_BACKUPS = 5
 const MAX_TEXT = 4000
+const GENDER_AFFINITY_VALUES = new Set(['male', 'female', 'neutral'])
 
 const asObject = (value: unknown): Record<string, any> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -64,6 +65,28 @@ const text = (value: unknown, max = MAX_TEXT): string =>
   typeof value === 'string' ? value.slice(0, max) : ''
 
 const truthyArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [])
+
+function normalizedGenderAffinity(value: unknown, issuePath: string, issues: CatalogIssue[]): string[] {
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === 'string' && value.trim()
+      ? [value]
+      : []
+  const labels: string[] = []
+  for (const raw of values) {
+    if (typeof raw !== 'string') continue
+    const label = raw.trim().toLowerCase()
+    if (!GENDER_AFFINITY_VALUES.has(label)) {
+      issues.push({
+        path: issuePath,
+        message: `性别适配只能是 male / female / neutral，收到：${raw}`,
+      })
+      continue
+    }
+    if (!labels.includes(label)) labels.push(label)
+  }
+  return labels.length ? labels : ['neutral']
+}
 
 /** 公开目录不返回隐藏项；管理员目录保留全部。 */
 function visibleCatalog(catalog: FaceCatalog): FaceCatalog {
@@ -199,6 +222,11 @@ export function normalizeFaceCatalog(input: unknown): {
         conflicts: truthyArray(item.conflicts)
           .filter(value => typeof value === 'string')
           .slice(0, 60),
+        gender_affinity: normalizedGenderAffinity(
+          item.gender_affinity,
+          `categories[${categoryIndex}].items[${itemIndex}].gender_affinity`,
+          issues,
+        ),
         sort_order: Number.isFinite(Number(item.sort_order)) ? Number(item.sort_order) : 9999,
         visible: item.visible !== false,
         is_custom: item.is_custom === true,
@@ -297,7 +325,7 @@ export function normalizeFaceCatalog(input: unknown): {
 
   const total = categories.reduce((sum, category) => sum + category.items.length, 0)
   const catalog: FaceCatalog = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision: Number.isFinite(Number(source.revision)) ? Math.max(0, Math.floor(Number(source.revision))) : 0,
     updatedAt: typeof source.updatedAt === 'string' ? source.updatedAt : new Date().toISOString(),
     version: text(source.version, 80) || undefined,
@@ -318,7 +346,7 @@ export function normalizeFaceCatalog(input: unknown): {
 
 function emptyCatalog(): FaceCatalog {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision: 0,
     updatedAt: new Date().toISOString(),
     total: 0,
@@ -330,6 +358,183 @@ function emptyCatalog(): FaceCatalog {
     presets: [],
     references: {},
   }
+}
+
+/**
+ * v1 目录没有性别适配字段。升级时只给缺失字段补种子标签，
+ * 管理员已经保存过的标签和自定义卡片保持原样。
+ */
+function migrateGenderAffinity(raw: Record<string, any>, seed: Record<string, any>): boolean {
+  let changed = Number(raw.schemaVersion || 1) < 2
+  raw.schemaVersion = 2
+  const seedItems = new Map<string, Record<string, any>>()
+  for (const category of truthyArray(seed.categories)) {
+    for (const item of truthyArray(asObject(category)?.items)) {
+      const object = asObject(item)
+      if (object && typeof object.id === 'string') seedItems.set(object.id, object)
+    }
+  }
+  for (const category of truthyArray(raw.categories)) {
+    for (const item of truthyArray(asObject(category)?.items)) {
+      const object = asObject(item)
+      if (!object || typeof object.id !== 'string' || object.gender_affinity !== undefined) continue
+      const seeded = seedItems.get(object.id)
+      if (!seeded?.gender_affinity) continue
+      object.gender_affinity = JSON.parse(JSON.stringify(seeded.gender_affinity))
+      changed = true
+    }
+  }
+  return changed
+}
+
+/**
+ * 新版种子新增分类或卡片时，把缺失内容补进管理员目录。
+ * 已有分类、卡片、显隐和自定义修改全部原样保留，只追加种子里有而目录里没有的项。
+ */
+function mergeSeedAdditions(raw: Record<string, any>, seed: Record<string, any>): boolean {
+  let changed = false
+  if (!Array.isArray(raw.groups)) {
+    raw.groups = []
+    changed = true
+  }
+  if (!Array.isArray(raw.categories)) {
+    raw.categories = []
+    changed = true
+  }
+  if (!Array.isArray(raw.conflict_rules)) {
+    raw.conflict_rules = []
+    changed = true
+  }
+
+  const rawCategories = raw.categories as Array<Record<string, any>>
+  const rawGroups = raw.groups as Array<Record<string, any>>
+  const rawCategoryMap = new Map<string, Record<string, any>>()
+  const rawItemCategories = new Map<string, string>()
+  for (const category of rawCategories) {
+    const object = asObject(category)
+    if (!object || typeof object.key !== 'string') continue
+    rawCategoryMap.set(object.key, object)
+    for (const item of truthyArray(object.items)) {
+      const itemObject = asObject(item)
+      if (itemObject && typeof itemObject.id === 'string') {
+        rawItemCategories.set(itemObject.id, object.key)
+      }
+    }
+  }
+
+  const seedCategories = new Map<string, Record<string, any>>()
+  for (const category of truthyArray(seed.categories)) {
+    const object = asObject(category)
+    if (object && typeof object.key === 'string') seedCategories.set(object.key, object)
+  }
+
+  for (const seedGroup of truthyArray(seed.groups)) {
+    const groupObject = asObject(seedGroup)
+    if (!groupObject || typeof groupObject.key !== 'string') continue
+    let group: Record<string, any> | undefined = rawGroups.find(
+      entry => asObject(entry)?.key === groupObject.key,
+    )
+    if (!group) {
+      const created: Record<string, any> = JSON.parse(JSON.stringify(groupObject))
+      rawGroups.push(created)
+      group = created
+      changed = true
+    }
+    if (!Array.isArray(group.categories)) {
+      group.categories = []
+      changed = true
+    }
+
+    const seedKeys = truthyArray(groupObject.categories)
+      .filter((key): key is string => typeof key === 'string')
+    for (const [index, key] of seedKeys.entries()) {
+      const seedCategory = seedCategories.get(key)
+      if (!seedCategory) continue
+      if (!rawCategoryMap.has(key)) {
+        const category = JSON.parse(JSON.stringify(seedCategory))
+        rawCategories.push(category)
+        rawCategoryMap.set(key, category)
+        changed = true
+      }
+      if (!group.categories.includes(key)) {
+        let insertAt = group.categories.length
+        for (const nextKey of seedKeys.slice(index + 1)) {
+          const nextIndex = group.categories.indexOf(nextKey)
+          if (nextIndex >= 0) {
+            insertAt = nextIndex
+            break
+          }
+        }
+        group.categories.splice(insertAt, 0, key)
+        changed = true
+      }
+    }
+  }
+
+  for (const [key, seedCategory] of seedCategories) {
+    const category = rawCategoryMap.get(key)
+    if (!category) continue
+    if (!Array.isArray(category.items)) {
+      category.items = []
+      changed = true
+    }
+    const items = category.items as Array<Record<string, any>>
+    const localIds = new Set(
+      items.map(item => asObject(item)?.id).filter((id): id is string => typeof id === 'string'),
+    )
+    for (const seedItem of truthyArray(seedCategory.items)) {
+      const seedObject = asObject(seedItem)
+      if (!seedObject || typeof seedObject.id !== 'string') continue
+      if (localIds.has(seedObject.id)) continue
+      const otherCategory = rawItemCategories.get(seedObject.id)
+      if (otherCategory && otherCategory !== key) {
+        throw new FaceCatalogError(
+          `目录升级时发现卡片 ID 冲突：${seedObject.id}`,
+          500,
+          [{ path: `categories.${key}.items`, message: `ID 已存在于 ${otherCategory}` }],
+        )
+      }
+      items.push(JSON.parse(JSON.stringify(seedObject)))
+      rawItemCategories.set(seedObject.id, key)
+      localIds.add(seedObject.id)
+      changed = true
+    }
+    category.count = items.length
+  }
+
+  const ruleKeys = new Set<string>()
+  for (const rule of truthyArray(raw.conflict_rules)) {
+    const object = asObject(rule)
+    if (!object) continue
+    ruleKeys.add([
+      object.left_category,
+      object.left,
+      object.right_category,
+      object.right,
+    ].join('|'))
+  }
+  for (const seedRule of truthyArray(seed.conflict_rules)) {
+    const object = asObject(seedRule)
+    if (!object) continue
+    const key = [
+      object.left_category,
+      object.left,
+      object.right_category,
+      object.right,
+    ].join('|')
+    if (ruleKeys.has(key)) continue
+    raw.conflict_rules.push(JSON.parse(JSON.stringify(object)))
+    ruleKeys.add(key)
+    changed = true
+  }
+
+  if (changed) {
+    if (typeof seed.version === 'string' && seed.version) raw.version = seed.version
+    if (typeof seed.generated_from === 'string' && seed.generated_from) {
+      raw.generated_from = seed.generated_from
+    }
+  }
+  return changed
 }
 
 export class FaceCatalogStore {
@@ -349,21 +554,32 @@ export class FaceCatalogStore {
     if (!existsSync(this.seedFile)) {
       throw new FaceCatalogError(`缺少捏脸种子目录：${this.seedFile}`, 503)
     }
+    const seed = JSON.parse(await readFile(this.seedFile, 'utf8'))
+    const normalizedSeed = normalizeFaceCatalog(seed)
+    if (normalizedSeed.issues.length) {
+      throw new FaceCatalogError('捏脸种子目录校验失败', 500, normalizedSeed.issues)
+    }
     if (existsSync(this.file)) {
       const raw = JSON.parse(await readFile(this.file, 'utf8'))
+      const merged = mergeSeedAdditions(raw, seed)
+      const migrated = migrateGenderAffinity(raw, seed) || merged
       const { catalog, issues } = normalizeFaceCatalog(raw)
       if (issues.length) {
         throw new FaceCatalogError('data/face-cards.json 校验失败', 500, issues)
       }
-      this.catalog = catalog
+      if (migrated) {
+        this.catalog = {
+          ...catalog,
+          revision: catalog.revision + 1,
+          updatedAt: new Date().toISOString(),
+        }
+        await this.write(this.catalog, true)
+      } else {
+        this.catalog = catalog
+      }
       return
     }
-    const seed = JSON.parse(await readFile(this.seedFile, 'utf8'))
-    const { catalog, issues } = normalizeFaceCatalog(seed)
-    if (issues.length) {
-      throw new FaceCatalogError('捏脸种子目录校验失败', 500, issues)
-    }
-    this.catalog = { ...catalog, revision: 1, updatedAt: new Date().toISOString() }
+    this.catalog = { ...normalizedSeed.catalog, revision: 1, updatedAt: new Date().toISOString() }
     await this.write(this.catalog)
   }
 

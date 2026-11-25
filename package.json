@@ -1,6 +1,6 @@
 {
   "name": "mpimage",
-  "version": "1.0.77",
+  "version": "1.0.78",
   "private": true,
   "type": "module",
   "description": "画境生图：前后端分离的单张工作台与资产批量工作台",
@@ -17,7 +17,8 @@
     "test:revise:ui": "npm run build && npm run build:server && node scripts/test-revise-animation.mjs",
     "test:image-title": "npm run build:server && node scripts/test-image-title.mjs",
     "test:face": "npm run build:server && node scripts/test-face-catalog.mjs",
-    "test:face:ui": "npm run build && npm run build:server && node scripts/test-face-ui.mjs && node scripts/test-face-cards-ui.mjs",
+    "test:face:submissions": "npm run build:server && node scripts/test-face-submissions.mjs",
+    "test:face:ui": "npm run build && npm run build:server && node scripts/test-face-submissions.mjs && node scripts/test-face-ui.mjs && node scripts/test-face-cards-ui.mjs",
     "start": "npm --prefix server run start",
     "desktop:dev": "electron .",
     "desktop:prepare": "npm run build && npm run build:server",

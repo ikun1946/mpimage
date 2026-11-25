@@ -1,6 +1,14 @@
 import { Store } from './store.js'
 import { createCompiler, searchItems } from './prompt.js'
-import { fetchFaceCatalog, fetchFaceCatalogMeta, uploadReferenceImage } from '../lib/api.js'
+import {
+  fetchFaceCatalog,
+  fetchFaceCatalogMeta,
+  fetchMyFaceSubmissions,
+  resubmitFaceSubmission,
+  submitFaceCard,
+  submitFaceReference,
+  withdrawFaceSubmission,
+} from '../lib/api.js'
 
 const $ = (sel, root = document) => root.querySelector(sel)
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)]
@@ -22,6 +30,7 @@ let catalogRevision = 0
 let categories = []
 let categoryMap = new Map()
 let itemMap = new Map()
+let submissions = new Map()
 
 const view = {
   tab: 'full',
@@ -60,6 +69,11 @@ async function boot() {
     return
   }
   store = new Store(data)
+  try {
+    await loadMySubmissions({ render: false })
+  } catch {
+    // 审核状态读不到时不影响本地编辑，聚焦或定时刷新会再试
+  }
   rebuildCompiler()
   view.mobileGroup = currentCategory().group
 
@@ -79,11 +93,11 @@ async function boot() {
   }
   window.dispatchEvent(new CustomEvent('face-ready'))
   setInterval(() => {
-    if (document.visibilityState === 'visible') void refreshCatalog()
+    if (document.visibilityState === 'visible') void refreshWorkspace()
   }, 45_000)
-  window.addEventListener('focus', () => { void refreshCatalog() })
+  window.addEventListener('focus', () => { void refreshWorkspace() })
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') void refreshCatalog()
+    if (document.visibilityState === 'visible') void refreshWorkspace()
   })
 }
 
@@ -124,6 +138,126 @@ function effectiveReferenceMap() {
   return { ...manifest, ...overrides }
 }
 
+const SUBMISSION_PRIORITY = { pending: 3, rejected: 2, approved: 1 }
+const submissionKey = (kind, targetId) => `${kind}:${targetId}`
+
+function mergeSubmission(submission) {
+  if (!submission?.id || !submission?.targetId) return false
+  const key = submissionKey(submission.kind, submission.targetId)
+  const current = submissions.get(key)
+  if (current) {
+    if (current.id === submission.id) {
+      submissions.set(key, submission)
+      return true
+    }
+    const nextPriority = SUBMISSION_PRIORITY[submission.status] || 0
+    const currentPriority = SUBMISSION_PRIORITY[current.status] || 0
+    const newer = String(submission.updatedAt || '').localeCompare(String(current.updatedAt || '')) > 0
+    if (nextPriority < currentPriority || (nextPriority === currentPriority && !newer)) return false
+  }
+  submissions.set(key, submission)
+  return true
+}
+
+function indexSubmissions(list) {
+  const next = new Map()
+  for (const submission of Array.isArray(list) ? list : []) {
+    const key = submissionKey(submission.kind, submission.targetId)
+    const current = next.get(key)
+    if (!current) {
+      next.set(key, submission)
+      continue
+    }
+    const priority = SUBMISSION_PRIORITY[submission.status] || 0
+    const currentPriority = SUBMISSION_PRIORITY[current.status] || 0
+    const newer = String(submission.updatedAt || '').localeCompare(String(current.updatedAt || '')) > 0
+    if (priority > currentPriority || (priority === currentPriority && newer)) next.set(key, submission)
+  }
+  submissions = next
+}
+
+function submissionKindForItem(item) {
+  return item?.source_section === 'custom' ? 'card' : 'reference'
+}
+
+function submissionForItem(item) {
+  if (!item?.id) return null
+  return submissions.get(submissionKey(submissionKindForItem(item), item.id)) || null
+}
+
+function itemReviewState(item) {
+  const submission = submissionForItem(item)
+  if (submission) {
+    return {
+      kind: submission.kind,
+      submission,
+      status: submission.status,
+      localOnly: false,
+    }
+  }
+  const localOnly = item?.source_section === 'custom'
+  return {
+    kind: localOnly ? 'card' : 'reference',
+    submission: null,
+    status: localOnly ? 'local' : 'none',
+    localOnly,
+  }
+}
+
+function serverHasCatalogItem(id) {
+  return (data?.categories || []).some(category =>
+    (category.items || []).some(item => item.id === id && item.source_section !== 'custom'),
+  )
+}
+
+function reconcilePublishedSubmissions() {
+  if (!store) return false
+  let changed = false
+  for (const submission of submissions.values()) {
+    if (submission.status !== 'approved') continue
+    const targetId = submission.publishedTargetId || submission.targetId
+    const localItem = (store.state.customItems || []).find(item => item.id === targetId)
+    if (submission.kind === 'card' && localItem && serverHasCatalogItem(targetId)) {
+      store.state.customItems = store.state.customItems.filter(item => item.id !== targetId)
+      for (const category of data.categories || []) {
+        if (!Array.isArray(category.items)) continue
+        category.items = category.items.filter(item =>
+          item.id !== targetId || item.source_section !== 'custom',
+        )
+      }
+      changed = true
+    }
+    const publishedReference = manifest[targetId] || ''
+    if (
+      publishedReference
+      && store.state.referenceOverrides?.[targetId]
+      && (!submission.publishedPath || submission.publishedPath === publishedReference)
+    ) {
+      delete store.state.referenceOverrides[targetId]
+      changed = true
+    }
+  }
+  if (changed) store.save()
+  return changed
+}
+
+async function loadMySubmissions({ render = true } = {}) {
+  const result = await fetchMyFaceSubmissions()
+  indexSubmissions(result?.submissions || [])
+  reconcilePublishedSubmissions()
+  if (render) renderAll()
+  return submissions
+}
+
+async function refreshWorkspace() {
+  await refreshCatalog()
+  try {
+    await loadMySubmissions()
+  } catch {
+    // 目录已刷新时先保留现有审核状态，下次聚焦再试
+  }
+}
+
 async function refreshCatalog() {
   try {
     const meta = await fetchFaceCatalogMeta()
@@ -139,6 +273,7 @@ async function refreshCatalog() {
       store.data = data
       store.applyCustomItems()
       store.ensureValid()
+      reconcilePublishedSubmissions()
     }
     renderAll()
     toast('捏脸卡片已更新')
@@ -169,6 +304,31 @@ function syncSchemeFields() {
   if (document.activeElement !== $('#custom-notes')) $('#custom-notes').value = scheme.customNotes || ''
   $('#gender').value = scheme.gender || ''
   $('#age').value = scheme.age || ''
+  syncRandomSettings()
+}
+
+function closeRandomSettings() {
+  const popover = $('#random-settings')
+  if (popover) popover.hidden = true
+  $('#random-settings-btn')?.setAttribute('aria-expanded', 'false')
+}
+
+function syncRandomSettings() {
+  const checkbox = $('#random-gender-aware')
+  const hint = $('#random-gender-hint')
+  if (!checkbox || !hint) return
+  const enabled = store.state.ui.randomGenderAware !== false
+  const gender = store.scheme.gender
+  checkbox.checked = enabled
+  if (!gender) {
+    hint.textContent = '当前未指定性别，随机不会按性别优化。'
+  } else if (!enabled) {
+    hint.textContent = `当前：${gender}；性别优化已关闭。`
+  } else if (gender === '中性呈现') {
+    hint.textContent = '当前：中性呈现；随机将优先中性特征。'
+  } else {
+    hint.textContent = `当前：${gender}；随机将优先${gender === '男性呈现' ? '男性' : '女性'}和中性特征。`
+  }
 }
 
 function renderNav() {
@@ -285,9 +445,28 @@ function cardMarkup(item, cat, selected, showCat) {
   const open = view.expanded.has(item.id)
   const image = effectiveReference(item.id)
   const customRef = Boolean(store.state.referenceOverrides?.[item.id])
+  const review = itemReviewState(item)
   const strength = Number(store.scheme.strengths?.[item.category]?.[item.id] || 3)
   const fav = store.state.favorites.includes(item.id)
   const tags = (item.mood_tags || []).slice(0, 3)
+  const referenceLabel = review.status === 'pending'
+    ? '审核中 · 仅本人可见'
+    : review.status === 'rejected'
+      ? '未通过 · 当前仅本人可见'
+      : review.status === 'approved'
+        ? '已公开'
+        : review.status === 'local'
+          ? image ? '仅本地 · 尚未提交审核' : '仅本地 · 待提交审核'
+          : image
+            ? customRef ? '当前：自定义上传' : '当前：内置图'
+            : '当前：待补'
+  const reviewBadge = review.status === 'pending'
+    ? `<span class="review-badge pending">审核中</span>`
+    : review.status === 'rejected'
+      ? `<span class="review-badge rejected">未通过</span>`
+      : review.status === 'local'
+        ? `<span class="review-badge local">仅本地</span>`
+        : ''
   const thumb = image
     ? `<div class="thumb-empty">${icon('image')}<span>待补参考图</span><em>${esc(cat.title_en)}</em></div>
        <img src="${esc(faceReferenceUrl(image))}" alt="${esc(item.name_zh)}参考图" loading="lazy" decoding="async" onerror="this.classList.add('is-broken')">`
@@ -296,6 +475,7 @@ function cardMarkup(item, cat, selected, showCat) {
     <div class="thumb">
       ${thumb}
       ${customRef ? `<span class="ref-custom-badge">自定义图</span>` : ''}
+      ${reviewBadge}
       <span class="picked-badge">${icon('check')}已选</span>
       <button class="fav-btn ${fav ? 'is-fav' : ''}" type="button" data-fav="${item.id}" aria-label="${fav ? '取消收藏' : '收藏'}${esc(item.name_zh)}" title="${fav ? '取消收藏' : '收藏'}">${icon('star')}</button>
     </div>
@@ -312,13 +492,19 @@ function cardMarkup(item, cat, selected, showCat) {
       <ul class="feature-list">${(item.visual_features || []).slice(0, 4).map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
       <p class="detail-prompt">${esc(item.prompt_zh)}</p>
       <div class="ref-upload">
-        <div class="ref-upload-head"><strong>参考图</strong><span>${image ? (customRef ? '当前：自定义上传' : '当前：内置图') : '当前：待补'}</span></div>
+        <div class="ref-upload-head"><strong>参考图</strong><span>${referenceLabel}</span></div>
         <div class="ref-upload-actions">
           <button class="btn ghost" type="button" data-upload-ref="${item.id}">${icon('upload')}${image ? '更换图片' : '上传图片'}</button>
-          ${customRef ? `<button class="text-btn" type="button" data-reset-ref="${item.id}">恢复默认</button>` : ''}
+          ${customRef ? `<button class="text-btn" type="button" data-reset-ref="${item.id}">${review.kind === 'card' ? '移除参考图' : '恢复默认'}</button>` : ''}
+          ${review.status === 'local' ? `<button class="text-btn" type="button" data-submit-review="${item.id}">提交审核</button>` : ''}
+          ${review.status === 'rejected' ? `<button class="text-btn" type="button" data-resubmit-review="${item.id}">重新提交审核</button>` : ''}
+          ${review.status === 'pending' ? `<button class="text-btn" type="button" data-withdraw-review="${item.id}">撤回审核</button>` : ''}
         </div>
         <input type="file" accept="image/png,image/jpeg,image/webp" data-ref-file="${item.id}" hidden>
         <small>JPG / PNG / WebP，自动压缩到 1400px 内。</small>
+        ${review.status === 'rejected' && review.submission?.reviewNote ? `<p class="review-note">审核未通过：${esc(review.submission.reviewNote)}</p>` : ''}
+        ${review.status === 'pending' ? `<p class="review-note">管理员审核通过后，其他用户才能看到${review.kind === 'card' ? '这张卡片' : '这张参考图'}。</p>` : ''}
+        ${review.status === 'local' ? `<p class="review-note">当前只保存在这台设备的账号里，提交审核并发布后其他用户才能看到。</p>` : ''}
       </div>
       ${item.strength_supported ? `<div class="strength">
         <div class="strength-head"><span>强度</span><b data-strength-label="${item.id}">${strength} / 5</b></div>
@@ -565,10 +751,9 @@ async function prepareReferenceImage(file) {
   return dataUrl
 }
 
-function faceUploadName(id) {
-  const user = String(window.__FACE_USER_ID__ || 'guest').replace(/[^a-z0-9]/gi, '').slice(0, 8)
-  const base = `face-${id}`.replace(/[^a-z0-9_-]/gi, '-').slice(0, 26)
-  return `${base}-${user}-${Date.now().toString(36).slice(-6)}`.slice(0, 40)
+function applySubmissionResult(submission) {
+  mergeSubmission(submission)
+  if (submission?.imagePath) store.setReferenceOverride(submission.targetId, submission.imagePath)
 }
 
 async function uploadReference(id, file) {
@@ -581,13 +766,22 @@ async function uploadReference(id, file) {
   }
   try {
     const dataUrl = await prepareReferenceImage(file)
-    const result = await uploadReferenceImage({ name: faceUploadName(id), dataUrl })
-    if (!result?.path) throw new Error('上传成功但没有返回文件路径')
-    store.setReferenceOverride(id, result.path)
+    const item = itemMap.get(id)
+    if (!item) throw new Error('卡片已经不存在，请刷新后重试')
+    const result = item.source_section === 'custom'
+      ? await submitFaceCard(item, dataUrl)
+      : await submitFaceReference({
+          targetId: item.id,
+          category: item.category,
+          name: item.name_zh,
+          imageDataUrl: dataUrl,
+        })
+    if (!result?.submission?.imagePath) throw new Error('上传成功但没有返回待审核图片路径')
+    applySubmissionResult(result.submission)
     renderAll()
-    toast('参考图已更新')
+    toast('参考图已保存，正在等待审核')
   } catch (err) {
-    toast(err.message || '上传失败')
+    toast(err.message || '提交失败')
     if (button) {
       button.disabled = false
       button.innerHTML = original
@@ -595,12 +789,98 @@ async function uploadReference(id, file) {
   }
 }
 
+async function localReferenceDataUrl(id) {
+  const path = store.state.referenceOverrides?.[id]
+  if (!path) return ''
+  try {
+    const response = await fetch(faceReferenceUrl(path), { credentials: 'include' })
+    if (!response.ok) return ''
+    const blob = await response.blob()
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(blob.type)) return ''
+    return await prepareReferenceImage(new File([blob], 'legacy-reference.webp', { type: blob.type }))
+  } catch {
+    return ''
+  }
+}
+
+async function submitLocalCard(item) {
+  try {
+    const imageDataUrl = await localReferenceDataUrl(item.id)
+    const result = await submitFaceCard(item, imageDataUrl)
+    if (!result?.submission) throw new Error('提交成功但没有返回审核记录')
+    applySubmissionResult(result.submission)
+    renderAll()
+    toast('已提交审核，管理员发布后其他用户可见')
+  } catch (error) {
+    toast(error.message || '提交审核失败')
+  }
+}
+
+async function resubmitReview(item) {
+  const review = itemReviewState(item)
+  if (!review.submission) return submitLocalCard(item)
+  try {
+    const result = await resubmitFaceSubmission(review.submission.id)
+    if (!result?.submission) throw new Error('重新提交失败')
+    mergeSubmission(result.submission)
+    renderAll()
+    toast('已重新提交审核')
+  } catch (error) {
+    toast(error.message || '重新提交失败')
+  }
+}
+
 function resetReference(id) {
-  confirmModal('恢复默认参考图？', '会删除当前账号上传的覆盖图，恢复服务端内置参考图。', '恢复').then((ok) => {
+  const item = itemMap.get(id)
+  if (!item) return toast('卡片已经不存在，请刷新后重试')
+  const review = itemReviewState(item)
+  const isPendingCard = review.kind === 'card' && review.submission && review.status !== 'approved'
+  confirmModal(isPendingCard ? '移除这张卡片的参考图？' : '恢复默认参考图？', isPendingCard
+    ? '卡片继续保留在审核里，只清空这次提交的参考图。'
+    : review.status === 'pending'
+      ? '会撤回正在审核的参考图，并恢复服务端默认图。'
+      : '会删除当前账号的参考图覆盖，恢复服务端内置参考图。', isPendingCard ? '移除' : '恢复').then(async (ok) => {
     if (!ok) return
+    if (isPendingCard) {
+      try {
+        const result = await submitFaceCard(item, '', true)
+        if (!result?.submission) throw new Error('移除参考图失败')
+        mergeSubmission(result.submission)
+        store.clearReferenceOverride(id)
+        renderAll()
+        toast('已从待审卡片中移除参考图')
+      } catch (error) {
+        toast(error.message || '移除参考图失败')
+      }
+      return
+    }
+    if (review.submission && review.status !== 'approved') {
+      try {
+        await withdrawFaceSubmission(review.submission.id)
+        submissions.delete(submissionKey(review.submission.kind, review.submission.targetId))
+      } catch (error) {
+        return toast(error.message || '撤回审核失败，请稍后再试')
+      }
+    }
     store.clearReferenceOverride(id)
     renderAll()
     toast('已恢复默认参考图')
+  })
+}
+
+function withdrawReview(item) {
+  const review = itemReviewState(item)
+  if (!review.submission) return
+  confirmModal('撤回这次审核提交？', '撤回后内容仍保留在本地，但其他用户和审核端都看不到。', '撤回').then(async (ok) => {
+    if (!ok) return
+    try {
+      await withdrawFaceSubmission(review.submission.id)
+      submissions.delete(submissionKey(review.submission.kind, review.submission.targetId))
+      renderAll()
+      toast('已撤回审核提交')
+    } catch (error) {
+      toast(error.message || '撤回失败')
+    }
   })
 }
 
@@ -838,7 +1118,7 @@ function openCustomModal(catKey) {
   const cat = categoryMap.get(catKey)
   if (!cat) return
   openModal(`<div class="modal-head">
-    <div><h2>新增自定义特征</h2><p class="modal-sub">补充到「${esc(cat.title_zh)}」。它会保存在本地，并参与提示词生成。</p></div>
+    <div><h2>新增自定义特征</h2><p class="modal-sub">保存后会先在本人账号可用，并自动提交审核；发布后其他用户也能看到。</p></div>
     <button class="icon-btn" data-modal-close type="button" aria-label="关闭">${icon('close')}</button>
   </div>
   <div class="form-grid">
@@ -853,7 +1133,7 @@ function openCustomModal(catKey) {
   </div>`)
   $$('#modal [data-modal-close]').forEach((btn) => { btn.onclick = closeOverlays })
   $('#custom-name').focus()
-  $('#modal [data-save-custom]').onclick = () => {
+  $('#modal [data-save-custom]').onclick = async () => {
     const name = $('#custom-name').value.trim()
     if (!name) {
       toast('先给这个特征起个名字')
@@ -873,7 +1153,12 @@ function openCustomModal(catKey) {
     view.expanded.add(item.id)
     const result = store.toggleItem(catKey, item.id)
     renderAll()
-    toast(result.notice || `已添加「${item.name_zh}」`)
+    toast(result.notice || `已添加「${item.name_zh}」，正在提交审核`)
+    try {
+      await submitLocalCard(item)
+    } catch {
+      // submitLocalCard 已给出失败提示，本地内容保持可用
+    }
   }
 }
 
@@ -978,8 +1263,19 @@ function bind() {
       e.stopPropagation()
       const item = itemMap.get(del.dataset.delCustom)
       if (!item) return
-      confirmModal('删除这个自定义项？', `「${item.name_zh}」会从当前方案和本地数据库中移除。`, '删除').then(async (ok) => {
+      const review = itemReviewState(item)
+      confirmModal('删除这个自定义项？', review.status === 'approved'
+        ? `「${item.name_zh}」已经公开，删除本地副本不会下架公共卡片。`
+        : `「${item.name_zh}」会从当前方案和本地数据库中移除。`, '删除').then(async (ok) => {
         if (!ok) return
+        if (review.submission && review.status !== 'approved') {
+          try {
+            await withdrawFaceSubmission(review.submission.id)
+            submissions.delete(submissionKey(review.submission.kind, review.submission.targetId))
+          } catch (error) {
+            return toast(error.message || '撤回审核失败，请稍后再试')
+          }
+        }
         store.clearReferenceOverride(item.id)
         store.removeCustomItem(item.id)
         rebuildCompiler()
@@ -1002,6 +1298,27 @@ function bind() {
     if (reset) {
       e.stopPropagation()
       resetReference(reset.dataset.resetRef)
+      return
+    }
+    const submitReview = e.target.closest('[data-submit-review]')
+    if (submitReview) {
+      e.stopPropagation()
+      const item = itemMap.get(submitReview.dataset.submitReview)
+      if (item) void submitLocalCard(item)
+      return
+    }
+    const resubmitReviewButton = e.target.closest('[data-resubmit-review]')
+    if (resubmitReviewButton) {
+      e.stopPropagation()
+      const item = itemMap.get(resubmitReviewButton.dataset.resubmitReview)
+      if (item) void resubmitReview(item)
+      return
+    }
+    const withdrawReviewButton = e.target.closest('[data-withdraw-review]')
+    if (withdrawReviewButton) {
+      e.stopPropagation()
+      const item = itemMap.get(withdrawReviewButton.dataset.withdrawReview)
+      if (item) withdrawReview(item)
       return
     }
     const fav = e.target.closest('[data-fav]')
@@ -1164,6 +1481,7 @@ function bind() {
   })
   $('#gender').addEventListener('change', (e) => {
     store.setSchemeField('gender', e.target.value)
+    syncRandomSettings()
     renderPanel()
   })
   $('#age').addEventListener('change', (e) => {
@@ -1193,6 +1511,7 @@ function bind() {
 
   $('#more-btn').addEventListener('click', (e) => {
     e.stopPropagation()
+    closeRandomSettings()
     $('#more-menu').hidden = !$('#more-menu').hidden
     $('#export-menu').hidden = true
   })
@@ -1229,6 +1548,7 @@ function bind() {
 
   $('#export-btn').addEventListener('click', (e) => {
     e.stopPropagation()
+    closeRandomSettings()
     $('#export-menu').hidden = !$('#export-menu').hidden
     $('#more-menu').hidden = true
   })
@@ -1250,16 +1570,35 @@ function bind() {
   })
 
   $('#open-presets').addEventListener('click', openPresets)
+  $('#random-settings-btn').addEventListener('click', (e) => {
+    e.stopPropagation()
+    const popover = $('#random-settings')
+    const open = popover.hidden
+    popover.hidden = !open
+    $('#random-settings-btn').setAttribute('aria-expanded', String(open))
+    $('#more-menu').hidden = true
+    $('#export-menu').hidden = true
+    if (open) syncRandomSettings()
+  })
+  $('#random-settings').addEventListener('click', (e) => e.stopPropagation())
+  $('#random-gender-aware').addEventListener('change', (e) => {
+    store.setUi({ randomGenderAware: e.target.checked })
+    syncRandomSettings()
+    toast(e.target.checked ? '随机时按已选性别优化' : '已关闭随机性别优化')
+  })
   $('#randomize-btn').addEventListener('click', async () => {
+    closeRandomSettings()
     const count = countSelections(store.scheme)
     if (count > 0) {
       const ok = await confirmModal(
         '随机生成新角色？',
-        `会替换当前已选的 ${count} 项特征，并重新随机视觉风格、性别、年龄和强度。方案名称与参考图会保留。`,
+        `会替换当前已选的 ${count} 项特征和强度。性别、年龄、角色定位、补充描述、画风和方案名称都会保留。`,
         '重新生成',
       )
       if (!ok) return
     }
+    const genderAware = store.state.ui.randomGenderAware !== false && Boolean(store.scheme.gender)
+    const gender = store.scheme.gender
     store.randomizeScheme()
     view.quick = ''
     view.mood = ''
@@ -1273,7 +1612,7 @@ function bind() {
     syncSchemeFields()
     renderAll()
     $('.cards-wrap').scrollTop = 0
-    toast('已随机生成新角色')
+    toast(genderAware ? `已按「${gender}」优化随机生成` : '已随机生成新角色')
   })
   $('#handoff-btn').addEventListener('click', handoffToFree)
   $('#open-search').addEventListener('click', openSearch)
@@ -1343,12 +1682,14 @@ function bind() {
   document.addEventListener('click', () => {
     $('#more-menu').hidden = true
     $('#export-menu').hidden = true
+    closeRandomSettings()
   })
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       view.confirmClose?.()
       closeOverlays()
       $('#panel').classList.remove('is-open')
+      closeRandomSettings()
       return
     }
     const tag = document.activeElement?.tagName

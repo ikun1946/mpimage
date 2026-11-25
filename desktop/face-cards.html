@@ -180,25 +180,40 @@
   }
   .mode-tabs {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
     padding: 10px;
     border-bottom: 1px solid var(--line-soft);
   }
   .mode-tabs button {
     min-width: 0;
-    padding: 7px 4px;
+    padding: 7px 6px;
     border: 0;
     border-radius: 8px;
     background: transparent;
     color: var(--ink-soft);
     font-size: 11.5px;
     font-weight: 600;
+    white-space: nowrap;
   }
   .mode-tabs button:hover { background: var(--surface-subtle); color: var(--ink); }
   .mode-tabs button.is-active {
     background: var(--moss-tint);
     color: var(--moss);
+  }
+  .mode-tabs button b {
+    display: inline-flex;
+    min-width: 15px;
+    height: 15px;
+    margin-left: 3px;
+    padding: 0 4px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-size: 9px;
+    vertical-align: 1px;
   }
   .side-search { padding: 9px 10px 4px; }
   .side-search input,
@@ -378,6 +393,9 @@
     white-space: nowrap;
   }
   .card-tag.custom { background: var(--accent-tint); color: var(--accent); }
+  .card-tag.pending { background: var(--accent-tint); color: var(--accent); }
+  .card-tag.rejected { background: #f3dfda; color: #a74331; }
+  .card-tag.approved { background: var(--moss-tint); color: var(--moss); }
   .empty-list {
     padding: 38px 16px;
     color: var(--ink-faint);
@@ -511,6 +529,34 @@
     padding: 0;
     accent-color: var(--moss);
   }
+  .gender-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .gender-picker label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 9px;
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    background: var(--surface-raised);
+    color: var(--ink-soft);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .gender-picker label:has(input:checked) {
+    border-color: var(--moss-soft);
+    background: var(--moss-tint);
+    color: var(--moss);
+  }
+  .gender-picker input {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--moss);
+  }
   .reference-box {
     display: grid;
     grid-template-columns: 116px minmax(0, 1fr);
@@ -531,6 +577,59 @@
     text-align: center;
   }
   .reference-preview img { width: 100%; height: 100%; object-fit: cover; }
+  .submission-review {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .submission-review figure {
+    margin: 0;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface-raised);
+  }
+  .submission-review figcaption {
+    margin-bottom: 6px;
+    color: var(--ink-faint);
+    font-size: 10.5px;
+  }
+  .submission-review .submission-image {
+    display: grid;
+    min-height: 150px;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--surface-subtle);
+    color: var(--ink-faint);
+    font-size: 11px;
+  }
+  .submission-review img { width: 100%; max-height: 260px; object-fit: contain; }
+  .submission-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px 12px;
+    margin: 0 0 12px;
+    padding: 9px 11px;
+    border: 1px solid var(--line-soft);
+    border-radius: 9px;
+    background: var(--surface-subtle);
+    font-size: 11px;
+  }
+  .submission-meta span { color: var(--ink-faint); }
+  .submission-meta strong { color: var(--ink); font-weight: 650; }
+  .submission-note {
+    margin: 0 0 10px;
+    padding: 9px 11px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface-raised);
+    color: var(--ink-soft);
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  .submission-note.error { border-color: #e3c0b8; background: #fbefec; color: #8e3929; }
   .reference-tools { display: grid; gap: 7px; }
   .reference-actions { display: flex; flex-wrap: wrap; gap: 6px; }
   .hint-line { color: var(--ink-faint); font-size: 10.5px; line-height: 1.6; }
@@ -708,6 +807,7 @@
       <div class="mode-tabs" role="tablist" aria-label="编辑模式">
         <button type="button" data-mode="cards" class="is-active">维度卡片</button>
         <button type="button" data-mode="presets">预设方案</button>
+        <button type="button" data-mode="submissions">待审核 <b id="submission-count" hidden>0</b></button>
         <button type="button" data-mode="advanced">高级 JSON</button>
       </div>
       <div class="side-search">
@@ -783,6 +883,15 @@
     advancedDraft: '',
     advancedDirty: false,
     referenceUrls: new Map(),
+    submissions: [],
+    submissionId: '',
+    submissionStatus: 'pending',
+    submissionDraft: null,
+    submissionSaved: '',
+    submissionReviewNote: '',
+    submissionNewImage: '',
+    submissionsLoading: false,
+    submissionsError: '',
     noticeTimer: 0,
   }
 
@@ -809,6 +918,7 @@
     exportButton: $('#btn-export'),
     restore: $('#btn-restore'),
     reset: $('#btn-reset'),
+    submissionCount: $('#submission-count'),
     statusDot: $('#status-dot'),
     statusState: $('#status-state'),
     statusCount: $('#status-count'),
@@ -829,6 +939,22 @@
 
   function currentPreset() {
     return (state.catalog?.presets || []).find(preset => preset.id === state.presetId) || null
+  }
+
+  function currentSubmission() {
+    return state.submissions.find(item => item.id === state.submissionId) || null
+  }
+
+  function isSubmissionDirty() {
+    return Boolean(state.submissionDraft) && (
+      JSON.stringify(state.submissionDraft) !== state.submissionSaved ||
+      Boolean(state.submissionNewImage)
+    )
+  }
+
+  function renderSubmissionDirty() {
+    const button = $('[data-action="save-submission"]', dom.editor)
+    if (button) button.disabled = !isSubmissionDirty()
   }
 
   function allCards() {
@@ -903,6 +1029,7 @@
       dom.app.hidden = false
       renderAll()
       notice('目录已读取，修改后按 Ctrl+S 保存')
+      void loadSubmissions({ silent: true })
     } catch (error) {
       showBootError(error.message || String(error))
     } finally {
@@ -927,9 +1054,140 @@
     return [...(category?.items || [])].sort(sortCards)[0]?.id || ''
   }
 
+  function renderSubmissionTab() {
+    const pending = state.submissions.filter(item => item.status === 'pending').length
+    dom.submissionCount.hidden = pending === 0
+    dom.submissionCount.textContent = String(pending)
+    dom.submissionCount.title = `${pending} 条待审核`
+  }
+
+  function submissionStatusText(status) {
+    return status === 'pending' ? '待审核' : status === 'rejected' ? '已驳回' : '已发布'
+  }
+
+  function submissionKindText(kind) {
+    return kind === 'reference' ? '参考图' : '新卡片'
+  }
+
+  function submissionTitle(submission) {
+    return submission?.card?.name_zh || submission?.targetId || submission?.id || ''
+  }
+
+  function filteredSubmissions() {
+    const query = `${state.navSearch} ${state.listSearch}`.trim().toLowerCase()
+    return state.submissions.filter(item => {
+      if (state.submissionStatus !== 'all' && item.status !== state.submissionStatus) return false
+      if (!query) return true
+      return [
+        item.id,
+        item.targetId,
+        item.username,
+        item.displayName,
+        item.category,
+        item.card?.name_zh,
+        item.card?.name_en,
+        item.reviewNote,
+      ].some(value => String(value || '').toLowerCase().includes(query))
+    })
+  }
+
+  function pickSubmission(preferredId = '') {
+    const list = filteredSubmissions()
+    const found = list.find(item => item.id === preferredId) || list[0] || null
+    state.submissionId = found?.id || ''
+    if (found) syncSubmissionDraft(found)
+    else {
+      state.submissionDraft = null
+      state.submissionSaved = ''
+      state.submissionReviewNote = ''
+      state.submissionNewImage = ''
+    }
+  }
+
+  function syncSubmissionDraft(submission) {
+    state.submissionDraft = clone(submission)
+    state.submissionSaved = JSON.stringify(submission)
+    state.submissionReviewNote = submission.reviewNote || ''
+    state.submissionNewImage = ''
+  }
+
+  async function loadSubmissions({ silent = false } = {}) {
+    if (state.submissionsLoading) return
+    state.submissionsLoading = true
+    state.submissionsError = ''
+    renderSubmissionTab()
+    try {
+      const data = await api('/api/admin/face/submissions?status=all')
+      state.submissions = Array.isArray(data?.submissions) ? data.submissions : []
+      const current = currentSubmission()
+      if (!current || (!isSubmissionDirty() && current.id === state.submissionId)) {
+        pickSubmission(state.submissionId)
+      } else if (isSubmissionDirty()) {
+        const fresh = state.submissions.find(item => item.id === state.submissionId)
+        if (!fresh) {
+          state.submissionDraft = null
+          state.submissionSaved = ''
+          state.submissionReviewNote = ''
+          state.submissionNewImage = ''
+          pickSubmission('')
+        }
+      }
+      renderSubmissionTab()
+      if (state.mode === 'submissions') {
+        renderTree()
+        renderList()
+        if (isSubmissionDirty()) renderSubmissionDirty()
+        else renderEditor()
+      }
+      if (!silent) notice('审核列表已刷新', 'ok')
+    } catch (error) {
+      state.submissionsError = error.message || String(error)
+      renderSubmissionTab()
+      if (state.mode === 'submissions') {
+        renderList()
+        renderEditor()
+      }
+      if (!silent) notice(`读取审核列表失败：${state.submissionsError}`, 'error')
+    } finally {
+      state.submissionsLoading = false
+    }
+  }
+
+  function confirmDiscardSubmissionDraft(action) {
+    if (!isSubmissionDirty()) return true
+    return confirm(`这条提交还有未保存的审核修改，继续${action}会丢掉这些修改。确定继续？`)
+  }
+
+  function selectSubmission(id) {
+    if (id === state.submissionId) return
+    if (!confirmDiscardSubmissionDraft('切换提交')) return
+    const submission = state.submissions.find(item => item.id === id)
+    if (!submission) return
+    state.submissionId = id
+    syncSubmissionDraft(submission)
+    renderList()
+    renderEditor()
+  }
+
+  function selectSubmissionStatus(status) {
+    if (status === state.submissionStatus) return
+    if (!confirmDiscardSubmissionDraft('切换审核筛选')) return
+    state.submissionStatus = status
+    state.navSearch = ''
+    state.listSearch = ''
+    dom.navSearch.value = ''
+    dom.listSearch.value = ''
+    pickSubmission('')
+    renderTree()
+    renderList()
+    renderEditor()
+  }
+
   function renderAll() {
     dom.workspace.classList.toggle('is-advanced', state.mode === 'advanced')
     $$('.mode-tabs button').forEach(button => button.classList.toggle('is-active', button.dataset.mode === state.mode))
+    dom.navSearch.placeholder = state.mode === 'submissions' ? '筛选提交人 / 卡片…' : '筛选维度…'
+    renderSubmissionTab()
     renderMeta()
     renderTree()
     renderList()
@@ -947,6 +1205,28 @@
 
   function renderTree() {
     if (!state.catalog) return
+    if (state.mode === 'submissions') {
+      const counts = state.submissions.reduce((acc, item) => {
+        acc.all = (acc.all || 0) + 1
+        acc[item.status] = (acc[item.status] || 0) + 1
+        return acc
+      }, {})
+      const options = [
+        ['pending', '待审核', counts.pending || 0],
+        ['rejected', '已驳回', counts.rejected || 0],
+        ['approved', '已发布', counts.approved || 0],
+        ['all', '全部', counts.all || 0],
+      ]
+      dom.tree.innerHTML = `<div class="tree-group">
+        <div class="tree-group-head">审核状态 <em>${counts.pending || 0}</em></div>
+        ${options.map(([key, label, count]) => `<button type="button" class="tree-cat ${key === state.submissionStatus ? 'is-active' : ''}" data-submission-status="${key}">
+          <span>${label}</span>
+          <em>${count}</em>
+        </button>`).join('')}
+      </div>
+      ${state.submissionsError ? `<div class="empty-list">${esc(state.submissionsError)}</div>` : ''}`
+      return
+    }
     const query = state.navSearch.trim().toLowerCase()
     const categories = categoryMap()
     dom.tree.innerHTML = (state.catalog.groups || []).map(group => {
@@ -969,6 +1249,7 @@
 
   function renderList() {
     if (state.mode === 'advanced') return
+    if (state.mode === 'submissions') return renderSubmissionList()
     if (state.mode === 'presets') return renderPresetList()
     const category = currentCategory()
     if (!category) {
@@ -1022,9 +1303,42 @@
       </button>`).join('') : '<div class="empty-list">没有预设方案</div>'
   }
 
+  function renderSubmissionList() {
+    const list = filteredSubmissions()
+    dom.listTitle.textContent = state.submissionStatus === 'all'
+      ? '全部提交'
+      : submissionStatusText(state.submissionStatus)
+    dom.listSubtitle.textContent = state.submissionsLoading
+      ? '正在读取审核列表…'
+      : `${list.length} 条 · 通过后立即发布到所有客户端`
+    dom.listActions.innerHTML = '<button class="button mini" type="button" data-action="reload-submissions">刷新</button>'
+    if (state.submissionsError) {
+      dom.list.innerHTML = `<div class="empty-list">${esc(state.submissionsError)}</div>`
+      return
+    }
+    dom.list.innerHTML = list.length ? list.map(item => {
+      const preview = item.imageUrl || state.catalog.references?.[item.targetId] || ''
+      const previewMarkup = item.imageUrl
+        ? `<img src="${esc(item.imageUrl)}" alt="" />`
+        : preview
+          ? `<img data-ref-path="${esc(preview)}" alt="" />`
+          : esc((submissionTitle(item) || '?').slice(0, 1))
+      return `<button type="button" class="card-row ${item.id === state.submissionId ? 'is-active' : ''}" data-submission="${esc(item.id)}">
+        <span class="card-thumb">${previewMarkup}</span>
+        <span class="card-main">
+          <span class="card-name">${esc(submissionTitle(item))}</span>
+          <span class="card-sub">${esc(item.displayName || item.username || '未知用户')} · ${esc(item.category)} · ${esc(item.updatedAt.slice(0, 16).replace('T', ' '))}</span>
+        </span>
+        <span class="card-tag ${esc(item.status)}">${submissionStatusText(item.status)}</span>
+      </button>`
+    }).join('') : '<div class="empty-list">当前筛选下没有提交</div>'
+    hydrateReferenceImages(dom.list)
+  }
+
   function renderEditor() {
     if (!state.catalog) return
     if (state.mode === 'advanced') return renderAdvanced()
+    if (state.mode === 'submissions') return renderSubmissionEditor()
     if (state.mode === 'presets') return renderPresetEditor()
     renderCardEditor()
   }
@@ -1039,6 +1353,11 @@
     if (!category) return editorEmpty('左侧还没有可编辑的维度')
     if (!card) return editorEmpty('这个维度还没有卡片。点中间的「新增」建一张。')
     const ref = state.catalog.references?.[card.id] || ''
+    const genderAffinity = new Set(
+      Array.isArray(card.gender_affinity) && card.gender_affinity.length
+        ? card.gender_affinity
+        : ['neutral'],
+    )
     dom.editor.innerHTML = `
       <div class="editor-head">
         <div>
@@ -1083,6 +1402,15 @@
               <label><input type="checkbox" data-card-field="visible" ${card.visible !== false ? 'checked' : ''} />客户端可见</label>
             </div></div>
           </div>
+          <div class="field" style="margin-top:11px">
+            <span>随机性别适配</span>
+            <div class="gender-picker">
+              <label><input type="checkbox" data-card-gender="male" ${genderAffinity.has('male') ? 'checked' : ''} />男性</label>
+              <label><input type="checkbox" data-card-gender="female" ${genderAffinity.has('female') ? 'checked' : ''} />女性</label>
+              <label><input type="checkbox" data-card-gender="neutral" ${genderAffinity.has('neutral') ? 'checked' : ''} />中性</label>
+            </div>
+            <small>可多选；全部取消时按中性处理。</small>
+          </div>
           <label class="field" style="margin-top:11px"><span>结构定义</span><textarea data-card-field="definition">${esc(card.definition)}</textarea><small>给自己看的说明，帮助后续判断哪些特征属于同一类。</small></label>
         </section>
 
@@ -1121,6 +1449,169 @@
               <span class="hint-line">上传图会进入运行数据目录，不会写进安装包。PNG / JPEG / WebP，最大 8 MB。</span>
             </div>
           </div>
+        </section>
+      </div>`
+    hydrateReferenceImages(dom.editor)
+  }
+
+  function submissionImageMarkup(submission, newImage, label) {
+    if (newImage) {
+      return `<figure>
+        <figcaption>${esc(label)}</figcaption>
+        <div class="submission-image"><img src="${esc(newImage)}" alt="${esc(label)}" /></div>
+      </figure>`
+    }
+    if (submission.imageUrl) {
+      return `<figure>
+        <figcaption>${esc(label)}</figcaption>
+        <div class="submission-image"><img src="${esc(submission.imageUrl)}" alt="${esc(label)}" /></div>
+      </figure>`
+    }
+    if (submission.imagePath) {
+      return `<figure>
+        <figcaption>${esc(label)}</figcaption>
+        <div class="submission-image"><img data-ref-path="${esc(submission.imagePath)}" alt="${esc(label)}" /></div>
+      </figure>`
+    }
+    if (submission.publishedPath) {
+      return `<figure>
+        <figcaption>${esc(label)}</figcaption>
+        <div class="submission-image"><img data-ref-path="${esc(submission.publishedPath)}" alt="${esc(label)}" /></div>
+      </figure>`
+    }
+    return `<figure>
+      <figcaption>${esc(label)}</figcaption>
+      <div class="submission-image">提交里没有图片</div>
+    </figure>`
+  }
+
+  function submissionPreview(submission, draft, newImage) {
+    if (newImage) return { imageUrl: newImage, imagePath: '', publishedPath: '' }
+    const imagePath = draft?.imagePath ?? submission.imagePath
+    if (imagePath !== submission.imagePath) {
+      return { imageUrl: '', imagePath: imagePath || '', publishedPath: '' }
+    }
+    return {
+      imageUrl: submission.imageUrl || '',
+      imagePath: imagePath || '',
+      publishedPath: submission.publishedPath || '',
+    }
+  }
+
+  function renderSubmissionEditor() {
+    const submission = currentSubmission()
+    if (!submission) return editorEmpty(state.submissionsLoading ? '正在读取审核列表…' : '当前筛选下没有提交。')
+    const draft = state.submissionDraft || clone(submission)
+    const editable = submission.status === 'pending'
+    const isCard = submission.kind === 'card'
+    const card = draft.card || {}
+    const publicRef = state.catalog.references?.[submission.targetId] || ''
+    const statusClass = submission.status === 'pending' ? 'pending' : submission.status === 'rejected' ? 'rejected' : 'approved'
+    const categoryOptions = (state.catalog.categories || []).map(category =>
+      `<option value="${esc(category.key)}" ${category.key === (isCard ? card.category : draft.category) ? 'selected' : ''}>${esc(category.title_zh || category.key)}</option>`,
+    ).join('')
+    const genderAffinity = new Set(
+      Array.isArray(card.gender_affinity) && card.gender_affinity.length
+        ? card.gender_affinity
+        : ['neutral'],
+    )
+    const draftDirty = isSubmissionDirty()
+    const preview = submissionPreview(submission, draft, state.submissionNewImage)
+    const previewLabel = isCard ? '提交的卡片参考图' : '提交的新参考图'
+    const currentLabel = isCard ? '发布时使用的参考图' : '当前线上参考图'
+    const imageReview = isCard
+      ? `<div class="submission-review">
+          ${submissionImageMarkup(preview, '', previewLabel)}
+          <figure><figcaption>${currentLabel}</figcaption><div class="submission-image">${card.reference_image ? `<img data-ref-path="${esc(card.reference_image)}" alt="" />` : '通过后使用上面这张图；没有图则卡片暂时不带参考图'}</div></figure>
+        </div>`
+      : `<div class="submission-review">
+          <figure><figcaption>当前线上参考图</figcaption><div class="submission-image">${publicRef ? `<img data-ref-path="${esc(publicRef)}" alt="当前参考图" />` : '当前没有参考图'}</div></figure>
+          ${submissionImageMarkup(preview, '', previewLabel)}
+        </div>`
+
+    dom.editor.innerHTML = `
+      <div class="editor-head">
+        <div>
+          <h1>${esc(submissionTitle(submission))}</h1>
+          <p>${submissionKindText(submission.kind)}提交 · ${esc(submission.displayName || submission.username || '未知用户')} · ${esc(submission.category)}</p>
+        </div>
+        <div class="editor-head-actions">
+          <span class="card-tag ${statusClass}">${submissionStatusText(submission.status)}</span>
+          ${editable ? `<button class="button mini" type="button" data-action="save-submission" ${draftDirty ? '' : 'disabled'}>保存修改</button>
+          <button class="button mini danger" type="button" data-action="reject-submission">仅驳回</button>
+          <button class="button primary mini" type="button" data-action="approve-submission">通过并发布</button>` : ''}
+        </div>
+      </div>
+      <div class="editor-body">
+        <section class="section">
+          <h2 class="section-title">提交信息 <span>${editable ? '可以修改后发布' : '只在待审核状态可以处理'}</span></h2>
+          <div class="submission-meta">
+            <div><span>提交人</span><br /><strong>${esc(submission.displayName || submission.username || '未知用户')}</strong></div>
+            <div><span>提交时间</span><br /><strong>${esc(String(submission.submittedAt || '').slice(0, 16).replace('T', ' '))}</strong></div>
+            <div><span>类型</span><br /><strong>${submissionKindText(submission.kind)}</strong></div>
+            <div><span>目标 ID</span><br /><strong>${esc(submission.targetId)}</strong></div>
+            <div><span>图片尺寸</span><br /><strong>${submission.imageWidth && submission.imageHeight ? `${submission.imageWidth} × ${submission.imageHeight}` : '无图片'}</strong></div>
+            <div><span>提交记录</span><br /><strong>${esc(submission.id.slice(0, 8))}</strong></div>
+          </div>
+          ${submission.status === 'rejected' ? `<p class="submission-note error">已驳回：${esc(submission.reviewNote || '没有填写原因')}</p>` : ''}
+          ${submission.status === 'approved' ? `<p class="submission-note">已在 ${esc(String(submission.publishedAt || '').slice(0, 16).replace('T', ' '))} 发布为 ${esc(submission.publishedTargetId || submission.targetId)}。</p>` : ''}
+          ${!editable ? '<p class="submission-note">这个提交已经处理过，下面内容仅供查看。</p>' : ''}
+        </section>
+
+        ${isCard ? `<section class="section">
+          <h2 class="section-title">卡片内容 <span>发布时会重新校验 ID 和同名卡片</span></h2>
+          <div class="grid-3">
+            <label class="field"><span>所属维度</span><select data-submission-field="category" ${editable ? '' : 'disabled'}>${categoryOptions}</select></label>
+            <label class="field"><span>卡片 ID</span><input data-submission-card-field="id" value="${esc(card.id || '')}" ${editable ? '' : 'disabled'} /><small>只能使用字母、数字、下划线、短横线</small></label>
+            <label class="field"><span>排序</span><input type="number" data-submission-card-field="sort_order" value="${Number(card.sort_order ?? 9999)}" ${editable ? '' : 'disabled'} /></label>
+          </div>
+          <div class="grid-2" style="margin-top:11px">
+            <label class="field"><span>中文名</span><input data-submission-card-field="name_zh" value="${esc(card.name_zh || '')}" ${editable ? '' : 'disabled'} /></label>
+            <label class="field"><span>英文名</span><input data-submission-card-field="name_en" value="${esc(card.name_en || '')}" ${editable ? '' : 'disabled'} /></label>
+          </div>
+          <label class="field" style="margin-top:11px"><span>结构定义</span><textarea data-submission-card-field="definition" ${editable ? '' : 'disabled'}>${esc(card.definition || '')}</textarea></label>
+          <div class="grid-2" style="margin-top:11px">
+            <label class="field"><span>中文提示词</span><textarea class="tall" data-submission-card-field="prompt_zh" ${editable ? '' : 'disabled'}>${esc(card.prompt_zh || '')}</textarea></label>
+            <label class="field"><span>英文提示词</span><textarea class="tall" data-submission-card-field="prompt_en" ${editable ? '' : 'disabled'}>${esc(card.prompt_en || '')}</textarea></label>
+          </div>
+          <div class="grid-2" style="margin-top:11px">
+            <label class="field"><span>视觉特征</span><textarea data-submission-card-field="visual_features" ${editable ? '' : 'disabled'}>${esc((card.visual_features || []).join('\n'))}</textarea><small>一行一项</small></label>
+            <label class="field"><span>气质标签</span><textarea data-submission-card-field="mood_tags" ${editable ? '' : 'disabled'}>${esc((card.mood_tags || []).join('\n'))}</textarea><small>一行一项</small></label>
+          </div>
+          <div class="grid-2" style="margin-top:11px">
+            <label class="field"><span>别名</span><textarea data-submission-card-field="aliases" ${editable ? '' : 'disabled'}>${esc((card.aliases || []).join('\n'))}</textarea></label>
+            <label class="field"><span>冲突卡片 ID</span><textarea data-submission-card-field="conflicts" ${editable ? '' : 'disabled'}>${esc((card.conflicts || []).join('\n'))}</textarea></label>
+          </div>
+          <div class="field" style="margin-top:11px">
+            <span>随机性别适配</span>
+            <div class="gender-picker">
+              <label><input type="checkbox" data-submission-gender="male" ${genderAffinity.has('male') ? 'checked' : ''} ${editable ? '' : 'disabled'} />男性</label>
+              <label><input type="checkbox" data-submission-gender="female" ${genderAffinity.has('female') ? 'checked' : ''} ${editable ? '' : 'disabled'} />女性</label>
+              <label><input type="checkbox" data-submission-gender="neutral" ${genderAffinity.has('neutral') ? 'checked' : ''} ${editable ? '' : 'disabled'} />中性</label>
+            </div>
+          </div>
+        </section>` : `<section class="section">
+          <h2 class="section-title">参考图目标 <span>发布时会替换该卡片当前的公共参考图</span></h2>
+          <div class="grid-2">
+            <label class="field"><span>目标卡片 ID</span><input data-submission-field="targetId" value="${esc(draft.targetId || '')}" ${editable ? '' : 'disabled'} /><small>必须是目录里已经存在的卡片</small></label>
+            <label class="field"><span>目标卡片</span><input value="${esc(state.catalog.categories.flatMap(category => category.items || []).find(item => item.id === draft.targetId)?.name_zh || '未找到')}" disabled /></label>
+          </div>
+        </section>`}
+
+        <section class="section">
+          <h2 class="section-title">参考图审核 <span>每张卡片只保留一张公共参考图</span></h2>
+          ${imageReview}
+          ${editable ? `<div class="reference-actions">
+            <button class="button mini" type="button" data-action="upload-submission-image">替换待审图片</button>
+            ${isCard ? `<button class="button mini" type="button" data-action="clear-submission-image" ${state.submissionNewImage || submission.imagePath ? '' : 'disabled'}>改为不带图</button>` : ''}
+            <input type="file" data-submission-file accept="image/png,image/jpeg,image/webp" hidden />
+          </div>
+          <p class="hint-line" style="margin-top:7px">上传后会先替换待审图，点击「保存修改」或「通过并发布」才会写入服务端。</p>` : ''}
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">审核备注 <span>驳回时必须填写；通过时会作为审核记录保存</span></h2>
+          <label class="field"><span>备注 / 驳回原因</span><textarea data-submission-note placeholder="例如：提示词和卡片分类不一致，请调整后重新提交" ${editable ? '' : 'disabled'}>${esc(state.submissionReviewNote)}</textarea></label>
         </section>
       </div>`
     hydrateReferenceImages(dom.editor)
@@ -1257,6 +1748,31 @@
     if (['name_zh', 'sort_order', 'visible', 'reference'].includes(field)) renderMeta()
   }
 
+  function updateCardGender(element) {
+    const card = currentCard()
+    if (!card) return
+    const selected = new Set(
+      Array.isArray(card.gender_affinity) && card.gender_affinity.length
+        ? card.gender_affinity
+        : ['neutral'],
+    )
+    if (element.checked) {
+      if (element.dataset.cardGender === 'neutral') {
+        selected.clear()
+        selected.add('neutral')
+      } else {
+        selected.delete('neutral')
+        selected.add(element.dataset.cardGender)
+      }
+    } else {
+      selected.delete(element.dataset.cardGender)
+    }
+    if (!selected.size) selected.add('neutral')
+    card.gender_affinity = [...selected]
+    renderDirty()
+    renderList()
+  }
+
   function updateCategoryField(field, element) {
     const category = currentCategory()
     if (!category) return
@@ -1277,6 +1793,209 @@
     else preset[field] = element.value
     renderDirty()
     renderList()
+  }
+
+  function updateSubmissionCategory(value) {
+    const draft = state.submissionDraft
+    if (!draft) return
+    draft.category = value
+    if (draft.card) draft.card.category = value
+    renderSubmissionDirty()
+  }
+
+  function updateSubmissionTarget(value) {
+    const draft = state.submissionDraft
+    if (!draft) return
+    draft.targetId = value
+    renderSubmissionDirty()
+  }
+
+  function updateSubmissionCardField(field, element) {
+    const card = state.submissionDraft?.card
+    if (!card) return
+    if (field === 'sort_order') card.sort_order = Number(element.value) || 9999
+    else if (field === 'visual_features' || field === 'mood_tags') {
+      card[field] = lines(element.value).slice(0, 40)
+    } else if (field === 'aliases') card[field] = words(element.value).slice(0, 40)
+    else if (field === 'conflicts' || field === 'compatibility') card[field] = words(element.value).slice(0, 60)
+    else card[field] = element.value
+    renderSubmissionDirty()
+  }
+
+  function updateSubmissionGender(element) {
+    const card = state.submissionDraft?.card
+    if (!card) return
+    const selected = new Set(
+      Array.isArray(card.gender_affinity) && card.gender_affinity.length
+        ? card.gender_affinity
+        : ['neutral'],
+    )
+    const value = element.dataset.submissionGender
+    if (element.checked) {
+      if (value === 'neutral') {
+        selected.clear()
+        selected.add('neutral')
+      } else {
+        selected.delete('neutral')
+        selected.add(value)
+      }
+    } else {
+      selected.delete(value)
+    }
+    if (!selected.size) selected.add('neutral')
+    card.gender_affinity = [...selected]
+    renderSubmissionDirty()
+  }
+
+  function updateSubmissionNote(value) {
+    const draft = state.submissionDraft
+    if (!draft) return
+    state.submissionReviewNote = value
+    draft.reviewNote = value
+    renderSubmissionDirty()
+  }
+
+  async function prepareSubmissionImage(file) {
+    if (!file) return ''
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      throw new Error('只支持 PNG / JPEG / WebP 图片')
+    }
+    if (file.size > 15 * 1024 * 1024) throw new Error('图片不能超过 15 MB')
+    let source
+    if ('createImageBitmap' in window) {
+      try {
+        source = await createImageBitmap(file)
+      } catch {
+        source = null
+      }
+    }
+    if (!source) {
+      source = await new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file)
+        const image = new Image()
+        image.onload = () => {
+          URL.revokeObjectURL(url)
+          resolve(image)
+        }
+        image.onerror = () => {
+          URL.revokeObjectURL(url)
+          reject(new Error('图片读取失败'))
+        }
+        image.src = url
+      })
+    }
+    const width = source.width || source.naturalWidth
+    const height = source.height || source.naturalHeight
+    const scale = Math.min(1, 1400 / Math.max(width, height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(width * scale))
+    canvas.height = Math.max(1, Math.round(height * scale))
+    const context = canvas.getContext('2d')
+    context.fillStyle = '#fff'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.imageSmoothingQuality = 'high'
+    context.drawImage(source, 0, 0, canvas.width, canvas.height)
+    source.close?.()
+    let dataUrl = canvas.toDataURL('image/webp', 0.9)
+    if (!dataUrl.startsWith('data:image/webp')) dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+    return dataUrl
+  }
+
+  function submissionPayload() {
+    const draft = state.submissionDraft
+    if (!draft) throw new Error('没有选中的提交')
+    const payload = {
+      reviewNote: state.submissionReviewNote,
+    }
+    if (state.submissionNewImage) payload.dataUrl = state.submissionNewImage
+    if (draft.kind === 'card') {
+      payload.category = draft.card?.category || draft.category
+      payload.targetId = draft.card?.id || draft.targetId
+      payload.card = draft.card
+    } else {
+      payload.category = draft.category
+      payload.targetId = draft.targetId
+      if (draft.imagePath !== currentSubmission()?.imagePath) payload.imagePath = draft.imagePath || ''
+    }
+    return payload
+  }
+
+  async function saveSubmissionDraft({ silent = false } = {}) {
+    const submission = currentSubmission()
+    if (!submission || submission.status !== 'pending') return false
+    try {
+      const data = await api(`/api/admin/face/submissions/${encodeURIComponent(submission.id)}`, {
+        method: 'PATCH',
+        body: submissionPayload(),
+      })
+      if (!data?.submission) throw new Error('服务端没有返回提交记录')
+      state.submissions = state.submissions.map(item => item.id === data.submission.id ? data.submission : item)
+      syncSubmissionDraft(data.submission)
+      renderSubmissionList()
+      renderSubmissionEditor()
+      if (!silent) notice('审核内容已保存', 'ok')
+      return true
+    } catch (error) {
+      notice(`保存审核内容失败：${error.message || error}`, 'error')
+      return false
+    }
+  }
+
+  async function approveSubmission() {
+    const submission = currentSubmission()
+    if (!submission || submission.status !== 'pending') return
+    if (isDirty()) {
+      notice('目录还有未保存的修改，请先保存或重新加载，再通过发布', 'error')
+      return
+    }
+    if (isSubmissionDirty() && !(await saveSubmissionDraft({ silent: true }))) return
+    if (!confirm(`通过并发布「${submissionTitle(submission)}」？\n发布后会立即出现在所有客户端的捏脸目录里。`)) return
+    try {
+      const data = await api(`/api/admin/face/submissions/${encodeURIComponent(submission.id)}/approve`, {
+        method: 'POST',
+      })
+      if (data?.catalog) {
+        state.catalog = data.catalog
+        state.saved = JSON.stringify(data.catalog)
+        state.advancedDraft = JSON.stringify(data.catalog, null, 2)
+        state.advancedDirty = false
+      }
+      if (data?.submission) {
+        state.submissions = state.submissions.map(item => item.id === data.submission.id ? data.submission : item)
+      }
+      await loadSubmissions({ silent: true })
+      renderAll()
+      notice(`已发布，目录版本升到 r${state.catalog?.revision || 0}`, 'ok')
+    } catch (error) {
+      notice(`发布失败：${error.message || error}`, 'error')
+    }
+  }
+
+  async function rejectSubmission() {
+    const submission = currentSubmission()
+    if (!submission || submission.status !== 'pending') return
+    const note = state.submissionReviewNote.trim()
+    if (!note) {
+      notice('请先在下面的审核备注里填写驳回原因', 'error')
+      const textarea = $('[data-submission-note]', dom.editor)
+      textarea?.focus()
+      return
+    }
+    if (!confirm(`驳回「${submissionTitle(submission)}」？\n提交人会在客户端看到原因，内容仍保留在本人账号里。`)) return
+    try {
+      const data = await api(`/api/admin/face/submissions/${encodeURIComponent(submission.id)}/reject`, {
+        method: 'POST',
+        body: { note },
+      })
+      if (data?.submission) {
+        state.submissions = state.submissions.map(item => item.id === data.submission.id ? data.submission : item)
+      }
+      await loadSubmissions({ silent: true })
+      renderAll()
+      notice('已驳回，提交人可修改后重新提交', 'ok')
+    } catch (error) {
+      notice(`驳回失败：${error.message || error}`, 'error')
+    }
   }
 
   function nextId(prefix) {
@@ -1307,6 +2026,7 @@
       visual_features: [],
       compatibility: [],
       conflicts: [],
+      gender_affinity: ['neutral'],
       sort_order: maxSort + 10,
       visible: true,
       is_custom: true,
@@ -1627,10 +2347,17 @@
   function switchMode(mode) {
     if (mode === state.mode) return
     if (!flushAdvanced()) return
+    if (state.mode === 'submissions' && mode !== 'submissions' && !confirmDiscardSubmissionDraft('离开待审核')) return
     state.mode = mode
     state.listSearch = ''
+    state.navSearch = ''
     dom.listSearch.value = ''
+    dom.navSearch.value = ''
     if (mode === 'presets' && !currentPreset()) state.presetId = state.catalog.presets?.[0]?.id || ''
+    if (mode === 'submissions') {
+      pickSubmission('')
+      void loadSubmissions({ silent: true })
+    }
     renderAll()
   }
 
@@ -1683,6 +2410,8 @@
     dom.tree.addEventListener('click', event => {
       const button = event.target.closest('[data-category]')
       if (button) selectCategory(button.dataset.category)
+      const status = event.target.closest('[data-submission-status]')
+      if (status) selectSubmissionStatus(status.dataset.submissionStatus)
     })
 
     dom.list.addEventListener('click', event => {
@@ -1690,6 +2419,8 @@
       if (card) return selectCard(card.dataset.card)
       const preset = event.target.closest('[data-preset]')
       if (preset) selectPreset(preset.dataset.preset)
+      const submission = event.target.closest('[data-submission]')
+      if (submission) selectSubmission(submission.dataset.submission)
     })
 
     dom.listActions.addEventListener('click', event => {
@@ -1698,9 +2429,18 @@
       if (button.dataset.action === 'add-card') addCard()
       else if (button.dataset.action === 'duplicate-card') duplicateCard()
       else if (button.dataset.action === 'add-preset') addPreset()
+      else if (button.dataset.action === 'reload-submissions') void loadSubmissions()
     })
 
     dom.editor.addEventListener('input', event => {
+      const submissionCategory = event.target.closest('[data-submission-field="category"]')
+      if (submissionCategory) return updateSubmissionCategory(submissionCategory.value)
+      const submissionTarget = event.target.closest('[data-submission-field="targetId"]')
+      if (submissionTarget) return updateSubmissionTarget(submissionTarget.value)
+      const submissionCardField = event.target.closest('[data-submission-card-field]')
+      if (submissionCardField) return updateSubmissionCardField(submissionCardField.dataset.submissionCardField, submissionCardField)
+      const submissionNote = event.target.closest('[data-submission-note]')
+      if (submissionNote) return updateSubmissionNote(submissionNote.value)
       const cardField = event.target.closest('[data-card-field]')
       if (cardField) return updateCardField(cardField.dataset.cardField, cardField)
       const catField = event.target.closest('[data-cat-field]')
@@ -1724,8 +2464,24 @@
     })
 
     dom.editor.addEventListener('change', event => {
+      const submissionCategory = event.target.closest('[data-submission-field="category"]')
+      if (submissionCategory) {
+        updateSubmissionCategory(submissionCategory.value)
+        renderList()
+        return
+      }
+      const submissionCardField = event.target.closest('[data-submission-card-field]')
+      if (submissionCardField) {
+        updateSubmissionCardField(submissionCardField.dataset.submissionCardField, submissionCardField)
+        if (['name_zh', 'sort_order'].includes(submissionCardField.dataset.submissionCardField)) renderList()
+        return
+      }
+      const submissionGender = event.target.closest('[data-submission-gender]')
+      if (submissionGender) return updateSubmissionGender(submissionGender)
       const cardField = event.target.closest('[data-card-field]')
       if (cardField) return updateCardField(cardField.dataset.cardField, cardField)
+      const genderField = event.target.closest('[data-card-gender]')
+      if (genderField) return updateCardGender(genderField)
       const catField = event.target.closest('[data-cat-field]')
       if (catField) return updateCategoryField(catField.dataset.catField, catField)
       const presetField = event.target.closest('[data-preset-field]')
@@ -1733,6 +2489,19 @@
       if (event.target.matches('[data-preset-cat]')) return togglePresetItem(event.target)
       const fileInput = event.target.closest('[data-reference-file]')
       if (fileInput) uploadReference(fileInput.files?.[0])
+      const submissionFile = event.target.closest('[data-submission-file]')
+      if (submissionFile && submissionFile.files?.[0]) {
+        void (async () => {
+          try {
+            notice('正在读取审核图片…')
+            state.submissionNewImage = await prepareSubmissionImage(submissionFile.files[0])
+            renderSubmissionEditor()
+            notice('待审图片已替换，保存后生效', 'ok')
+          } catch (error) {
+            notice(`图片读取失败：${error.message || error}`, 'error')
+          }
+        })()
+      }
     })
 
     dom.editor.addEventListener('click', event => {
@@ -1740,6 +2509,18 @@
       if (!button) return
       switch (button.dataset.action) {
         case 'delete-card': deleteCard(); break
+        case 'save-submission': void saveSubmissionDraft(); break
+        case 'approve-submission': void approveSubmission(); break
+        case 'reject-submission': void rejectSubmission(); break
+        case 'upload-submission-image': $('[data-submission-file]', dom.editor)?.click(); break
+        case 'clear-submission-image': {
+          const draft = state.submissionDraft
+          if (!draft) break
+          state.submissionNewImage = ''
+          draft.imagePath = ''
+          renderSubmissionEditor()
+          break
+        }
         case 'upload-reference': $('[data-reference-file]', dom.editor)?.click(); break
         case 'clear-reference': {
           const card = currentCard()
@@ -1784,6 +2565,12 @@
   }
 
   bindEvents()
+  setInterval(() => {
+    if (!state.loading && !state.submissionsLoading) void loadSubmissions({ silent: true })
+  }, 30_000)
+  window.addEventListener('focus', () => {
+    if (!state.submissionsLoading) void loadSubmissions({ silent: true })
+  })
   void boot()
 })()
 </script>

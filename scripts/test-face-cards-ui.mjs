@@ -52,8 +52,54 @@ try {
     source: `(() => {
       const original = ${JSON.stringify(catalog)}
       let current = JSON.parse(JSON.stringify(original))
+      let submissions = [{
+        id: 'submission-ui-test',
+        kind: 'card',
+        status: 'pending',
+        userId: 'user-ui',
+        username: 'reviewer',
+        displayName: '界面测试用户',
+        category: 'face_shape',
+        targetId: 'community_ui_test',
+        card: {
+          id: 'community_ui_test',
+          category: 'face_shape',
+          name_zh: '界面测试社区卡片',
+          name_en: 'UI community card',
+          definition: '用于测试审核页的卡片。',
+          prompt_zh: '窄长脸型，正面自然光。',
+          prompt_en: 'Narrow long face, natural frontal light.',
+          aliases: [],
+          mood_tags: ['社区'],
+          visual_features: ['窄长脸'],
+          compatibility: [],
+          conflicts: [],
+          gender_affinity: ['neutral'],
+          sort_order: 9999,
+          visible: true,
+          is_custom: true,
+          reference_image: '',
+          reference_status: 'pending',
+          source_section: 'community',
+        },
+        imagePath: '',
+        imageBytes: 0,
+        imageWidth: 0,
+        imageHeight: 0,
+        submittedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        reviewedAt: '',
+        reviewedBy: '',
+        reviewedByName: '',
+        reviewNote: '',
+        publishedAt: '',
+        publishedTargetId: '',
+        publishedPath: '',
+        imageUrl: '',
+      }]
       window.__editorCalls = []
       window.__editorCatalog = () => current
+      window.__editorSubmissions = () => JSON.parse(JSON.stringify(submissions))
       window.faceCardsApi = {
         fileUrl: async path => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
           '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#dfe7df"/><path d="M60 22c18 0 29 15 29 36 0 23-13 40-29 40S31 81 31 58c0-21 11-36 29-36z" fill="#84978a"/><circle cx="49" cy="54" r="3" fill="#fff"/><circle cx="71" cy="54" r="3" fill="#fff"/></svg>'
@@ -76,6 +122,38 @@ try {
           if (path === '/api/reference-images') {
             return { status: 201, ok: true, data: { path: '参考图/测试-参考.png', width: 512, height: 512 } }
           }
+          if (path === '/api/admin/face/submissions?status=all') {
+            return { status: 200, ok: true, data: { submissions: JSON.parse(JSON.stringify(submissions)) } }
+          }
+          if (path.startsWith('/api/admin/face/submissions/submission-ui-test') && init.method === 'PATCH') {
+            const target = submissions.find(item => item.id === 'submission-ui-test')
+            if (init.body?.card) target.card = { ...target.card, ...init.body.card }
+            if (init.body?.reviewNote !== undefined) target.reviewNote = init.body.reviewNote
+            target.updatedAt = new Date().toISOString()
+            return { status: 200, ok: true, data: { submission: JSON.parse(JSON.stringify(target)) } }
+          }
+          if (path === '/api/admin/face/submissions/submission-ui-test/approve' && init.method === 'POST') {
+            const target = submissions.find(item => item.id === 'submission-ui-test')
+            target.status = 'approved'
+            target.publishedAt = new Date().toISOString()
+            target.publishedTargetId = target.card.id
+            const category = current.categories.find(item => item.key === target.card.category)
+            if (category && !category.items.some(item => item.id === target.card.id)) {
+              category.items.push(JSON.parse(JSON.stringify(target.card)))
+              category.count = category.items.length
+            }
+            current.revision = Number(current.revision || 0) + 1
+            current.updatedAt = new Date().toISOString()
+            return {
+              status: 200,
+              ok: true,
+              data: {
+                submission: JSON.parse(JSON.stringify(target)),
+                catalog: JSON.parse(JSON.stringify(current)),
+                meta: { revision: current.revision },
+              },
+            }
+          }
           return { status: 404, ok: false, data: null, error: 'not found' }
         },
       }
@@ -94,7 +172,7 @@ try {
     editor: Boolean(document.querySelector('[data-card-field="name_zh"]')),
   })`)
   assert.equal(initial.revision, 'r1')
-  assert.match(initial.meta, /46 维度 · 484 卡片 · 14 预设/)
+  assert.match(initial.meta, /56 维度 · 592 卡片 · 14 预设/)
   assert.ok(initial.categories > 0)
   assert.ok(initial.cards > 0)
   assert.equal(initial.editor, true)
@@ -109,6 +187,16 @@ try {
     input.dispatchEvent(new Event('input', { bubbles: true }))
     return true
   })()`)
+  assert.equal(await evalJs(`document.querySelector('[data-card-gender="neutral"]').checked`), true)
+  await evalJs(`(() => {
+    const neutral = document.querySelector('[data-card-gender="neutral"]')
+    neutral.checked = false
+    neutral.dispatchEvent(new Event('change', { bubbles: true }))
+    const male = document.querySelector('[data-card-gender="male"]')
+    male.checked = true
+    male.dispatchEvent(new Event('change', { bubbles: true }))
+    return true
+  })()`)
   assert.equal(await evalJs(`document.querySelector('#status-state').textContent`), '有未保存修改')
   assert.equal(await evalJs(`document.querySelector('#btn-save').disabled`), false)
   await evalJs(`document.querySelector('#btn-save').click(); true`)
@@ -120,12 +208,15 @@ try {
       revision: call.init.body.baseRevision,
       total: call.init.body.catalog.categories.reduce((sum, cat) => sum + cat.items.length, 0),
       found: call.init.body.catalog.categories.some(cat => cat.items.some(item => item.name_zh === '测试新增卡片')),
+      gender: call.init.body.catalog.categories.flatMap(cat => cat.items)
+        .find(item => item.name_zh === '测试新增卡片')?.gender_affinity,
       revisionAfter: window.__editorCatalog().revision,
     }
   })()`)
   assert.equal(save.revision, 1)
-  assert.equal(save.total, 485)
+  assert.equal(save.total, 593)
   assert.equal(save.found, true)
+  assert.deepEqual(save.gender, ['male'])
   assert.equal(save.revisionAfter, 2)
 
   // 预设页：能列出 14 套，切换一张卡片后进入未保存状态。
@@ -149,6 +240,34 @@ try {
   await evalJs(`document.querySelector('[data-action="apply-json"]').click(); true`)
   assert.match(await evalJs(`document.querySelector('#status-msg').textContent`), /JSON 已应用/)
 
+  // 待审核页：列出用户提交，修改名称后通过发布。
+  await evalJs(`document.querySelector('#btn-save').click(); true`)
+  await waitForPage(() => evalJs(`document.querySelector('#status-state').textContent === '已保存'`))
+  await evalJs(`document.querySelector('[data-mode="submissions"]').click(); true`)
+  await waitForPage(() => evalJs(`document.querySelectorAll('[data-submission]').length === 1`))
+  assert.equal(await evalJs(`document.querySelector('#submission-count').textContent`), '1')
+  assert.equal(await evalJs(`document.querySelector('#submission-count').hidden`), false)
+  await evalJs(`(() => {
+    const input = document.querySelector('[data-submission-card-field="name_zh"]')
+    input.value = '界面测试社区卡片·已改'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })()`)
+  await evalJs(`document.querySelector('[data-action="save-submission"]').click(); true`)
+  await waitForPage(() => evalJs(`window.__editorCalls.some(call => call.path.includes('/api/admin/face/submissions/') && call.init.method === 'PATCH')`))
+  const reviewShotDir = join(ROOT, 'release', 'face-tests')
+  await mkdir(reviewShotDir, { recursive: true })
+  const reviewShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(reviewShotDir, 'face-cards-review.png'), Buffer.from(reviewShot.data, 'base64'))
+  await evalJs(`window.confirm = () => true; document.querySelector('[data-action="approve-submission"]').click(); true`)
+  await waitForPage(() => evalJs(`window.__editorCalls.some(call => call.path.endsWith('/approve') && call.init.method === 'POST')`))
+  await waitForPage(() => evalJs(`window.__editorCatalog().categories.some(category => category.items.some(item => item.id === 'community_ui_test'))`))
+  assert.equal(await evalJs(`document.querySelector('#submission-count').hidden`), true)
+  await evalJs(`document.querySelector('[data-submission-status="approved"]').click(); true`)
+  await waitForPage(() => evalJs(`document.querySelectorAll('[data-submission]').length === 1`))
+  await evalJs(`document.querySelector('[data-submission]').click(); true`)
+  assert.equal(await evalJs(`document.querySelector('.editor-head .card-tag')?.textContent.trim()`), '已发布')
+
   // 回到卡片页截图，浅色 + 暗色各一张。
   await evalJs(`document.querySelector('[data-mode="cards"]').click(); true`)
   await waitForPage(() => evalJs(`Boolean(document.querySelector('[data-card-field="name_zh"]'))`))
@@ -169,10 +288,12 @@ try {
     assert.ok(actions.includes(label), `缺少按钮：${label}`)
   }
 
-  console.log('✓ 桌面编辑器：三栏布局、46 维度和 484 张卡片正常载入')
-  console.log('✓ 新增卡片：改名后标记未保存，PUT 携带 baseRevision 且总数变为 485')
+  console.log('✓ 桌面编辑器：三栏布局、56 维度和 592 张卡片正常载入')
+  console.log('✓ 新增卡片：改名后标记未保存，PUT 携带 baseRevision 且总数变为 593')
+  console.log('✓ 性别适配：新增卡片可在桌面编辑器里标注为男性、女性或中性')
   console.log('✓ 预设方案：14 套预设可编辑，卡片勾选会同步修改目录')
   console.log('✓ 高级 JSON：格式化与应用正常，不产生脚本异常')
+  console.log('✓ 待审核：用户提交可修改、通过发布并出现在公共目录')
   console.log('✓ 界面：浅色与暗色截图已输出到 release/face-tests/')
 } finally {
   try { ws?.close() } catch {}

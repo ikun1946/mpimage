@@ -16,6 +16,76 @@ function shuffled(list, random = Math.random) {
   return copy
 }
 
+const GENDER_WEIGHTS = {
+  male: { male: 6, neutral: 2.5, female: 0.35 },
+  female: { female: 6, neutral: 2.5, male: 0.35 },
+  neutral: { neutral: 4, male: 1, female: 1 },
+}
+
+/** 主发型结构互斥组：随机时只选一个分类和一张主卡，避免男发、女发、盘发、编发同时出现。 */
+const RANDOM_PRIMARY_GROUPS = [[
+  'hair_cut',
+  'hair_style',
+  'updo',
+  'braid',
+  'ancient_bun',
+  'hair_male_modern',
+  'hair_female_short',
+  'hair_curl_form',
+  'hair_braid_cultural',
+  'hair_updo_detail',
+  'hair_history',
+]]
+
+function randomGenderTarget(gender) {
+  if (gender === '男性呈现') return 'male'
+  if (gender === '女性呈现') return 'female'
+  if (gender === '中性呈现') return 'neutral'
+  return ''
+}
+
+function itemGenderWeight(item, target) {
+  if (!target) return 1
+  const labels = Array.isArray(item.gender_affinity) && item.gender_affinity.length
+    ? item.gender_affinity
+    : ['neutral']
+  if (labels.includes(target)) return GENDER_WEIGHTS[target][target]
+  if (labels.includes('neutral')) return GENDER_WEIGHTS[target].neutral
+  return GENDER_WEIGHTS[target][target === 'male' ? 'female' : 'male'] ?? 0.35
+}
+
+function categoryGenderWeight(category, target) {
+  if (!target) return 1
+  const pool = (category.items || []).filter(item => item.visible !== false)
+  if (!pool.length) return 0
+  return Math.max(...pool.map(item => itemGenderWeight(item, target)))
+}
+
+function weightedShuffle(list, weightOf, random = Math.random) {
+  const pool = [...list]
+  const result = []
+  while (pool.length) {
+    const weights = pool.map((item) => Math.max(0, Number(weightOf(item)) || 0))
+    const total = weights.reduce((sum, value) => sum + value, 0)
+    if (total <= 0) {
+      result.push(...shuffled(pool, random))
+      break
+    }
+    let cursor = random() * total
+    let index = weights.length - 1
+    for (let pos = 0; pos < weights.length; pos += 1) {
+      cursor -= weights[pos]
+      if (cursor <= 0) {
+        index = pos
+        break
+      }
+    }
+    result.push(pool[index])
+    pool.splice(index, 1)
+  }
+  return result
+}
+
 export class Store {
   constructor(data) {
     this.data = data
@@ -36,7 +106,13 @@ export class Store {
       recents: [],
       customItems: [],
       referenceOverrides: {},
-      ui: { lang: 'zh', length: 'full', shot: 'portrait', category: 'face_shape' },
+      ui: {
+        lang: 'zh',
+        length: 'full',
+        shot: 'portrait',
+        category: 'face_shape',
+        randomGenderAware: true,
+      },
     }
   }
 
@@ -97,7 +173,14 @@ export class Store {
     if (!this.state.schemes.some((s) => s.id === this.state.activeId)) {
       this.state.activeId = this.state.schemes[0].id
     }
-    this.state.ui = Object.assign({ lang: 'zh', length: 'full', shot: 'portrait', category: 'face_shape' }, this.state.ui)
+    this.state.ui = Object.assign({
+      lang: 'zh',
+      length: 'full',
+      shot: 'portrait',
+      category: 'face_shape',
+      randomGenderAware: true,
+    }, this.state.ui)
+    this.state.ui.randomGenderAware = this.state.ui.randomGenderAware !== false
   }
 
   applyCustomItems() {
@@ -196,18 +279,29 @@ export class Store {
 
   /** 按维度的单选/多选规则生成一套完整随机角色，并消除已知冲突。 */
   randomizeScheme(random = Math.random) {
-    const pick = (list) => list[Math.floor(random() * list.length)]
+    const scheme = this.scheme
+    const genderTarget = this.state.ui.randomGenderAware === false
+      ? ''
+      : randomGenderTarget(scheme.gender)
     const selections = {}
     const strengths = {}
-
-    for (const category of this.data.categories) {
+    const primaryKeys = new Set(RANDOM_PRIMARY_GROUPS.flat())
+    const pickItems = (category, exactOne = false) => {
       const pool = (category.items || []).filter((item) => item.visible !== false)
-      if (!pool.length) continue
-      const max = category.select_mode === 'multi'
-        ? Math.min(Number(category.max_select) || 1, 2, pool.length)
-        : 1
-      const count = 1 + Math.floor(random() * Math.max(1, max))
-      const picked = shuffled(pool, random).slice(0, Math.min(count, pool.length))
+      if (!pool.length) return []
+      const max = exactOne
+        ? 1
+        : category.select_mode === 'multi'
+          ? Math.min(Number(category.max_select) || 1, 2, pool.length)
+          : 1
+      const count = exactOne ? 1 : 1 + Math.floor(random() * Math.max(1, max))
+      const ranked = genderTarget
+        ? weightedShuffle(pool, (item) => itemGenderWeight(item, genderTarget), random)
+        : shuffled(pool, random)
+      return ranked.slice(0, Math.min(count, pool.length))
+    }
+    const applyPicked = (category, picked) => {
+      if (!picked.length) return
       selections[category.key] = picked.map((item) => item.id)
       if (category.strength_supported) {
         strengths[category.key] = {}
@@ -217,6 +311,23 @@ export class Store {
       }
     }
 
+    for (const category of this.data.categories) {
+      if (primaryKeys.has(category.key)) continue
+      applyPicked(category, pickItems(category))
+    }
+
+    for (const group of RANDOM_PRIMARY_GROUPS) {
+      const available = group
+        .map(key => this.data.categories.find(category => category.key === key))
+        .filter(category => category && (category.items || []).some(item => item.visible !== false))
+      if (!available.length) continue
+      const ranked = genderTarget
+        ? weightedShuffle(available, (category) => categoryGenderWeight(category, genderTarget), random)
+        : shuffled(available, random)
+      const category = ranked[0]
+      applyPicked(category, pickItems(category, true))
+    }
+
     for (let guard = 0; guard < 100; guard += 1) {
       const rule = (this.data.conflict_rules || []).find((entry) => {
         const left = selections[entry.left_category] || []
@@ -224,7 +335,13 @@ export class Store {
         return left.includes(entry.left) && right.includes(entry.right)
       })
       if (!rule) break
-      const dropLeft = random() < 0.5
+      const leftPrimary = primaryKeys.has(rule.left_category)
+      const rightPrimary = primaryKeys.has(rule.right_category)
+      const dropLeft = leftPrimary && !rightPrimary
+        ? false
+        : !leftPrimary && rightPrimary
+          ? true
+          : random() < 0.5
       const category = dropLeft ? rule.left_category : rule.right_category
       const id = dropLeft ? rule.left : rule.right
       selections[category] = (selections[category] || []).filter((value) => value !== id)
@@ -235,20 +352,10 @@ export class Store {
       }
     }
 
-    const scheme = this.scheme
-    const style = this.data.visual_styles?.length ? pick(this.data.visual_styles) : null
-    scheme.visualStyle = style?.id || scheme.visualStyle
-    scheme.gender = pick(['女性呈现', '男性呈现', '中性呈现'])
-    scheme.age = pick(['青年', '成年', '中年'])
-    scheme.role = ''
     scheme.selections = selections
     scheme.strengths = strengths
     scheme.negatives = this.data.negatives.filter((item) => item.default).map((item) => item.id)
-    scheme.customNotes = ''
     scheme.manual = { full: null, negative: null }
-    if (!scheme.name || scheme.name === '未命名角色' || scheme.name.startsWith('随机角色')) {
-      scheme.name = '随机角色'
-    }
     this.commit()
     return scheme
   }
@@ -429,6 +536,7 @@ export class Store {
       strength_supported: false,
       compatibility: [],
       conflicts: [],
+      gender_affinity: ['neutral'],
       reference_image: '',
       reference_status: 'pending',
       sort_order: 9999,
