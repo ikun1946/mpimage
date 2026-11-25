@@ -46,6 +46,35 @@ app.stdout.on('data', chunk => { serverOutput += chunk })
 app.stderr.on('data', chunk => { serverOutput += chunk })
 
 try {
+  const memoryStorage = new Map()
+  globalThis.window = { __FACE_USER_ID__: 'scope-migration' }
+  globalThis.localStorage = {
+    clear: () => memoryStorage.clear(),
+    getItem: key => memoryStorage.get(key) ?? null,
+    setItem: (key, value) => memoryStorage.set(key, String(value)),
+  }
+  const { Store } = await import('../web/src/face-app/store.js')
+  const seedCatalog = JSON.parse(await readFile(join(ROOT, 'server', 'assets', 'face', 'catalog-seed.json'), 'utf8'))
+  const migrateScope = (legacyValue) => {
+    memoryStorage.clear()
+    const initial = new Store(seedCatalog)
+    initial.save()
+    const state = JSON.parse(memoryStorage.get(`huajing.faceStudio.v1.${globalThis.window.__FACE_USER_ID__}`))
+    delete state.ui.randomGenderScope
+    if (legacyValue === undefined) delete state.ui.randomGenderAware
+    else state.ui.randomGenderAware = legacyValue
+    memoryStorage.set(`huajing.faceStudio.v1.${globalThis.window.__FACE_USER_ID__}`, JSON.stringify(state))
+    const migrated = new Store(seedCatalog)
+    assert.equal(migrated.state.ui.randomGenderAware, undefined)
+    return migrated.state.ui.randomGenderScope
+  }
+  assert.equal(migrateScope(undefined), 'mixed')
+  assert.equal(migrateScope(false), 'any')
+  assert.equal(migrateScope(true), 'mixed')
+  memoryStorage.clear()
+  delete globalThis.window
+  delete globalThis.localStorage
+
   await waitFor(async () => (await fetch(`${base}/api/health`)).ok, 20_000)
   await fetch(`${base}/api/auth/setup`, {
     method: 'POST',
@@ -111,10 +140,21 @@ try {
   assert.equal(catalog.total, 592)
   assert.equal(catalog.categories, 56)
   assert.equal(catalog.presets, 14)
-  assert.equal(catalog.references, 16)
+  assert.equal(catalog.references, 36)
   assert.equal(catalog.title, '画境 · 捏脸')
   assert.equal(catalog.back, '/batch.html')
   assert.ok(catalog.userId)
+  await waitForPage(() => evalJs(`Boolean(document.querySelector('.card[data-id="face_oval"] .thumb img')?.naturalWidth)`))
+  const faceShapeReference = await evalJs(`document.querySelector('.card[data-id="face_oval"] .thumb img')?.getAttribute('src')`)
+  assert.match(faceShapeReference, /^\/face-assets\/references\/face\/face_shape\/face_oval\.webp$/)
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 13 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 350))))`)
+  await mkdir(join(ROOT, 'release', 'face-tests'), { recursive: true })
+  const faceShapeShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'face-shape-vectors-app.png'), Buffer.from(faceShapeShot.data, 'base64'))
   const hairExtension = await evalJs(`(() => {
     const studio = window.__faceStudio
     const categoryMap = new Map(studio.data.categories.map(category => [category.key, category]))
@@ -230,6 +270,18 @@ try {
   })()`)
   assert.match(eyeCard.src, /^\/face-assets\/references\/eyes\/eye_shape\/eye_almond\.webp/)
   assert.equal(eyeCard.loaded, true)
+
+  await evalJs(`document.querySelector('#nav [data-cat="eye_corner"]').click(); true`)
+  await waitForPage(() => evalJs(`Boolean(document.querySelector('.card[data-id="eye_corner_level"]'))`))
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 7 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  const eyeCornerReference = await evalJs(`document.querySelector('.card[data-id="eye_corner_high_up"] .thumb img')?.getAttribute('src')`)
+  assert.match(eyeCornerReference, /^\/face-assets\/references\/eyes\/eye_corner\/eye_corner_high_up\.webp$/)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 300))))`)
+  const eyeCornerShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'eye-corner-references-app.png'), Buffer.from(eyeCornerShot.data, 'base64'))
 
   const storageHasUser = await evalJs(`Object.keys(localStorage).some(key => key.startsWith('huajing.faceStudio.v1.${catalog.userId}'))`)
   assert.equal(storageHasUser, true)
@@ -477,7 +529,7 @@ try {
     store.setSchemeField('role', '守夜人')
     store.setSchemeField('customNotes', '左眉有一道旧伤')
     store.setSchemeField('visualStyle', 'ink')
-    store.setUi({ randomGenderAware: true })
+    store.setUi({ randomGenderScope: 'mixed' })
     return true
   })()`)
   await evalJs(`document.querySelector('#randomize-btn').click(); true`)
@@ -537,7 +589,7 @@ try {
   await evalJs(`document.querySelector('#modal [data-confirm]').click(); true`)
   await waitForPage(() => evalJs(`document.querySelector('#modal-overlay').hidden && Number(document.querySelector('#panel-toggle-count')?.textContent || 0) > 30`))
 
-  const genderWeights = await evalJs(`(() => {
+  const genderScopes = await evalJs(`(() => {
     const studio = window.__faceStudio
     const store = studio.store
     const scheme = store.scheme
@@ -549,35 +601,74 @@ try {
       seed = (seed * 1664525 + 1013904223) >>> 0
       return seed / 4294967296
     }
-    const rate = (gender, label, aware = true, count = 80) => {
+    const rate = (gender, scope, count = 80) => {
       scheme.gender = gender
-      store.state.ui.randomGenderAware = aware
+      store.state.ui.randomGenderScope = scope
       const random = makeRandom(20261125)
-      let hits = 0
+      const hits = { male: 0, female: 0, neutral: 0 }
       for (let index = 0; index < count; index += 1) {
         store.randomizeScheme(random)
         const id = (scheme.selections.face_shape || [])[0]
-        if (itemMap.get(id)?.gender_affinity?.includes(label)) hits += 1
+        const labels = itemMap.get(id)?.gender_affinity || []
+        for (const label of Object.keys(hits)) {
+          if (labels.includes(label)) hits[label] += 1 / count
+        }
       }
-      return hits / count
+      return hits
     }
     try {
       return {
-        maleAware: rate('男性呈现', 'male', true),
-        femaleAware: rate('女性呈现', 'female', true),
-        neutralAware: rate('中性呈现', 'neutral', true),
-        maleAwareOff: rate('男性呈现', 'male', false),
-        maleAwareUnspecified: rate('', 'male', true),
+        maleMixed: rate('男性呈现', 'mixed'),
+        femaleMixed: rate('女性呈现', 'mixed'),
+        neutralMixed: rate('中性呈现', 'mixed'),
+        maleAny: rate('男性呈现', 'any'),
+        maleSameOnly: rate('男性呈现', 'same-only'),
       }
     } finally {
       store.commit = originalCommit
     }
   })()`)
-  assert.ok(genderWeights.maleAware > 0.48)
-  assert.ok(genderWeights.femaleAware > 0.34)
-  assert.ok(genderWeights.neutralAware > 0.58)
-  assert.ok(genderWeights.maleAware > genderWeights.maleAwareOff + 0.12)
-  assert.ok(genderWeights.maleAware > genderWeights.maleAwareUnspecified + 0.12)
+  assert.ok(genderScopes.maleMixed.male > 0.48)
+  assert.equal(genderScopes.maleMixed.female, 0)
+  assert.ok(genderScopes.maleMixed.neutral > 0)
+  assert.ok(genderScopes.femaleMixed.female > 0.34)
+  assert.equal(genderScopes.femaleMixed.male, 0)
+  assert.ok(genderScopes.femaleMixed.neutral > 0)
+  assert.equal(genderScopes.neutralMixed.male, 0)
+  assert.equal(genderScopes.neutralMixed.female, 0)
+  assert.ok(genderScopes.neutralMixed.neutral > 0.9)
+  assert.ok(genderScopes.maleAny.female > 0)
+  assert.ok(genderScopes.maleAny.male > 0)
+  assert.ok(genderScopes.maleSameOnly.male > 0.99)
+  assert.equal(genderScopes.maleSameOnly.female, 0)
+  assert.equal(genderScopes.maleSameOnly.neutral, 0)
+
+  const sameOnlyFallback = await evalJs(`(() => {
+    const store = window.__faceStudio.store
+    const scheme = store.scheme
+    const originalCommit = store.commit
+    store.commit = () => true
+    scheme.gender = '男性呈现'
+    store.state.ui.randomGenderScope = 'same-only'
+    const makeRandom = (seed) => () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0
+      return seed / 4294967296
+    }
+    try {
+      store.randomizeScheme(makeRandom(202611253))
+      const category = window.__faceStudio.data.categories.find(item => item.key === 'face_proportion')
+      const itemMap = new Map(category.items.map(item => [item.id, item]))
+      const ids = scheme.selections.face_proportion || []
+      return {
+        ids,
+        labels: ids.map(id => itemMap.get(id)?.gender_affinity || []),
+      }
+    } finally {
+      store.commit = originalCommit
+    }
+  })()`)
+  assert.ok(sameOnlyFallback.ids.length > 0)
+  assert.ok(sameOnlyFallback.labels.every(labels => labels.includes('neutral')))
 
   const hairRandom = await evalJs(`(() => {
     const store = window.__faceStudio.store
@@ -596,7 +687,7 @@ try {
     }
     const run = (gender, seed, count = 120) => {
       scheme.gender = gender
-      store.state.ui.randomGenderAware = true
+      store.state.ui.randomGenderScope = 'mixed'
       const random = makeRandom(seed)
       let badPrimaryCount = 0
       let maleModernHits = 0
@@ -630,26 +721,63 @@ try {
 
   await evalJs(`(() => {
     window.__faceStudio.store.setSchemeField('gender', '男性呈现')
-    window.__faceStudio.store.setUi({ randomGenderAware: true })
+    window.__faceStudio.store.setUi({ randomGenderScope: 'mixed' })
     return true
   })()`)
   await evalJs(`document.querySelector('#random-settings-btn').click(); true`)
   await waitForPage(() => evalJs(`!document.querySelector('#random-settings').hidden`))
   const settingsOpen = await evalJs(`({
-    checked: document.querySelector('#random-gender-aware').checked,
+    checked: document.querySelector('[data-random-scope="mixed"]').getAttribute('aria-checked'),
+    disabled: [...document.querySelectorAll('[data-random-scope]')].some(button => button.disabled),
+    state: document.querySelector('#random-scope-state').textContent,
     hint: document.querySelector('#random-gender-hint').textContent,
+    layout: (() => {
+      const random = document.querySelector('#randomize-btn').getBoundingClientRect()
+      const settings = document.querySelector('#random-settings-btn').getBoundingClientRect()
+      return {
+        overlap: random.right > settings.left + 0.5,
+        randomWidth: random.width,
+        settingsWidth: settings.width,
+        insideViewport: settings.right <= innerWidth,
+      }
+    })(),
   })`)
-  assert.equal(settingsOpen.checked, true)
+  assert.equal(settingsOpen.checked, 'true')
+  assert.equal(settingsOpen.disabled, false)
+  assert.match(settingsOpen.state, /同性优先/)
   assert.match(settingsOpen.hint, /男性呈现/)
+  assert.match(settingsOpen.hint, /男性和中性/)
+  assert.equal(settingsOpen.layout.overlap, false)
+  assert.ok(settingsOpen.layout.randomWidth > 40)
+  assert.ok(settingsOpen.layout.settingsWidth >= 30)
+  assert.equal(settingsOpen.layout.insideViewport, true)
   const randomSettingsShot = await cdp('Page.captureScreenshot', { format: 'png' })
   await writeFile(join(shotDir, 'face-random-settings.png'), Buffer.from(randomSettingsShot.data, 'base64'))
   await evalJs(`(() => {
-    const input = document.querySelector('#random-gender-aware')
-    input.checked = false
-    input.dispatchEvent(new Event('change', { bubbles: true }))
+    document.querySelector('[data-random-scope="same-only"]').click()
     return true
   })()`)
-  assert.equal(await evalJs(`window.__faceStudio.store.state.ui.randomGenderAware`), false)
+  assert.equal(await evalJs(`window.__faceStudio.store.state.ui.randomGenderScope`), 'same-only')
+  assert.match(await evalJs(`document.querySelector('#random-gender-hint').textContent`), /中性卡兜底/)
+  await evalJs(`(() => {
+    document.querySelector('[data-random-scope="any"]').click()
+    return true
+  })()`)
+  assert.equal(await evalJs(`window.__faceStudio.store.state.ui.randomGenderScope`), 'any')
+  await evalJs(`(() => {
+    const select = document.querySelector('#gender')
+    select.value = '中性呈现'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+    return true
+  })()`)
+  assert.equal(await evalJs(`[...document.querySelectorAll('[data-random-scope]')].every(button => button.disabled)`), true)
+  assert.match(await evalJs(`document.querySelector('#random-gender-hint').textContent`), /固定使用中性/)
+  await evalJs(`(() => {
+    const select = document.querySelector('#gender')
+    select.value = '男性呈现'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+    return true
+  })()`)
 
   // 自定义卡片：保存后自动提交审核，本人立即可用；参考图走待审核，不走公共目录。
   await evalJs(`document.querySelector('#random-settings-btn').click(); true`)
@@ -792,22 +920,29 @@ try {
       const rect = button?.getBoundingClientRect()
       return Boolean(button && rect && rect.width > 0 && rect.height > 0 && getComputedStyle(button).display !== 'none')
     })(),
-    genderAware: window.__faceStudio.store.state.ui.randomGenderAware,
+    randomScope: window.__faceStudio.store.state.ui.randomGenderScope,
+    randomOverlap: (() => {
+      const random = document.querySelector('#randomize-btn').getBoundingClientRect()
+      const settings = document.querySelector('#random-settings-btn').getBoundingClientRect()
+      return random.right > settings.left + 0.5
+    })(),
   })`)
   assert.ok(mobile.scrollWidth <= mobile.innerWidth + 2)
   assert.equal(mobile.toggle, true)
   assert.equal(mobile.resetVisible, true)
   assert.equal(mobile.randomVisible, true)
   assert.equal(mobile.settingsVisible, true)
-  assert.equal(mobile.genderAware, false)
+  assert.equal(mobile.randomScope, 'any')
+  assert.equal(mobile.randomOverlap, false)
 
   const shot = await cdp('Page.captureScreenshot', { format: 'png' })
   await writeFile(join(shotDir, 'face-page-mobile.png'), Buffer.from(shot.data, 'base64'))
 
-  console.log('✓ 捏脸页：服务端目录 592 条特征 / 56 维度 / 14 预设 / 16 张内置图')
+  console.log('✓ 捏脸页：服务端目录 592 条特征 / 56 维度 / 14 预设 / 36 张内置图')
   console.log('✓ 预设与提示词：载入清冷古典美人后实时生成完整提示词')
   console.log('✓ 提示词只读：完整提示词和负向词都无法用键盘增删改')
   console.log('✓ 服务端资产：参考图从 /face-assets/ 正常加载')
+  console.log('✓ 脸型矢量图：13 张轮廓图随目录提供并在卡片中正常显示')
   console.log('✓ 账号隔离：本地状态键包含当前 userId')
   console.log('✓ 服务端修改：改名后客户端重新加载可见，恢复默认后还原')
   console.log('✓ 卡片比例：同类卡片宽高比一致，详情展开时才变高')
@@ -815,7 +950,7 @@ try {
   console.log('✓ 大屏滚动：1.25 倍缩放下工作区不超出视口，最后一行和页脚都能滚到')
   console.log('✓ 全维度滚动：56 个维度逐页检查，最后一行都没有被底部截断')
   console.log('✓ 恢复空白：清空全部选择与设定、保留方案名称，移动端按钮仍可见')
-  console.log('✓ 随机生成：保留角色设定与画风，按性别加权且设置可持久化')
+  console.log('✓ 随机生成：保留角色设定与画风，三档性别范围生效且设置可持久化')
   console.log('✓ 随机主发型：每次只选一个主结构，不会混合男发与女短发')
   console.log('✓ 自定义审核：保存自动提交、参考图待审、驳回原因和重新提交正常')
   console.log('✓ 带入自由创作：提示词和负向约束成功写入自由创作')

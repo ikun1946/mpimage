@@ -313,21 +313,44 @@ function closeRandomSettings() {
   $('#random-settings-btn')?.setAttribute('aria-expanded', 'false')
 }
 
+const RANDOM_SCOPE_LABELS = {
+  any: '不按性别筛选',
+  mixed: '同性优先，含中性',
+  'same-only': '优先同性，缺卡时中性兜底',
+}
+
+function currentRandomScope() {
+  const value = store.state.ui.randomGenderScope
+  return ['any', 'mixed', 'same-only'].includes(value) ? value : 'mixed'
+}
+
 function syncRandomSettings() {
-  const checkbox = $('#random-gender-aware')
+  const scopeGroup = $('#random-gender-scope')
+  const scopeState = $('#random-scope-state')
   const hint = $('#random-gender-hint')
-  if (!checkbox || !hint) return
-  const enabled = store.state.ui.randomGenderAware !== false
+  if (!scopeGroup || !scopeState || !hint) return
+  const scope = currentRandomScope()
   const gender = store.scheme.gender
-  checkbox.checked = enabled
+  const genderApplicable = gender === '男性呈现' || gender === '女性呈现'
+  $$('[data-random-scope]', scopeGroup).forEach((button) => {
+    button.disabled = !genderApplicable
+    button.setAttribute('aria-checked', String(button.dataset.randomScope === scope))
+  })
   if (!gender) {
-    hint.textContent = '当前未指定性别，随机不会按性别优化。'
-  } else if (!enabled) {
-    hint.textContent = `当前：${gender}；性别优化已关闭。`
+    scopeState.textContent = '选择性别后可用'
+    hint.textContent = '先选择“男性呈现”或“女性呈现”，再设置随机性别范围。'
   } else if (gender === '中性呈现') {
-    hint.textContent = '当前：中性呈现；随机将优先中性特征。'
+    scopeState.textContent = '固定使用中性'
+    hint.textContent = '当前：中性呈现；随机固定使用中性特征，性别范围设置暂不生效。'
+  } else if (scope === 'any') {
+    scopeState.textContent = RANDOM_SCOPE_LABELS.any
+    hint.textContent = `当前：${gender}；所有性别特征均等参与，不按性别筛选。`
+  } else if (scope === 'same-only') {
+    scopeState.textContent = RANDOM_SCOPE_LABELS[scope]
+    hint.textContent = `当前：${gender}；优先${gender === '男性呈现' ? '男性' : '女性'}特征，没有同性卡的维度自动使用中性卡兜底。`
   } else {
-    hint.textContent = `当前：${gender}；随机将优先${gender === '男性呈现' ? '男性' : '女性'}和中性特征。`
+    scopeState.textContent = RANDOM_SCOPE_LABELS[scope]
+    hint.textContent = `当前：${gender}；只在${gender === '男性呈现' ? '男性和' : '女性和'}中性特征中抽取。`
   }
 }
 
@@ -1581,10 +1604,12 @@ function bind() {
     if (open) syncRandomSettings()
   })
   $('#random-settings').addEventListener('click', (e) => e.stopPropagation())
-  $('#random-gender-aware').addEventListener('change', (e) => {
-    store.setUi({ randomGenderAware: e.target.checked })
+  $('#random-gender-scope').addEventListener('click', (e) => {
+    const button = e.target.closest('[data-random-scope]')
+    if (!button || button.disabled) return
+    store.setUi({ randomGenderScope: button.dataset.randomScope })
     syncRandomSettings()
-    toast(e.target.checked ? '随机时按已选性别优化' : '已关闭随机性别优化')
+    toast(`随机范围：${button.textContent.trim()}`)
   })
   $('#randomize-btn').addEventListener('click', async () => {
     closeRandomSettings()
@@ -1597,8 +1622,12 @@ function bind() {
       )
       if (!ok) return
     }
-    const genderAware = store.state.ui.randomGenderAware !== false && Boolean(store.scheme.gender)
     const gender = store.scheme.gender
+    const selectedScope = currentRandomScope()
+    const genderApplicable = gender === '男性呈现' || gender === '女性呈现'
+    const effectiveScope = !genderApplicable
+      ? gender === '中性呈现' ? 'mixed' : 'any'
+      : selectedScope
     store.randomizeScheme()
     view.quick = ''
     view.mood = ''
@@ -1612,7 +1641,15 @@ function bind() {
     syncSchemeFields()
     renderAll()
     $('.cards-wrap').scrollTop = 0
-    toast(genderAware ? `已按「${gender}」优化随机生成` : '已随机生成新角色')
+    if (gender === '中性呈现') {
+      toast('已随机生成中性呈现特征')
+    } else if (effectiveScope === 'same-only') {
+      toast(`已按「${gender}」优先同性生成，缺失维度使用中性兜底`)
+    } else if (effectiveScope === 'mixed') {
+      toast(`已按「${gender}」在同性 + 中性范围生成`)
+    } else {
+      toast('已随机生成新角色')
+    }
   })
   $('#handoff-btn').addEventListener('click', handoffToFree)
   $('#open-search').addEventListener('click', openSearch)

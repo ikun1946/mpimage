@@ -17,10 +17,12 @@ function shuffled(list, random = Math.random) {
 }
 
 const GENDER_WEIGHTS = {
-  male: { male: 6, neutral: 2.5, female: 0.35 },
-  female: { female: 6, neutral: 2.5, male: 0.35 },
-  neutral: { neutral: 4, male: 1, female: 1 },
+  male: 6,
+  female: 6,
+  neutral: 2.5,
 }
+const RANDOM_GENDER_SCOPES = new Set(['any', 'mixed', 'same-only'])
+const DEFAULT_RANDOM_GENDER_SCOPE = 'mixed'
 
 /** 主发型结构互斥组：随机时只选一个分类和一张主卡，避免男发、女发、盘发、编发同时出现。 */
 const RANDOM_PRIMARY_GROUPS = [[
@@ -44,21 +46,53 @@ function randomGenderTarget(gender) {
   return ''
 }
 
-function itemGenderWeight(item, target) {
-  if (!target) return 1
-  const labels = Array.isArray(item.gender_affinity) && item.gender_affinity.length
-    ? item.gender_affinity
-    : ['neutral']
-  if (labels.includes(target)) return GENDER_WEIGHTS[target][target]
-  if (labels.includes('neutral')) return GENDER_WEIGHTS[target].neutral
-  return GENDER_WEIGHTS[target][target === 'male' ? 'female' : 'male'] ?? 0.35
+function normalizeRandomGenderScope(value) {
+  return RANDOM_GENDER_SCOPES.has(value) ? value : DEFAULT_RANDOM_GENDER_SCOPE
 }
 
-function categoryGenderWeight(category, target) {
-  if (!target) return 1
+function itemGenderLabels(item) {
+  return Array.isArray(item.gender_affinity) && item.gender_affinity.length
+    ? item.gender_affinity
+    : ['neutral']
+}
+
+function itemMatchesGender(item, target) {
+  return Boolean(target) && itemGenderLabels(item).includes(target)
+}
+
+function itemIsNeutral(item) {
+  return itemGenderLabels(item).includes('neutral')
+}
+
+/**
+ * 只保留当前范围允许的卡片。“仅同性”在没有同性卡时退回该维度的中性卡，
+ * 避免大量维度因为缺少性别专属卡而整组留空。
+ */
+function scopedGenderPool(pool, target, scope) {
+  if (!target || scope === 'any') return pool
+  const sameGender = pool.filter((item) => itemMatchesGender(item, target))
+  if (scope === 'same-only') {
+    return sameGender.length ? sameGender : pool.filter(itemIsNeutral)
+  }
+  return pool.filter((item) => itemMatchesGender(item, target) || itemIsNeutral(item))
+}
+
+function itemGenderWeight(item, target, scope) {
+  if (!target || scope === 'any') return 1
+  if (itemMatchesGender(item, target)) return GENDER_WEIGHTS[target]
+  if (scope === 'mixed' && itemIsNeutral(item)) return GENDER_WEIGHTS.neutral
+  return 0
+}
+
+function categoryGenderWeight(category, target, scope) {
+  if (!target || scope === 'any') return 1
   const pool = (category.items || []).filter(item => item.visible !== false)
-  if (!pool.length) return 0
-  return Math.max(...pool.map(item => itemGenderWeight(item, target)))
+  const scoped = scopedGenderPool(pool, target, scope)
+  if (!scoped.length) return 0
+  if (scope === 'same-only') {
+    return scoped.some((item) => itemMatchesGender(item, target)) ? GENDER_WEIGHTS[target] : 0.35
+  }
+  return Math.max(...scoped.map((item) => itemGenderWeight(item, target, scope)))
 }
 
 function weightedShuffle(list, weightOf, random = Math.random) {
@@ -111,7 +145,7 @@ export class Store {
         length: 'full',
         shot: 'portrait',
         category: 'face_shape',
-        randomGenderAware: true,
+        randomGenderScope: DEFAULT_RANDOM_GENDER_SCOPE,
       },
     }
   }
@@ -173,14 +207,24 @@ export class Store {
     if (!this.state.schemes.some((s) => s.id === this.state.activeId)) {
       this.state.activeId = this.state.schemes[0].id
     }
+    const previousUi = this.state.ui || {}
+    const explicitScope = RANDOM_GENDER_SCOPES.has(previousUi.randomGenderScope)
+    const legacyScope = previousUi.randomGenderAware === false
+      ? 'any'
+      : previousUi.randomGenderAware === true
+        ? 'mixed'
+        : ''
     this.state.ui = Object.assign({
       lang: 'zh',
       length: 'full',
       shot: 'portrait',
       category: 'face_shape',
-      randomGenderAware: true,
-    }, this.state.ui)
-    this.state.ui.randomGenderAware = this.state.ui.randomGenderAware !== false
+      randomGenderScope: DEFAULT_RANDOM_GENDER_SCOPE,
+    }, previousUi)
+    this.state.ui.randomGenderScope = explicitScope
+      ? this.state.ui.randomGenderScope
+      : normalizeRandomGenderScope(legacyScope)
+    delete this.state.ui.randomGenderAware
   }
 
   applyCustomItems() {
@@ -235,7 +279,11 @@ export class Store {
   }
 
   setUi(patch) {
-    Object.assign(this.state.ui, patch)
+    const next = { ...patch }
+    if ('randomGenderScope' in next) {
+      next.randomGenderScope = normalizeRandomGenderScope(next.randomGenderScope)
+    }
+    Object.assign(this.state.ui, next)
     this.save()
   }
 
@@ -280,25 +328,26 @@ export class Store {
   /** 按维度的单选/多选规则生成一套完整随机角色，并消除已知冲突。 */
   randomizeScheme(random = Math.random) {
     const scheme = this.scheme
-    const genderTarget = this.state.ui.randomGenderAware === false
-      ? ''
-      : randomGenderTarget(scheme.gender)
+    const selectedScope = normalizeRandomGenderScope(this.state.ui.randomGenderScope)
+    const genderScope = scheme.gender === '中性呈现' ? 'mixed' : selectedScope
+    const genderTarget = genderScope === 'any' ? '' : randomGenderTarget(scheme.gender)
     const selections = {}
     const strengths = {}
     const primaryKeys = new Set(RANDOM_PRIMARY_GROUPS.flat())
     const pickItems = (category, exactOne = false) => {
       const pool = (category.items || []).filter((item) => item.visible !== false)
-      if (!pool.length) return []
+      const scoped = scopedGenderPool(pool, genderTarget, genderScope)
+      if (!scoped.length) return []
       const max = exactOne
         ? 1
         : category.select_mode === 'multi'
-          ? Math.min(Number(category.max_select) || 1, 2, pool.length)
+          ? Math.min(Number(category.max_select) || 1, 2, scoped.length)
           : 1
       const count = exactOne ? 1 : 1 + Math.floor(random() * Math.max(1, max))
       const ranked = genderTarget
-        ? weightedShuffle(pool, (item) => itemGenderWeight(item, genderTarget), random)
-        : shuffled(pool, random)
-      return ranked.slice(0, Math.min(count, pool.length))
+        ? weightedShuffle(scoped, (item) => itemGenderWeight(item, genderTarget, genderScope), random)
+        : shuffled(scoped, random)
+      return ranked.slice(0, Math.min(count, scoped.length))
     }
     const applyPicked = (category, picked) => {
       if (!picked.length) return
@@ -322,9 +371,10 @@ export class Store {
         .filter(category => category && (category.items || []).some(item => item.visible !== false))
       if (!available.length) continue
       const ranked = genderTarget
-        ? weightedShuffle(available, (category) => categoryGenderWeight(category, genderTarget), random)
+        ? weightedShuffle(available, (category) => categoryGenderWeight(category, genderTarget, genderScope), random)
         : shuffled(available, random)
       const category = ranked[0]
+      if (!category || categoryGenderWeight(category, genderTarget, genderScope) <= 0) continue
       applyPicked(category, pickItems(category, true))
     }
 

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "generated_from": "scripts/build-face-shape-vectors.mjs, scripts/build-eye-corner-references.mjs",
+  "references": {
+    "face_oval": "/face-assets/references/face/face_shape/face_oval.webp",
+    "face_narrow_oval": "/face-assets/references/face/face_shape/face_narrow_oval.webp",
+    "face_long_oval": "/face-assets/references/face/face_shape/face_long_oval.webp",
+    "face_round": "/face-assets/references/face/face_shape/face_round.webp",
+    "face_short_wide": "/face-assets/references/face/face_shape/face_short_wide.webp",
+    "face_square": "/face-assets/references/face/face_shape/face_square.webp",
+    "face_rectangular": "/face-assets/references/face/face_shape/face_rectangular.webp",
+    "face_heart": "/face-assets/references/face/face_shape/face_heart.webp",
+    "face_inverted_triangle": "/face-assets/references/face/face_shape/face_inverted_triangle.webp",
+    "face_diamond": "/face-assets/references/face/face_shape/face_diamond.webp",
+    "face_pear": "/face-assets/references/face/face_shape/face_pear.webp",
+    "face_trapezoid": "/face-assets/references/face/face_shape/face_trapezoid.webp",
+    "face_oblong": "/face-assets/references/face/face_shape/face_oblong.webp",
+    "eye_corner_level": "/face-assets/references/eyes/eye_corner/eye_corner_level.webp",
+    "eye_corner_slight_up": "/face-assets/references/eyes/eye_corner/eye_corner_slight_up.webp",
+    "eye_corner_high_up": "/face-assets/references/eyes/eye_corner/eye_corner_high_up.webp",
+    "eye_corner_slight_down": "/face-assets/references/eyes/eye_corner/eye_corner_slight_down.webp",
+    "eye_corner_down": "/face-assets/references/eyes/eye_corner/eye_corner_down.webp",
+    "eye_inner_sharp": "/face-assets/references/eyes/eye_corner/eye_inner_sharp.webp",
+    "eye_outer_extended": "/face-assets/references/eyes/eye_corner/eye_outer_extended.webp"
+  }
+}

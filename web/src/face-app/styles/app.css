@@ -88,12 +88,31 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .save-state.is-dirty { color: var(--warn); }
 
 .top-actions { display: flex; align-items: center; gap: 6px; }
-.random-control { position: relative; display: inline-flex; align-items: center; }
-.random-settings-btn {
-  width: 25px;
-  height: 28px;
-  margin-left: -5px;
+.random-control {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  transition: border-color .15s;
+}
+.random-control:hover,
+.random-control:focus-within { border-color: #3b352c; }
+.random-control .random-btn {
+  height: 30px;
+  padding: 0 10px;
   border: 0;
+  border-radius: 8px 0 0 8px;
+}
+.random-control .random-btn:hover { border-color: transparent; }
+.random-settings-btn {
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0 8px 8px 0;
   background: transparent;
   color: var(--muted-2);
 }
@@ -125,47 +144,52 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 }
 .random-popover-head strong { font-size: 13px; }
 .random-popover-head span { color: var(--ink-faint); font-size: 10.5px; }
-.random-switch {
-  position: relative;
+.random-scope-field { display: flex; flex-direction: column; gap: 8px; }
+.random-scope-title {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
 }
-.random-switch > span { display: flex; flex: 1; flex-direction: column; gap: 2px; }
-.random-switch b { font-size: 12px; font-weight: 600; }
-.random-switch small { color: var(--ink-faint); font-size: 10.5px; line-height: 1.45; }
-.random-switch input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+.random-scope-title b { font-size: 12px; font-weight: 600; }
+.random-scope-title small { color: var(--ink-faint); font-size: 10px; }
+.random-scope {
+  display: grid;
+  grid-template-columns: .75fr 1.4fr .85fr;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface-subtle);
 }
-.random-switch i {
-  position: relative;
-  flex: none;
-  width: 34px;
-  height: 20px;
-  border-radius: 20px;
-  background: var(--line-strong);
-  transition: background .16s;
+.random-scope button {
+  height: 26px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10.5px;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
 }
-.random-switch i::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--surface-raised);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
-  transition: transform .16s;
+.random-scope button:hover:not(:disabled) {
+  color: var(--ink);
+  background: rgba(255, 255, 255, .04);
 }
-.random-switch input:checked + i { background: var(--moss); }
-.random-switch input:checked + i::after { transform: translateX(14px); }
-.random-switch input:focus-visible + i { outline: 2px solid var(--moss); outline-offset: 2px; }
+.random-scope button[aria-checked="true"] {
+  background: var(--moss);
+  color: #211a10;
+  font-weight: 600;
+}
+.random-scope button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+.random-scope button:focus-visible {
+  outline: 2px solid var(--moss);
+  outline-offset: 1px;
+}
 .random-popover p {
   margin: 9px 0 0;
   padding-top: 9px;
@@ -708,7 +732,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
   .top-actions .btn.ghost, .style-select, #more-btn { display: none; }
   .top-actions .btn.random-btn { display: inline-flex; width: 32px; padding: 0; }
   .random-btn span { display: none; }
-  .random-settings-btn { width: 23px; margin-left: -5px; }
+  .random-settings-btn { width: 30px; margin-left: 0; }
   .random-popover {
     position: fixed;
     top: calc(var(--header-h) + 7px);

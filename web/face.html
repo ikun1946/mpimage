@@ -99,14 +99,17 @@
             <strong>随机设置</strong>
             <span>只影响特征参数</span>
           </div>
-          <label class="random-switch">
-            <span>
-              <b>按已选性别优化</b>
-              <small>优先同性向和中性特征</small>
-            </span>
-            <input type="checkbox" id="random-gender-aware" />
-            <i aria-hidden="true"></i>
-          </label>
+          <div class="random-scope-field">
+            <div class="random-scope-title">
+              <b>性别范围</b>
+              <small id="random-scope-state">同性优先，含中性</small>
+            </div>
+            <div class="random-scope" id="random-gender-scope" role="radiogroup" aria-label="随机性别范围">
+              <button type="button" role="radio" data-random-scope="any" aria-checked="false">不限</button>
+              <button type="button" role="radio" data-random-scope="mixed" aria-checked="true">同性 + 中性</button>
+              <button type="button" role="radio" data-random-scope="same-only" aria-checked="false">仅同性</button>
+            </div>
+          </div>
           <p id="random-gender-hint">当前：女性呈现</p>
         </div>
       </div>
@@ -216,7 +219,7 @@
       <footer class="stage-foot">
         <span id="selection-summary">尚未选择</span>
         <span class="dot"></span>
-        <span id="coverage">参考图 0 / 592</span>
+        <span id="coverage">参考图 36 / 592</span>
       </footer>
     </main>
 

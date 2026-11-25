@@ -32,10 +32,15 @@ try {
   assert.equal(initial.total, 592)
   assert.equal(initial.categories, 56)
   assert.equal(initial.presets, 14)
-  assert.equal(initial.references, 16)
+  assert.equal(initial.references, 36)
   assert.equal(store.getPublic().total, 592)
   assert.equal(store.getAdmin().schemaVersion, 2)
   assert.equal(store.getAdmin().version, '1.1')
+  assert.equal(
+    store.getAdmin().categories.find(category => category.key === 'face_shape').items
+      .filter(item => store.getAdmin().references[item.id]).length,
+    13,
+  )
   assert.equal(
     store.getAdmin().groups.find(group => group.key === 'hair').categories.length,
     21,
@@ -111,11 +116,15 @@ try {
   legacy.version = '1.0'
   const extensionCategoryKeys = new Set(extension.categories.map(category => category.key))
   const extensionIds = new Set(extensionItems.map(item => item.id))
+  const faceShapeIds = new Set(
+    legacy.categories.find(category => category.key === 'face_shape').items.map(item => item.id),
+  )
   legacy.categories = legacy.categories.filter(category => !extensionCategoryKeys.has(category.key))
   const legacyHairGroup = legacy.groups.find(group => group.key === 'hair')
   legacyHairGroup.categories = legacyHairGroup.categories.filter(key => !extensionCategoryKeys.has(key))
   legacy.conflict_rules = legacy.conflict_rules.filter(rule =>
     !extensionIds.has(rule.left) && !extensionIds.has(rule.right))
+  for (const id of faceShapeIds) delete legacy.references[id]
   for (const category of legacy.categories) {
     for (const item of category.items) delete item.gender_affinity
   }
@@ -140,6 +149,11 @@ try {
   assert.equal(migratedItems.find(item => item.id === 'face_square').name_zh, '管理员改过的方脸')
   assert.equal(migratedItems.find(item => item.id === 'face_square').visible, false)
   assert.ok(migratedItems.find(item => item.id === 'hair_male_fade'))
+  assert.equal(Object.keys(migrated.references).length, 36)
+  assert.match(
+    migrated.references.face_oval,
+    /\/face-assets\/references\/face\/face_shape\/face_oval\.webp$/,
+  )
   assert.ok(migrated.groups.find(group => group.key === 'hair').categories.includes('hair_male_modern'))
   assert.ok(migrated.conflict_rules.some(rule => rule.left === 'hair_male_buzz_cut'))
 
@@ -147,7 +161,7 @@ try {
   assert.equal(store.getPublic().total, 592)
   assert.ok(reset.revision > restored.revision)
 
-  console.log('✓ 种子目录：592 张卡片 / 56 个维度 / 14 套预设 / 16 张参考图')
+  console.log('✓ 种子目录：592 张卡片 / 56 个维度 / 14 套预设 / 36 张参考图')
   console.log('✓ 发型扩展：10 个新分类、108 张新卡片，ID 和分类计数正确')
   console.log('✓ 公共服务目录会过滤隐藏维度和隐藏卡片')
   console.log('✓ 保存会生成备份，并可恢复上一版')

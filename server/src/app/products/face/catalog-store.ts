@@ -528,6 +528,18 @@ function mergeSeedAdditions(raw: Record<string, any>, seed: Record<string, any>)
     changed = true
   }
 
+  const rawReferences = asObject(raw.references)
+  if (!rawReferences) {
+    raw.references = {}
+    changed = true
+  }
+  const references = raw.references as Record<string, string>
+  for (const [id, path] of Object.entries(asObject(seed.references) || {})) {
+    if (typeof path !== 'string' || !path || references[id] || !rawItemCategories.has(id)) continue
+    references[id] = path
+    changed = true
+  }
+
   if (changed) {
     if (typeof seed.version === 'string' && seed.version) raw.version = seed.version
     if (typeof seed.generated_from === 'string' && seed.generated_from) {

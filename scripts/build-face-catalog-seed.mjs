@@ -18,6 +18,7 @@ const manifestFile = join(source, 'src', 'data', 'reference-manifest.json')
 const outFile = join(root, 'server', 'assets', 'face', 'catalog-seed.json')
 const genderAffinityFile = join(root, 'server', 'assets', 'face', 'gender-affinity.json')
 const extensionDirectory = join(root, 'server', 'assets', 'face', 'extensions')
+const referenceAdditionsFile = join(root, 'server', 'assets', 'face', 'reference-additions.json')
 
 const data = JSON.parse(readFileSync(featuresFile, 'utf8'))
 const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'))
@@ -36,6 +37,15 @@ const references = Object.fromEntries(
     url.replace(/^\/assets\/references\//, '/face-assets/references/').replace(/\.(png|jpe?g)$/i, '.webp'),
   ]),
 )
+if (existsSync(referenceAdditionsFile)) {
+  const additions = JSON.parse(readFileSync(referenceAdditionsFile, 'utf8'))
+  for (const [id, path] of Object.entries(additions.references || {})) {
+    if (typeof path !== 'string' || !path.startsWith('/face-assets/')) {
+      throw new Error(`附加参考图路径无效：${id} / ${path}`)
+    }
+    references[id] = path
+  }
+}
 
 const groups = data.groups.map(group => ({
   ...group,
