@@ -140,7 +140,7 @@ try {
   assert.equal(catalog.total, 592)
   assert.equal(catalog.categories, 56)
   assert.equal(catalog.presets, 14)
-  assert.equal(catalog.references, 36)
+  assert.equal(catalog.references, 272)
   assert.equal(catalog.title, '画境 · 捏脸')
   assert.equal(catalog.back, '/batch.html')
   assert.ok(catalog.userId)
@@ -206,7 +206,7 @@ try {
     hair_state: 7,
     hair_history: 23,
   })
-  assert.equal(hairExtension.pendingRefs, 0)
+  assert.equal(hairExtension.pendingRefs, 108)
   for (const phrase of [
     '两侧及后脑由短到长自然渐变',
     '卷束呈连续弹簧状',
@@ -283,6 +283,149 @@ try {
   const eyeCornerShot = await cdp('Page.captureScreenshot', { format: 'png' })
   await writeFile(join(ROOT, 'release', 'face-tests', 'eye-corner-references-app.png'), Buffer.from(eyeCornerShot.data, 'base64'))
 
+  for (const [category, count, sampleId] of [
+    ['eyelid', 9, 'lid_monolid'],
+    ['eye_size', 5, 'eye_size_large'],
+    ['eye_spacing', 3, 'eye_spacing_wide'],
+    ['eye_position', 2, 'eye_position_high'],
+    ['brow_eye', 5, 'brow_eye_defined'],
+  ]) {
+    await evalJs(`document.querySelector('#nav [data-cat="${category}"]').click(); true`)
+    await waitForPage(() => evalJs(`Boolean(document.querySelector('.card[data-id="${sampleId}"]'))`))
+    await waitForPage(() => evalJs(`(() => {
+      const images = [...document.querySelectorAll('#cards .card .thumb img')]
+      return images.length === ${count} && images.every(image => image.complete && image.naturalWidth > 0)
+    })()`), 15_000)
+  }
+  await evalJs(`document.querySelector('#nav [data-cat="eyelid"]').click(); true`)
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 9 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  const eyelidReference = await evalJs(`document.querySelector('.card[data-id="lid_inner_double"] .thumb img')?.getAttribute('src')`)
+  assert.match(eyelidReference, /^\/face-assets\/references\/eyes\/eyelid\/lid_inner_double\.webp$/)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 300))))`)
+  const eyelidShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'eye-lid-references-app.png'), Buffer.from(eyelidShot.data, 'base64'))
+
+  await evalJs(`document.querySelector('[data-group-head="hair"]').click(); true`)
+  await waitForPage(() => evalJs(`Boolean(document.querySelector('#nav [data-cat="bangs"]'))`))
+  await evalJs(`document.querySelector('#nav [data-cat="bangs"]').click(); true`)
+  await waitForPage(() => evalJs(`Boolean(document.querySelector('.card[data-id="bang_air"]'))`))
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 15 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  const bangReference = await evalJs(`document.querySelector('.card[data-id="bang_air"] .thumb img')?.getAttribute('src')`)
+  assert.match(bangReference, /^\/face-assets\/references\/hair\/bangs\/bang_air\.webp$/)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 300))))`)
+  const bangsShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'hair-bangs-app.png'), Buffer.from(bangsShot.data, 'base64'))
+
+  for (const [category, count, sampleId] of [
+    ['hair_cut', 15, 'cut_wolf'],
+    ['braid', 12, 'braid_fishtail'],
+    ['hair_style', 15, 'style_fluffy'],
+    ['updo', 16, 'updo_high_ponytail'],
+    ['hair_length', 12, 'hair_length_chin'],
+    ['hair_part', 7, 'hair_part_center'],
+    ['ancient_bun', 12, 'ancient_bun_double_ring'],
+    ['hair_male_modern', 14, 'hair_male_quiff'],
+    ['hair_female_short', 10, 'hair_female_french_bob'],
+    ['hair_curl_form', 8, 'hair_curl_afro'],
+    ['hair_curl_pattern', 9, 'curl_3b'],
+    ['hair_state', 7, 'hair_state_windblown'],
+    ['hair_braid_cultural', 11, 'hair_braid_bow'],
+    ['hair_updo_detail', 10, 'hair_updo_ballet_bun'],
+    ['hairline_sideburn', 8, 'hairline_peaks'],
+    ['hair_silhouette', 8, 'hair_silhouette_high_crown'],
+    ['hair_history', 23, 'hair_history_china_tang_high'],
+  ]) {
+    await evalJs(`document.querySelector('#nav [data-cat="${category}"]').click(); true`)
+    await waitForPage(() => evalJs(`Boolean(document.querySelector('.card[data-id="${sampleId}"]'))`))
+    await waitForPage(() => evalJs(`(() => {
+      const images = [...document.querySelectorAll('#cards .card .thumb img')]
+      return images.length === ${count} && images.every(image => image.complete && image.naturalWidth > 0)
+    })()`), 15_000)
+  }
+  await evalJs(`document.querySelector('#nav [data-cat="hair_cut"]').click(); true`)
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 15 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  const cutReference = await evalJs(`document.querySelector('.card[data-id="cut_bob"] .thumb img')?.getAttribute('src')`)
+  assert.match(cutReference, /^\/face-assets\/references\/hair\/hair_cut\/cut_bob\.webp$/)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 300))))`)
+  const hairCutShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'hair-cut-app.png'), Buffer.from(hairCutShot.data, 'base64'))
+
+  await evalJs(`document.querySelector('#nav [data-cat="updo"]').click(); true`)
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 16 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  const updoReference = await evalJs(`document.querySelector('.card[data-id="updo_high_bun"] .thumb img')?.getAttribute('src')`)
+  assert.match(updoReference, /^\/face-assets\/references\/hair\/updo\/updo_high_bun\.webp$/)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 300))))`)
+  const updoShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'hair-updo-app.png'), Buffer.from(updoShot.data, 'base64'))
+
+  await evalJs(`document.querySelector('#nav [data-cat="ancient_bun"]').click(); true`)
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 12 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  const ancientBunReference = await evalJs(`document.querySelector('.card[data-id="ancient_bun_double_ring"] .thumb img')?.getAttribute('src')`)
+  assert.match(ancientBunReference, /^\/face-assets\/references\/hair\/ancient_bun\/ancient_bun_double_ring\.webp$/)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 300))))`)
+  const ancientBunShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'hair-ancient-bun-app.png'), Buffer.from(ancientBunShot.data, 'base64'))
+
+  await evalJs(`document.querySelector('#nav [data-cat="hair_length"]').click(); true`)
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 12 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 300))))`)
+  const hairLengthShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'hair-length-app.png'), Buffer.from(hairLengthShot.data, 'base64'))
+
+  await evalJs(`document.querySelector('#nav [data-cat="hair_male_modern"]').click(); true`)
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 14 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 300))))`)
+  const maleModernShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'hair-male-modern-app.png'), Buffer.from(maleModernShot.data, 'base64'))
+
+  await evalJs(`document.querySelector('#nav [data-cat="hair_curl_pattern"]').click(); true`)
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 9 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 300))))`)
+  const curlPatternShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'hair-curl-pattern-app.png'), Buffer.from(curlPatternShot.data, 'base64'))
+
+  await evalJs(`document.querySelector('#nav [data-cat="hair_braid_cultural"]').click(); true`)
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 11 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 300))))`)
+  const braidCulturalShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'hair-braid-cultural-app.png'), Buffer.from(braidCulturalShot.data, 'base64'))
+
+  await evalJs(`document.querySelector('#nav [data-cat="hair_history"]').click(); true`)
+  await waitForPage(() => evalJs(`(() => {
+    const images = [...document.querySelectorAll('#cards .card .thumb img')]
+    return images.length === 23 && images.every(image => image.complete && image.naturalWidth > 0)
+  })()`), 15_000)
+  await evalJs(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 300))))`)
+  const hairHistoryShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(ROOT, 'release', 'face-tests', 'hair-history-app.png'), Buffer.from(hairHistoryShot.data, 'base64'))
+
   const storageHasUser = await evalJs(`Object.keys(localStorage).some(key => key.startsWith('huajing.faceStudio.v1.${catalog.userId}'))`)
   assert.equal(storageHasUser, true)
 
@@ -324,8 +467,8 @@ try {
     images: document.querySelectorAll('#cards .card .thumb img').length,
   })`)
   assert.equal(maleCards.cards, 14)
-  assert.equal(maleCards.placeholders, 14)
-  assert.equal(maleCards.images, 0)
+  assert.equal(maleCards.placeholders, 0)
+  assert.equal(maleCards.images, 14)
   await mkdir(join(ROOT, 'release', 'face-tests'), { recursive: true })
   const hairExtensionShot = await cdp('Page.captureScreenshot', { format: 'png' })
   await writeFile(join(ROOT, 'release', 'face-tests', 'face-hair-extension.png'), Buffer.from(hairExtensionShot.data, 'base64'))
@@ -354,7 +497,7 @@ try {
   await waitForPage(() => evalJs(`Boolean(window.__faceStudio)`), 20_000)
   await evalJs(`(() => {
     document.querySelector('[data-group-head="eyes"]')?.click()
-    document.querySelector('#nav [data-cat="eye_spacing"]')?.click()
+    document.querySelector('#nav [data-cat="iris"]')?.click()
     return true
   })()`)
   await waitForPage(() => evalJs(`document.querySelectorAll('#cards .card.no-ref').length >= 3`))
@@ -409,7 +552,7 @@ try {
   await mkdir(shotDir, { recursive: true })
   await evalJs(`(() => {
     document.querySelector('[data-group-head="eyes"]')?.click()
-    document.querySelector('#nav [data-cat="eye_spacing"]')?.click()
+    document.querySelector('#nav [data-cat="iris"]')?.click()
     return true
   })()`)
   await waitForPage(() => evalJs(`document.querySelectorAll('#cards .card.no-ref').length >= 3`))
@@ -751,6 +894,40 @@ try {
   assert.ok(settingsOpen.layout.randomWidth > 40)
   assert.ok(settingsOpen.layout.settingsWidth >= 30)
   assert.equal(settingsOpen.layout.insideViewport, true)
+
+  const readSlideThumb = (groupSelector, activeSelector) => evalJs(`(() => {
+    const group = document.querySelector(${JSON.stringify(groupSelector)})
+    const thumb = group?.querySelector(':scope > .seg-thumb')
+    const active = group?.querySelector(${JSON.stringify(activeSelector)})
+    if (!group || !thumb || !active) return null
+    const t = thumb.getBoundingClientRect()
+    const a = active.getBoundingClientRect()
+    const style = getComputedStyle(thumb)
+    return {
+      ready: group.classList.contains('is-ready'),
+      opacity: Number(style.opacity),
+      dx: Math.abs(t.left - a.left),
+      dw: Math.abs(t.width - a.width),
+      duration: style.transitionDuration,
+      active: active.textContent.trim(),
+    }
+  })()`)
+
+  const randomThumb = await readSlideThumb('#random-gender-scope', '[aria-checked="true"]')
+  assert.ok(randomThumb, '性别范围缺少滑动指示块')
+  assert.equal(randomThumb.ready, true)
+  assert.ok(randomThumb.opacity > 0.9)
+  assert.ok(randomThumb.dx < 1.5, `初始指示块左边缘偏差 ${randomThumb.dx}`)
+  assert.ok(randomThumb.dw < 1.5, `初始指示块宽度偏差 ${randomThumb.dw}`)
+  assert.notEqual(randomThumb.duration, '0s')
+
+  await evalJs(`document.querySelector('#random-settings-btn').click(); true`)
+  await evalJs(`document.querySelector('#random-settings-btn').click(); true`)
+  await waitForPage(() => evalJs(`!document.querySelector('#random-settings').hidden`))
+  const reopenedThumb = await readSlideThumb('#random-gender-scope', '[aria-checked="true"]')
+  assert.ok(reopenedThumb.dx < 1.5, `重新打开后指示块左边缘偏差 ${reopenedThumb.dx}`)
+  assert.ok(reopenedThumb.dw < 1.5, `重新打开后指示块宽度偏差 ${reopenedThumb.dw}`)
+
   const randomSettingsShot = await cdp('Page.captureScreenshot', { format: 'png' })
   await writeFile(join(shotDir, 'face-random-settings.png'), Buffer.from(randomSettingsShot.data, 'base64'))
   await evalJs(`(() => {
@@ -759,6 +936,13 @@ try {
   })()`)
   assert.equal(await evalJs(`window.__faceStudio.store.state.ui.randomGenderScope`), 'same-only')
   assert.match(await evalJs(`document.querySelector('#random-gender-hint').textContent`), /中性卡兜底/)
+  await evalJs(`new Promise(resolve => setTimeout(resolve, 320))`)
+  const movedThumb = await readSlideThumb('#random-gender-scope', '[aria-checked="true"]')
+  assert.equal(movedThumb.active, '仅同性')
+  assert.ok(movedThumb.dx < 1.5, `切换后指示块左边缘偏差 ${movedThumb.dx}`)
+  assert.ok(movedThumb.dw < 1.5, `切换后指示块宽度偏差 ${movedThumb.dw}`)
+  const segmentedShot = await cdp('Page.captureScreenshot', { format: 'png' })
+  await writeFile(join(shotDir, 'segmented-slider.png'), Buffer.from(segmentedShot.data, 'base64'))
   await evalJs(`(() => {
     document.querySelector('[data-random-scope="any"]').click()
     return true
@@ -772,12 +956,30 @@ try {
   })()`)
   assert.equal(await evalJs(`[...document.querySelectorAll('[data-random-scope]')].every(button => button.disabled)`), true)
   assert.match(await evalJs(`document.querySelector('#random-gender-hint').textContent`), /固定使用中性/)
+  const disabledThumb = await readSlideThumb('#random-gender-scope', '[aria-checked="true"]')
+  assert.ok(disabledThumb.opacity < 0.5, `禁用态指示块没有变淡：${disabledThumb.opacity}`)
   await evalJs(`(() => {
     const select = document.querySelector('#gender')
     select.value = '男性呈现'
     select.dispatchEvent(new Event('change', { bubbles: true }))
     return true
   })()`)
+
+  for (const [group, value, label] of [['lang', 'en', 'English'], ['length', 'compact', '精简'], ['shot', 'turnaround', '三视图']]) {
+    await evalJs(`document.querySelector('#modes .seg[data-group="${group}"] button[data-val="${value}"]').click(); true`)
+    await evalJs(`new Promise(resolve => setTimeout(resolve, 320))`)
+    const metrics = await readSlideThumb(`#modes .seg[data-group="${group}"]`, 'button.is-active')
+    assert.ok(metrics, `${group} 分段按钮缺少滑动指示块`)
+    assert.equal(metrics.active, label)
+    assert.ok(metrics.dx < 1.5, `${group} 指示块左边缘偏差 ${metrics.dx}`)
+    assert.ok(metrics.dw < 1.5, `${group} 指示块宽度偏差 ${metrics.dw}`)
+  }
+  await evalJs(`document.querySelector('#modes .seg[data-group="lang"] button[data-val="zh"]').click(); true`)
+  await evalJs(`document.querySelector('#modes .seg[data-group="length"] button[data-val="full"]').click(); true`)
+  await evalJs(`document.querySelector('#modes .seg[data-group="shot"] button[data-val="portrait"]').click(); true`)
+  await evalJs(`new Promise(resolve => setTimeout(resolve, 320))`)
+  const restoredShot = await readSlideThumb('#modes .seg[data-group="shot"]', 'button.is-active')
+  assert.equal(restoredShot.active, '半身参考')
 
   // 自定义卡片：保存后自动提交审核，本人立即可用；参考图走待审核，不走公共目录。
   await evalJs(`document.querySelector('#random-settings-btn').click(); true`)
@@ -938,7 +1140,7 @@ try {
   const shot = await cdp('Page.captureScreenshot', { format: 'png' })
   await writeFile(join(shotDir, 'face-page-mobile.png'), Buffer.from(shot.data, 'base64'))
 
-  console.log('✓ 捏脸页：服务端目录 592 条特征 / 56 维度 / 14 预设 / 36 张内置图')
+  console.log('✓ 捏脸页：服务端目录 592 条特征 / 56 维度 / 14 预设 / 272 张内置图')
   console.log('✓ 预设与提示词：载入清冷古典美人后实时生成完整提示词')
   console.log('✓ 提示词只读：完整提示词和负向词都无法用键盘增删改')
   console.log('✓ 服务端资产：参考图从 /face-assets/ 正常加载')
@@ -946,7 +1148,7 @@ try {
   console.log('✓ 账号隔离：本地状态键包含当前 userId')
   console.log('✓ 服务端修改：改名后客户端重新加载可见，恢复默认后还原')
   console.log('✓ 卡片比例：同类卡片宽高比一致，详情展开时才变高')
-  console.log('✓ 发型扩展：108 张新卡、10 个分类、占位图和完整/精简提示词正常')
+  console.log('✓ 发型扩展：108 张新卡、10 个分类、男发/女短发参考图和完整/精简提示词正常')
   console.log('✓ 大屏滚动：1.25 倍缩放下工作区不超出视口，最后一行和页脚都能滚到')
   console.log('✓ 全维度滚动：56 个维度逐页检查，最后一行都没有被底部截断')
   console.log('✓ 恢复空白：清空全部选择与设定、保留方案名称，移动端按钮仍可见')

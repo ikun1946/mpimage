@@ -324,6 +324,52 @@ function currentRandomScope() {
   return ['any', 'mixed', 'same-only'].includes(value) ? value : 'mixed'
 }
 
+const slidingGroups = new WeakMap()
+const slidingObserved = new WeakSet()
+const slidingObserver = typeof ResizeObserver === 'function'
+  ? new ResizeObserver((entries) => {
+    entries.forEach((entry) => syncSlidingGroup(entry.target, true))
+  })
+  : null
+
+function syncSlidingGroup(group, force = false) {
+  if (!group) return
+  const thumb = group.querySelector(':scope > .seg-thumb')
+  if (!thumb) return
+  const active = group.querySelector('[aria-checked="true"], .is-active')
+  if (!active || !group.offsetWidth) return
+  const cached = slidingGroups.get(group)
+  if (!force && cached?.active === active) return
+  const groupRect = group.getBoundingClientRect()
+  const activeRect = active.getBoundingClientRect()
+  const zoom = Number(getComputedStyle(document.body).zoom) || 1
+  const x = (activeRect.left - groupRect.left) / zoom - group.clientLeft
+  const width = activeRect.width / zoom
+  const first = !group.classList.contains('is-ready')
+  if (first) thumb.style.transition = 'none'
+  thumb.style.width = `${width}px`
+  thumb.style.transform = `translateX(${x}px)`
+  slidingGroups.set(group, { active, x, width })
+  if (first) {
+    void thumb.offsetWidth
+    thumb.style.transition = ''
+    group.classList.add('is-ready')
+  }
+  if (slidingObserver && !slidingObserved.has(group)) {
+    slidingObserved.add(group)
+    slidingObserver.observe(group)
+  }
+}
+
+function syncSlidingControls(force = false) {
+  $$('.seg, .random-scope').forEach((group) => syncSlidingGroup(group, force))
+}
+
+window.addEventListener('resize', () => syncSlidingControls(true))
+if (document.fonts?.ready) {
+  document.fonts.ready.then(() => syncSlidingControls(true)).catch(() => {})
+}
+
 function syncRandomSettings() {
   const scopeGroup = $('#random-gender-scope')
   const scopeState = $('#random-scope-state')
@@ -336,6 +382,7 @@ function syncRandomSettings() {
     button.disabled = !genderApplicable
     button.setAttribute('aria-checked', String(button.dataset.randomScope === scope))
   })
+  scopeGroup.classList.toggle('is-disabled', !genderApplicable)
   if (!gender) {
     scopeState.textContent = '选择性别后可用'
     hint.textContent = '先选择“男性呈现”或“女性呈现”，再设置随机性别范围。'
@@ -352,6 +399,7 @@ function syncRandomSettings() {
     scopeState.textContent = RANDOM_SCOPE_LABELS[scope]
     hint.textContent = `当前：${gender}；只在${gender === '男性呈现' ? '男性和' : '女性和'}中性特征中抽取。`
   }
+  syncSlidingControls()
 }
 
 function renderNav() {
@@ -566,6 +614,7 @@ function renderPanel() {
   $$('#modes .seg').forEach((seg) => {
     $$('button', seg).forEach((btn) => btn.classList.toggle('is-active', btn.dataset.val === ui[seg.dataset.group]))
   })
+  syncSlidingControls()
 
   const conflictBox = $('#conflict-box')
   if (compiled.conflicts.length) {
@@ -1703,7 +1752,10 @@ function bind() {
     e.target.value = ''
   })
 
-  $('#panel-toggle').addEventListener('click', () => $('#panel').classList.add('is-open'))
+  $('#panel-toggle').addEventListener('click', () => {
+    $('#panel').classList.add('is-open')
+    syncSlidingControls()
+  })
   $('#panel-close').addEventListener('click', () => $('#panel').classList.remove('is-open'))
 
   $('#search-overlay').addEventListener('click', (e) => {

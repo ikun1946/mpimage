@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "revision": 0,
-  "updatedAt": "2026-11-25T05:38:48.821Z",
+  "updatedAt": "2026-11-26T04:30:44.869Z",
   "version": "1.1",
   "generated_from": "AI角色面部设计工作台_需求说明与四大数据库_V1.0.md + AI角色面部设计工作台_发型数据库扩展包_V1.1.md",
   "total": 592,
@@ -4815,7 +4815,7 @@
           ],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "B3",
@@ -4846,7 +4846,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "B3",
@@ -4877,7 +4877,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "B3",
@@ -4909,7 +4909,7 @@
           ],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 40,
           "is_custom": false,
           "source_section": "B3",
@@ -4940,7 +4940,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 50,
           "is_custom": false,
           "source_section": "B3",
@@ -4970,7 +4970,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 60,
           "is_custom": false,
           "source_section": "B3",
@@ -5000,7 +5000,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 70,
           "is_custom": false,
           "source_section": "B3",
@@ -5030,7 +5030,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 80,
           "is_custom": false,
           "source_section": "B3",
@@ -5061,7 +5061,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 90,
           "is_custom": false,
           "source_section": "B3",
@@ -5108,7 +5108,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "B4",
@@ -5138,7 +5138,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "B4",
@@ -5168,7 +5168,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "B4",
@@ -5198,7 +5198,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 40,
           "is_custom": false,
           "source_section": "B4",
@@ -5228,7 +5228,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 50,
           "is_custom": false,
           "source_section": "B4",
@@ -5275,7 +5275,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "B4",
@@ -5305,7 +5305,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "B4",
@@ -5335,7 +5335,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "B4",
@@ -5382,7 +5382,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "B4",
@@ -5412,7 +5412,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "B4",
@@ -5459,7 +5459,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "B5",
@@ -5489,7 +5489,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "B5",
@@ -5519,7 +5519,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "B5",
@@ -5549,7 +5549,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 40,
           "is_custom": false,
           "source_section": "B5",
@@ -5579,7 +5579,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 50,
           "is_custom": false,
           "source_section": "B5",
@@ -6970,7 +6970,7 @@
           ],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "C1",
@@ -7002,7 +7002,7 @@
           ],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "C1",
@@ -7032,7 +7032,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "C1",
@@ -7062,7 +7062,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 40,
           "is_custom": false,
           "source_section": "C1",
@@ -7092,7 +7092,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 50,
           "is_custom": false,
           "source_section": "C1",
@@ -7122,7 +7122,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 60,
           "is_custom": false,
           "source_section": "C1",
@@ -7152,7 +7152,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 70,
           "is_custom": false,
           "source_section": "C1",
@@ -7182,7 +7182,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 80,
           "is_custom": false,
           "source_section": "C1",
@@ -7212,7 +7212,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 90,
           "is_custom": false,
           "source_section": "C1",
@@ -7242,7 +7242,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 100,
           "is_custom": false,
           "source_section": "C1",
@@ -7272,7 +7272,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 110,
           "is_custom": false,
           "source_section": "C1",
@@ -7302,7 +7302,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 120,
           "is_custom": false,
           "source_section": "C1",
@@ -7349,7 +7349,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "C2",
@@ -7379,7 +7379,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "C2",
@@ -7409,7 +7409,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "C2",
@@ -7439,7 +7439,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 40,
           "is_custom": false,
           "source_section": "C2",
@@ -7469,7 +7469,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 50,
           "is_custom": false,
           "source_section": "C2",
@@ -7499,7 +7499,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 60,
           "is_custom": false,
           "source_section": "C2",
@@ -7529,7 +7529,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 70,
           "is_custom": false,
           "source_section": "C2",
@@ -7578,7 +7578,7 @@
           ],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "C3",
@@ -7608,7 +7608,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "C3",
@@ -7643,7 +7643,7 @@
             "空气"
           ],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "C3",
@@ -7673,7 +7673,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 40,
           "is_custom": false,
           "source_section": "C3",
@@ -7704,7 +7704,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 50,
           "is_custom": false,
           "source_section": "C3",
@@ -7734,7 +7734,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 60,
           "is_custom": false,
           "source_section": "C3",
@@ -7767,7 +7767,7 @@
             "法式八字"
           ],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 70,
           "is_custom": false,
           "source_section": "C3",
@@ -7798,7 +7798,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 80,
           "is_custom": false,
           "source_section": "C3",
@@ -7828,7 +7828,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 90,
           "is_custom": false,
           "source_section": "C3",
@@ -7858,7 +7858,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 100,
           "is_custom": false,
           "source_section": "C3",
@@ -7889,7 +7889,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 110,
           "is_custom": false,
           "source_section": "C3",
@@ -7919,7 +7919,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 120,
           "is_custom": false,
           "source_section": "C3",
@@ -7950,7 +7950,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 130,
           "is_custom": false,
           "source_section": "C3",
@@ -7980,7 +7980,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 140,
           "is_custom": false,
           "source_section": "C3",
@@ -8010,7 +8010,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 150,
           "is_custom": false,
           "source_section": "C3",
@@ -8057,7 +8057,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "C4",
@@ -8087,7 +8087,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "C4",
@@ -8117,7 +8117,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "C4",
@@ -8147,7 +8147,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 40,
           "is_custom": false,
           "source_section": "C4",
@@ -8178,7 +8178,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 50,
           "is_custom": false,
           "source_section": "C4",
@@ -8209,7 +8209,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 60,
           "is_custom": false,
           "source_section": "C4",
@@ -8239,7 +8239,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 70,
           "is_custom": false,
           "source_section": "C4",
@@ -8269,7 +8269,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 80,
           "is_custom": false,
           "source_section": "C4",
@@ -8299,7 +8299,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 90,
           "is_custom": false,
           "source_section": "C4",
@@ -8329,7 +8329,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 100,
           "is_custom": false,
           "source_section": "C4",
@@ -8359,7 +8359,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 110,
           "is_custom": false,
           "source_section": "C4",
@@ -8389,7 +8389,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 120,
           "is_custom": false,
           "source_section": "C4",
@@ -8419,7 +8419,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 130,
           "is_custom": false,
           "source_section": "C4",
@@ -8450,7 +8450,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 140,
           "is_custom": false,
           "source_section": "C4",
@@ -8480,7 +8480,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 150,
           "is_custom": false,
           "source_section": "C4",
@@ -8532,7 +8532,7 @@
             "直发"
           ],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "C5",
@@ -8565,7 +8565,7 @@
           ],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "C5",
@@ -8595,7 +8595,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "C5",
@@ -8629,7 +8629,7 @@
             "大波浪"
           ],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 40,
           "is_custom": false,
           "source_section": "C5",
@@ -8659,7 +8659,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 50,
           "is_custom": false,
           "source_section": "C5",
@@ -8689,7 +8689,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 60,
           "is_custom": false,
           "source_section": "C5",
@@ -8719,7 +8719,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 70,
           "is_custom": false,
           "source_section": "C5",
@@ -8749,7 +8749,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 80,
           "is_custom": false,
           "source_section": "C5",
@@ -8782,7 +8782,7 @@
           ],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 90,
           "is_custom": false,
           "source_section": "C5",
@@ -8812,7 +8812,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 100,
           "is_custom": false,
           "source_section": "C5",
@@ -8843,7 +8843,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 110,
           "is_custom": false,
           "source_section": "C5",
@@ -8873,7 +8873,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 120,
           "is_custom": false,
           "source_section": "C5",
@@ -8903,7 +8903,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 130,
           "is_custom": false,
           "source_section": "C5",
@@ -8933,7 +8933,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 140,
           "is_custom": false,
           "source_section": "C5",
@@ -8963,7 +8963,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 150,
           "is_custom": false,
           "source_section": "C5",
@@ -9014,7 +9014,7 @@
             "高马尾"
           ],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "C6",
@@ -9046,7 +9046,7 @@
           ],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "C6",
@@ -9076,7 +9076,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "C6",
@@ -9106,7 +9106,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 40,
           "is_custom": false,
           "source_section": "C6",
@@ -9138,7 +9138,7 @@
           ],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 50,
           "is_custom": false,
           "source_section": "C6",
@@ -9168,7 +9168,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 60,
           "is_custom": false,
           "source_section": "C6",
@@ -9198,7 +9198,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 70,
           "is_custom": false,
           "source_section": "C6",
@@ -9228,7 +9228,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 80,
           "is_custom": false,
           "source_section": "C6",
@@ -9259,7 +9259,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 90,
           "is_custom": false,
           "source_section": "C6",
@@ -9293,7 +9293,7 @@
             "半束发"
           ],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 100,
           "is_custom": false,
           "source_section": "C6",
@@ -9323,7 +9323,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 110,
           "is_custom": false,
           "source_section": "C6",
@@ -9353,7 +9353,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 120,
           "is_custom": false,
           "source_section": "C6",
@@ -9383,7 +9383,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 130,
           "is_custom": false,
           "source_section": "C6",
@@ -9413,7 +9413,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 140,
           "is_custom": false,
           "source_section": "C6",
@@ -9443,7 +9443,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 150,
           "is_custom": false,
           "source_section": "C6",
@@ -9473,7 +9473,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 160,
           "is_custom": false,
           "source_section": "C6",
@@ -9520,7 +9520,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "C7",
@@ -9550,7 +9550,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "C7",
@@ -9580,7 +9580,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "C7",
@@ -9610,7 +9610,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 40,
           "is_custom": false,
           "source_section": "C7",
@@ -9640,7 +9640,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 50,
           "is_custom": false,
           "source_section": "C7",
@@ -9672,7 +9672,7 @@
           ],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 60,
           "is_custom": false,
           "source_section": "C7",
@@ -9704,7 +9704,7 @@
           ],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 70,
           "is_custom": false,
           "source_section": "C7",
@@ -9734,7 +9734,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 80,
           "is_custom": false,
           "source_section": "C7",
@@ -9764,7 +9764,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 90,
           "is_custom": false,
           "source_section": "C7",
@@ -9794,7 +9794,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 100,
           "is_custom": false,
           "source_section": "C7",
@@ -9824,7 +9824,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 110,
           "is_custom": false,
           "source_section": "C7",
@@ -9854,7 +9854,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 120,
           "is_custom": false,
           "source_section": "C7",
@@ -9901,7 +9901,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 10,
           "is_custom": false,
           "source_section": "C8",
@@ -9931,7 +9931,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 20,
           "is_custom": false,
           "source_section": "C8",
@@ -9961,7 +9961,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 30,
           "is_custom": false,
           "source_section": "C8",
@@ -9991,7 +9991,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 40,
           "is_custom": false,
           "source_section": "C8",
@@ -10024,7 +10024,7 @@
             "飞仙髻"
           ],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 50,
           "is_custom": false,
           "source_section": "C8",
@@ -10057,7 +10057,7 @@
             "垂云髻"
           ],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 60,
           "is_custom": false,
           "source_section": "C8",
@@ -10089,7 +10089,7 @@
             "灵蛇髻"
           ],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 70,
           "is_custom": false,
           "source_section": "C8",
@@ -10122,7 +10122,7 @@
             "堕马髻"
           ],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 80,
           "is_custom": false,
           "source_section": "C8",
@@ -10152,7 +10152,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 90,
           "is_custom": false,
           "source_section": "C8",
@@ -10183,7 +10183,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 100,
           "is_custom": false,
           "source_section": "C8",
@@ -10213,7 +10213,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 110,
           "is_custom": false,
           "source_section": "C8",
@@ -10243,7 +10243,7 @@
           "conflicts": [],
           "aliases": [],
           "reference_image": "",
-          "reference_status": "pending",
+          "reference_status": "ready",
           "sort_order": 120,
           "is_custom": false,
           "source_section": "C8",
@@ -15689,7 +15689,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_buzz_cut",
@@ -15739,7 +15739,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_bowl_cut",
@@ -15782,7 +15782,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_fade",
@@ -15825,7 +15825,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_slick_back",
@@ -15869,7 +15869,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_quiff",
@@ -15912,7 +15912,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_pompadour",
@@ -15955,7 +15955,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_undercut",
@@ -16001,7 +16001,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_side_shave",
@@ -16048,7 +16048,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_comma",
@@ -16092,7 +16092,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_two_block",
@@ -16136,7 +16136,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_textured_crop",
@@ -16180,7 +16180,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_mohawk",
@@ -16224,7 +16224,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_male_mullet",
@@ -16267,7 +16267,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         }
       ],
       "count": 14
@@ -16332,7 +16332,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_female_bixie",
@@ -16375,7 +16375,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_female_french_bob",
@@ -16419,7 +16419,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_female_micro_bob",
@@ -16463,7 +16463,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_female_italian_bob",
@@ -16507,7 +16507,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_female_hush_cut",
@@ -16551,7 +16551,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_female_short_wolf",
@@ -16594,7 +16594,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_female_shag_bob",
@@ -16638,7 +16638,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_female_asym_bob",
@@ -16682,7 +16682,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_female_tucked_bob",
@@ -16726,7 +16726,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         }
       ],
       "count": 10
@@ -16794,7 +16794,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_curl_spring",
@@ -16842,7 +16842,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_curl_tight",
@@ -16890,7 +16890,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_curl_natural_fluffy",
@@ -16936,7 +16936,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_curl_cloud",
@@ -16982,7 +16982,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_curl_wool_spiral",
@@ -17030,7 +17030,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_curl_vintage_mix",
@@ -17075,7 +17075,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_curl_short",
@@ -17121,7 +17121,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         }
       ],
       "count": 8
@@ -17191,7 +17191,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "curl_2b",
@@ -17242,7 +17242,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "curl_2c",
@@ -17294,7 +17294,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "curl_3a",
@@ -17347,7 +17347,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "curl_3b",
@@ -17400,7 +17400,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "curl_3c",
@@ -17452,7 +17452,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "curl_4a",
@@ -17504,7 +17504,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "curl_4b",
@@ -17556,7 +17556,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "curl_4c",
@@ -17609,7 +17609,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         }
       ],
       "count": 9
@@ -17672,7 +17672,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_braid_box",
@@ -17716,7 +17716,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_braid_knotless_box",
@@ -17760,7 +17760,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_braid_milkmaid",
@@ -17804,7 +17804,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_braid_pancake",
@@ -17848,7 +17848,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_braid_four_strand",
@@ -17892,7 +17892,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_braid_five_strand",
@@ -17936,7 +17936,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_braid_bow",
@@ -17980,7 +17980,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_braid_dreadlocks",
@@ -18024,7 +18024,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_braid_senegalese_twist",
@@ -18068,7 +18068,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_braid_fulani",
@@ -18113,7 +18113,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         }
       ],
       "count": 11
@@ -18176,7 +18176,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_updo_high_sleek_ponytail",
@@ -18220,7 +18220,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_updo_low_sleek_ponytail",
@@ -18264,7 +18264,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_updo_braided_ponytail",
@@ -18307,7 +18307,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_updo_wrapped_ponytail",
@@ -18352,7 +18352,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_updo_vintage_side_ponytail",
@@ -18397,7 +18397,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_updo_ballet_bun",
@@ -18445,7 +18445,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_updo_french_twist",
@@ -18489,7 +18489,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_updo_banana_roll",
@@ -18533,7 +18533,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_updo_spiral_bun",
@@ -18577,7 +18577,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         }
       ],
       "count": 10
@@ -18638,7 +18638,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hairline_m_shape",
@@ -18681,7 +18681,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hairline_round",
@@ -18724,7 +18724,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hairline_straight",
@@ -18767,7 +18767,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hairline_high",
@@ -18811,7 +18811,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hairline_low",
@@ -18855,7 +18855,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hairline_baby_hair",
@@ -18898,7 +18898,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hairline_sideburn_strands",
@@ -18941,7 +18941,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         }
       ],
       "count": 8
@@ -19010,7 +19010,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_silhouette_inverted_triangle",
@@ -19062,7 +19062,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_silhouette_a_line",
@@ -19113,7 +19113,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_silhouette_vertical",
@@ -19164,7 +19164,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_silhouette_high_crown",
@@ -19215,7 +19215,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_silhouette_sleek",
@@ -19267,7 +19267,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_silhouette_asymmetric",
@@ -19318,7 +19318,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_silhouette_layered",
@@ -19369,7 +19369,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         }
       ],
       "count": 8
@@ -19438,7 +19438,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_state_messy",
@@ -19490,7 +19490,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_state_damp",
@@ -19543,7 +19543,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_state_wet",
@@ -19596,7 +19596,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_state_bedhead",
@@ -19648,7 +19648,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_state_floating",
@@ -19699,7 +19699,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_state_static_drape",
@@ -19750,7 +19750,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         }
       ],
       "count": 7
@@ -19813,7 +19813,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_yuanbao",
@@ -19858,7 +19858,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_tongxin",
@@ -19903,7 +19903,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_shuangdao",
@@ -19948,7 +19948,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_mudan",
@@ -19994,7 +19994,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_panheng",
@@ -20039,7 +20039,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_huixin",
@@ -20084,7 +20084,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_chuiji",
@@ -20129,7 +20129,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_fanwan",
@@ -20174,7 +20174,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_liangbatou",
@@ -20219,7 +20219,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_qitou",
@@ -20266,7 +20266,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_dalachiyi",
@@ -20314,7 +20314,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_tang_high",
@@ -20360,7 +20360,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_china_song_simple",
@@ -20406,7 +20406,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_western_greek",
@@ -20450,7 +20450,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_western_roman",
@@ -20494,7 +20494,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_western_regency",
@@ -20538,7 +20538,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_western_rococo",
@@ -20582,7 +20582,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_western_victorian",
@@ -20626,7 +20626,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_western_gibson",
@@ -20671,7 +20671,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_western_finger_wave",
@@ -20715,7 +20715,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_western_victory_rolls",
@@ -20758,7 +20758,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         },
         {
           "id": "hair_history_western_beehive",
@@ -20802,7 +20802,7 @@
           "visible": true,
           "is_custom": false,
           "reference_image": "",
-          "reference_status": "pending"
+          "reference_status": "ready"
         }
       ],
       "count": 23
@@ -22496,6 +22496,242 @@
     "eye_corner_slight_down": "/face-assets/references/eyes/eye_corner/eye_corner_slight_down.webp",
     "eye_corner_down": "/face-assets/references/eyes/eye_corner/eye_corner_down.webp",
     "eye_inner_sharp": "/face-assets/references/eyes/eye_corner/eye_inner_sharp.webp",
-    "eye_outer_extended": "/face-assets/references/eyes/eye_corner/eye_outer_extended.webp"
+    "eye_outer_extended": "/face-assets/references/eyes/eye_corner/eye_outer_extended.webp",
+    "bang_8": "/face-assets/references/hair/bangs/bang_8.webp",
+    "bang_air": "/face-assets/references/hair/bangs/bang_air.webp",
+    "bang_blunt": "/face-assets/references/hair/bangs/bang_blunt.webp",
+    "bang_brow_above": "/face-assets/references/hair/bangs/bang_brow_above.webp",
+    "bang_brow_cover": "/face-assets/references/hair/bangs/bang_brow_cover.webp",
+    "bang_center": "/face-assets/references/hair/bangs/bang_center.webp",
+    "bang_curtain": "/face-assets/references/hair/bangs/bang_curtain.webp",
+    "bang_french": "/face-assets/references/hair/bangs/bang_french.webp",
+    "bang_long_side": "/face-assets/references/hair/bangs/bang_long_side.webp",
+    "bang_micro": "/face-assets/references/hair/bangs/bang_micro.webp",
+    "bang_none": "/face-assets/references/hair/bangs/bang_none.webp",
+    "bang_s_shape": "/face-assets/references/hair/bangs/bang_s_shape.webp",
+    "bang_see_through": "/face-assets/references/hair/bangs/bang_see_through.webp",
+    "bang_side": "/face-assets/references/hair/bangs/bang_side.webp",
+    "bang_split": "/face-assets/references/hair/bangs/bang_split.webp",
+    "braid_cornrow": "/face-assets/references/hair/braid/braid_cornrow.webp",
+    "braid_crown": "/face-assets/references/hair/braid/braid_crown.webp",
+    "braid_double": "/face-assets/references/hair/braid/braid_double.webp",
+    "braid_dutch": "/face-assets/references/hair/braid/braid_dutch.webp",
+    "braid_fishtail": "/face-assets/references/hair/braid/braid_fishtail.webp",
+    "braid_french": "/face-assets/references/hair/braid/braid_french.webp",
+    "braid_halo": "/face-assets/references/hair/braid/braid_halo.webp",
+    "braid_multi": "/face-assets/references/hair/braid/braid_multi.webp",
+    "braid_rope": "/face-assets/references/hair/braid/braid_rope.webp",
+    "braid_single_side": "/face-assets/references/hair/braid/braid_single_side.webp",
+    "braid_three_strand": "/face-assets/references/hair/braid/braid_three_strand.webp",
+    "braid_waterfall": "/face-assets/references/hair/braid/braid_waterfall.webp",
+    "cut_asymmetrical": "/face-assets/references/hair/hair_cut/cut_asymmetrical.webp",
+    "cut_blunt": "/face-assets/references/hair/hair_cut/cut_blunt.webp",
+    "cut_bob": "/face-assets/references/hair/hair_cut/cut_bob.webp",
+    "cut_butterfly": "/face-assets/references/hair/hair_cut/cut_butterfly.webp",
+    "cut_curved_in": "/face-assets/references/hair/hair_cut/cut_curved_in.webp",
+    "cut_face_framing": "/face-assets/references/hair/hair_cut/cut_face_framing.webp",
+    "cut_feather": "/face-assets/references/hair/hair_cut/cut_feather.webp",
+    "cut_flipped_out": "/face-assets/references/hair/hair_cut/cut_flipped_out.webp",
+    "cut_hime": "/face-assets/references/hair/hair_cut/cut_hime.webp",
+    "cut_layered_high": "/face-assets/references/hair/hair_cut/cut_layered_high.webp",
+    "cut_layered_low": "/face-assets/references/hair/hair_cut/cut_layered_low.webp",
+    "cut_long_bob": "/face-assets/references/hair/hair_cut/cut_long_bob.webp",
+    "cut_shag": "/face-assets/references/hair/hair_cut/cut_shag.webp",
+    "cut_textured": "/face-assets/references/hair/hair_cut/cut_textured.webp",
+    "cut_wolf": "/face-assets/references/hair/hair_cut/cut_wolf.webp",
+    "style_big_waves": "/face-assets/references/hair/hair_style/style_big_waves.webp",
+    "style_corkscrew": "/face-assets/references/hair/hair_style/style_corkscrew.webp",
+    "style_egg_roll": "/face-assets/references/hair/hair_style/style_egg_roll.webp",
+    "style_fluffy": "/face-assets/references/hair/hair_style/style_fluffy.webp",
+    "style_half_wet": "/face-assets/references/hair/hair_style/style_half_wet.webp",
+    "style_horse": "/face-assets/references/hair/hair_style/style_horse.webp",
+    "style_inward": "/face-assets/references/hair/hair_style/style_inward.webp",
+    "style_loose_waves": "/face-assets/references/hair/hair_style/style_loose_waves.webp",
+    "style_outward": "/face-assets/references/hair/hair_style/style_outward.webp",
+    "style_perm": "/face-assets/references/hair/hair_style/style_perm.webp",
+    "style_sleek_straight": "/face-assets/references/hair/hair_style/style_sleek_straight.webp",
+    "style_small_waves": "/face-assets/references/hair/hair_style/style_small_waves.webp",
+    "style_soft_straight": "/face-assets/references/hair/hair_style/style_soft_straight.webp",
+    "style_straight": "/face-assets/references/hair/hair_style/style_straight.webp",
+    "style_water_waves": "/face-assets/references/hair/hair_style/style_water_waves.webp",
+    "updo_bubble_ponytail": "/face-assets/references/hair/updo/updo_bubble_ponytail.webp",
+    "updo_double_bun": "/face-assets/references/hair/updo/updo_double_bun.webp",
+    "updo_double_ponytail": "/face-assets/references/hair/updo/updo_double_ponytail.webp",
+    "updo_half_bun": "/face-assets/references/hair/updo/updo_half_bun.webp",
+    "updo_half_ponytail": "/face-assets/references/hair/updo/updo_half_ponytail.webp",
+    "updo_half_up": "/face-assets/references/hair/updo/updo_half_up.webp",
+    "updo_high_bun": "/face-assets/references/hair/updo/updo_high_bun.webp",
+    "updo_high_chignon": "/face-assets/references/hair/updo/updo_high_chignon.webp",
+    "updo_high_ponytail": "/face-assets/references/hair/updo/updo_high_ponytail.webp",
+    "updo_low_bun": "/face-assets/references/hair/updo/updo_low_bun.webp",
+    "updo_low_chignon": "/face-assets/references/hair/updo/updo_low_chignon.webp",
+    "updo_low_ponytail": "/face-assets/references/hair/updo/updo_low_ponytail.webp",
+    "updo_messy_bun": "/face-assets/references/hair/updo/updo_messy_bun.webp",
+    "updo_side_bun": "/face-assets/references/hair/updo/updo_side_bun.webp",
+    "updo_side_ponytail": "/face-assets/references/hair/updo/updo_side_ponytail.webp",
+    "updo_sleek_back": "/face-assets/references/hair/updo/updo_sleek_back.webp",
+    "ancient_bun_cloud": "/face-assets/references/hair/ancient_bun/ancient_bun_cloud.webp",
+    "ancient_bun_crown": "/face-assets/references/hair/ancient_bun/ancient_bun_crown.webp",
+    "ancient_bun_double_ring": "/face-assets/references/hair/ancient_bun/ancient_bun_double_ring.webp",
+    "ancient_bun_double_spiral": "/face-assets/references/hair/ancient_bun/ancient_bun_double_spiral.webp",
+    "ancient_bun_dual_knots": "/face-assets/references/hair/ancient_bun/ancient_bun_dual_knots.webp",
+    "ancient_bun_flying": "/face-assets/references/hair/ancient_bun/ancient_bun_flying.webp",
+    "ancient_bun_half_up": "/face-assets/references/hair/ancient_bun/ancient_bun_half_up.webp",
+    "ancient_bun_loose": "/face-assets/references/hair/ancient_bun/ancient_bun_loose.webp",
+    "ancient_bun_low": "/face-assets/references/hair/ancient_bun/ancient_bun_low.webp",
+    "ancient_bun_side_fall": "/face-assets/references/hair/ancient_bun/ancient_bun_side_fall.webp",
+    "ancient_bun_snake": "/face-assets/references/hair/ancient_bun/ancient_bun_snake.webp",
+    "ancient_bun_tall": "/face-assets/references/hair/ancient_bun/ancient_bun_tall.webp",
+    "hair_length_chest": "/face-assets/references/hair/hair_length/hair_length_chest.webp",
+    "hair_length_chest_upper": "/face-assets/references/hair/hair_length/hair_length_chest_upper.webp",
+    "hair_length_chin": "/face-assets/references/hair/hair_length/hair_length_chin.webp",
+    "hair_length_collarbone": "/face-assets/references/hair/hair_length/hair_length_collarbone.webp",
+    "hair_length_ear": "/face-assets/references/hair/hair_length/hair_length_ear.webp",
+    "hair_length_ear_above": "/face-assets/references/hair/hair_length/hair_length_ear_above.webp",
+    "hair_length_hip": "/face-assets/references/hair/hair_length/hair_length_hip.webp",
+    "hair_length_neck": "/face-assets/references/hair/hair_length/hair_length_neck.webp",
+    "hair_length_shoulder": "/face-assets/references/hair/hair_length/hair_length_shoulder.webp",
+    "hair_length_thigh": "/face-assets/references/hair/hair_length/hair_length_thigh.webp",
+    "hair_length_ultra_short": "/face-assets/references/hair/hair_length/hair_length_ultra_short.webp",
+    "hair_length_waist": "/face-assets/references/hair/hair_length/hair_length_waist.webp",
+    "hair_part_28": "/face-assets/references/hair/hair_part/hair_part_28.webp",
+    "hair_part_37": "/face-assets/references/hair/hair_part/hair_part_37.webp",
+    "hair_part_center": "/face-assets/references/hair/hair_part/hair_part_center.webp",
+    "hair_part_no": "/face-assets/references/hair/hair_part/hair_part_no.webp",
+    "hair_part_off_center": "/face-assets/references/hair/hair_part/hair_part_off_center.webp",
+    "hair_part_side_soft": "/face-assets/references/hair/hair_part/hair_part_side_soft.webp",
+    "hair_part_zigzag": "/face-assets/references/hair/hair_part/hair_part_zigzag.webp",
+    "hair_female_asym_bob": "/face-assets/references/hair/hair_female_short/hair_female_asym_bob.webp",
+    "hair_female_bixie": "/face-assets/references/hair/hair_female_short/hair_female_bixie.webp",
+    "hair_female_french_bob": "/face-assets/references/hair/hair_female_short/hair_female_french_bob.webp",
+    "hair_female_hush_cut": "/face-assets/references/hair/hair_female_short/hair_female_hush_cut.webp",
+    "hair_female_italian_bob": "/face-assets/references/hair/hair_female_short/hair_female_italian_bob.webp",
+    "hair_female_micro_bob": "/face-assets/references/hair/hair_female_short/hair_female_micro_bob.webp",
+    "hair_female_pixie": "/face-assets/references/hair/hair_female_short/hair_female_pixie.webp",
+    "hair_female_shag_bob": "/face-assets/references/hair/hair_female_short/hair_female_shag_bob.webp",
+    "hair_female_short_wolf": "/face-assets/references/hair/hair_female_short/hair_female_short_wolf.webp",
+    "hair_female_tucked_bob": "/face-assets/references/hair/hair_female_short/hair_female_tucked_bob.webp",
+    "hair_male_bowl_cut": "/face-assets/references/hair/hair_male_modern/hair_male_bowl_cut.webp",
+    "hair_male_buzz_cut": "/face-assets/references/hair/hair_male_modern/hair_male_buzz_cut.webp",
+    "hair_male_comma": "/face-assets/references/hair/hair_male_modern/hair_male_comma.webp",
+    "hair_male_fade": "/face-assets/references/hair/hair_male_modern/hair_male_fade.webp",
+    "hair_male_mohawk": "/face-assets/references/hair/hair_male_modern/hair_male_mohawk.webp",
+    "hair_male_mullet": "/face-assets/references/hair/hair_male_modern/hair_male_mullet.webp",
+    "hair_male_pixie_short": "/face-assets/references/hair/hair_male_modern/hair_male_pixie_short.webp",
+    "hair_male_pompadour": "/face-assets/references/hair/hair_male_modern/hair_male_pompadour.webp",
+    "hair_male_quiff": "/face-assets/references/hair/hair_male_modern/hair_male_quiff.webp",
+    "hair_male_side_shave": "/face-assets/references/hair/hair_male_modern/hair_male_side_shave.webp",
+    "hair_male_slick_back": "/face-assets/references/hair/hair_male_modern/hair_male_slick_back.webp",
+    "hair_male_textured_crop": "/face-assets/references/hair/hair_male_modern/hair_male_textured_crop.webp",
+    "hair_male_two_block": "/face-assets/references/hair/hair_male_modern/hair_male_two_block.webp",
+    "hair_male_undercut": "/face-assets/references/hair/hair_male_modern/hair_male_undercut.webp",
+    "curl_2a": "/face-assets/references/hair/hair_curl_pattern/curl_2a.webp",
+    "curl_2b": "/face-assets/references/hair/hair_curl_pattern/curl_2b.webp",
+    "curl_2c": "/face-assets/references/hair/hair_curl_pattern/curl_2c.webp",
+    "curl_3a": "/face-assets/references/hair/hair_curl_pattern/curl_3a.webp",
+    "curl_3b": "/face-assets/references/hair/hair_curl_pattern/curl_3b.webp",
+    "curl_3c": "/face-assets/references/hair/hair_curl_pattern/curl_3c.webp",
+    "curl_4a": "/face-assets/references/hair/hair_curl_pattern/curl_4a.webp",
+    "curl_4b": "/face-assets/references/hair/hair_curl_pattern/curl_4b.webp",
+    "curl_4c": "/face-assets/references/hair/hair_curl_pattern/curl_4c.webp",
+    "hair_curl_afro": "/face-assets/references/hair/hair_curl_form/hair_curl_afro.webp",
+    "hair_curl_cloud": "/face-assets/references/hair/hair_curl_form/hair_curl_cloud.webp",
+    "hair_curl_natural_fluffy": "/face-assets/references/hair/hair_curl_form/hair_curl_natural_fluffy.webp",
+    "hair_curl_short": "/face-assets/references/hair/hair_curl_form/hair_curl_short.webp",
+    "hair_curl_spring": "/face-assets/references/hair/hair_curl_form/hair_curl_spring.webp",
+    "hair_curl_tight": "/face-assets/references/hair/hair_curl_form/hair_curl_tight.webp",
+    "hair_curl_vintage_mix": "/face-assets/references/hair/hair_curl_form/hair_curl_vintage_mix.webp",
+    "hair_curl_wool_spiral": "/face-assets/references/hair/hair_curl_form/hair_curl_wool_spiral.webp",
+    "hair_state_bedhead": "/face-assets/references/hair/hair_state/hair_state_bedhead.webp",
+    "hair_state_damp": "/face-assets/references/hair/hair_state/hair_state_damp.webp",
+    "hair_state_floating": "/face-assets/references/hair/hair_state/hair_state_floating.webp",
+    "hair_state_messy": "/face-assets/references/hair/hair_state/hair_state_messy.webp",
+    "hair_state_static_drape": "/face-assets/references/hair/hair_state/hair_state_static_drape.webp",
+    "hair_state_wet": "/face-assets/references/hair/hair_state/hair_state_wet.webp",
+    "hair_state_windblown": "/face-assets/references/hair/hair_state/hair_state_windblown.webp",
+    "hair_braid_bow": "/face-assets/references/hair/hair_braid_cultural/hair_braid_bow.webp",
+    "hair_braid_box": "/face-assets/references/hair/hair_braid_cultural/hair_braid_box.webp",
+    "hair_braid_boxing": "/face-assets/references/hair/hair_braid_cultural/hair_braid_boxing.webp",
+    "hair_braid_dreadlocks": "/face-assets/references/hair/hair_braid_cultural/hair_braid_dreadlocks.webp",
+    "hair_braid_five_strand": "/face-assets/references/hair/hair_braid_cultural/hair_braid_five_strand.webp",
+    "hair_braid_four_strand": "/face-assets/references/hair/hair_braid_cultural/hair_braid_four_strand.webp",
+    "hair_braid_fulani": "/face-assets/references/hair/hair_braid_cultural/hair_braid_fulani.webp",
+    "hair_braid_knotless_box": "/face-assets/references/hair/hair_braid_cultural/hair_braid_knotless_box.webp",
+    "hair_braid_milkmaid": "/face-assets/references/hair/hair_braid_cultural/hair_braid_milkmaid.webp",
+    "hair_braid_pancake": "/face-assets/references/hair/hair_braid_cultural/hair_braid_pancake.webp",
+    "hair_braid_senegalese_twist": "/face-assets/references/hair/hair_braid_cultural/hair_braid_senegalese_twist.webp",
+    "hair_updo_ballet_bun": "/face-assets/references/hair/hair_updo_detail/hair_updo_ballet_bun.webp",
+    "hair_updo_banana_roll": "/face-assets/references/hair/hair_updo_detail/hair_updo_banana_roll.webp",
+    "hair_updo_braided_ponytail": "/face-assets/references/hair/hair_updo_detail/hair_updo_braided_ponytail.webp",
+    "hair_updo_french_twist": "/face-assets/references/hair/hair_updo_detail/hair_updo_french_twist.webp",
+    "hair_updo_high_fluffy_ponytail": "/face-assets/references/hair/hair_updo_detail/hair_updo_high_fluffy_ponytail.webp",
+    "hair_updo_high_sleek_ponytail": "/face-assets/references/hair/hair_updo_detail/hair_updo_high_sleek_ponytail.webp",
+    "hair_updo_low_sleek_ponytail": "/face-assets/references/hair/hair_updo_detail/hair_updo_low_sleek_ponytail.webp",
+    "hair_updo_spiral_bun": "/face-assets/references/hair/hair_updo_detail/hair_updo_spiral_bun.webp",
+    "hair_updo_vintage_side_ponytail": "/face-assets/references/hair/hair_updo_detail/hair_updo_vintage_side_ponytail.webp",
+    "hair_updo_wrapped_ponytail": "/face-assets/references/hair/hair_updo_detail/hair_updo_wrapped_ponytail.webp",
+    "hairline_baby_hair": "/face-assets/references/hair/hairline_sideburn/hairline_baby_hair.webp",
+    "hairline_high": "/face-assets/references/hair/hairline_sideburn/hairline_high.webp",
+    "hairline_low": "/face-assets/references/hair/hairline_sideburn/hairline_low.webp",
+    "hairline_m_shape": "/face-assets/references/hair/hairline_sideburn/hairline_m_shape.webp",
+    "hairline_peaks": "/face-assets/references/hair/hairline_sideburn/hairline_peaks.webp",
+    "hairline_round": "/face-assets/references/hair/hairline_sideburn/hairline_round.webp",
+    "hairline_sideburn_strands": "/face-assets/references/hair/hairline_sideburn/hairline_sideburn_strands.webp",
+    "hairline_straight": "/face-assets/references/hair/hairline_sideburn/hairline_straight.webp",
+    "hair_history_china_chaotian": "/face-assets/references/hair/hair_history/hair_history_china_chaotian.webp",
+    "hair_history_china_chuiji": "/face-assets/references/hair/hair_history/hair_history_china_chuiji.webp",
+    "hair_history_china_dalachiyi": "/face-assets/references/hair/hair_history/hair_history_china_dalachiyi.webp",
+    "hair_history_china_fanwan": "/face-assets/references/hair/hair_history/hair_history_china_fanwan.webp",
+    "hair_history_china_huixin": "/face-assets/references/hair/hair_history/hair_history_china_huixin.webp",
+    "hair_history_china_liangbatou": "/face-assets/references/hair/hair_history/hair_history_china_liangbatou.webp",
+    "hair_history_china_mudan": "/face-assets/references/hair/hair_history/hair_history_china_mudan.webp",
+    "hair_history_china_panheng": "/face-assets/references/hair/hair_history/hair_history_china_panheng.webp",
+    "hair_history_china_qitou": "/face-assets/references/hair/hair_history/hair_history_china_qitou.webp",
+    "hair_history_china_shuangdao": "/face-assets/references/hair/hair_history/hair_history_china_shuangdao.webp",
+    "hair_history_china_song_simple": "/face-assets/references/hair/hair_history/hair_history_china_song_simple.webp",
+    "hair_history_china_tang_high": "/face-assets/references/hair/hair_history/hair_history_china_tang_high.webp",
+    "hair_history_china_tongxin": "/face-assets/references/hair/hair_history/hair_history_china_tongxin.webp",
+    "hair_history_china_yuanbao": "/face-assets/references/hair/hair_history/hair_history_china_yuanbao.webp",
+    "hair_history_western_beehive": "/face-assets/references/hair/hair_history/hair_history_western_beehive.webp",
+    "hair_history_western_finger_wave": "/face-assets/references/hair/hair_history/hair_history_western_finger_wave.webp",
+    "hair_history_western_gibson": "/face-assets/references/hair/hair_history/hair_history_western_gibson.webp",
+    "hair_history_western_greek": "/face-assets/references/hair/hair_history/hair_history_western_greek.webp",
+    "hair_history_western_regency": "/face-assets/references/hair/hair_history/hair_history_western_regency.webp",
+    "hair_history_western_rococo": "/face-assets/references/hair/hair_history/hair_history_western_rococo.webp",
+    "hair_history_western_roman": "/face-assets/references/hair/hair_history/hair_history_western_roman.webp",
+    "hair_history_western_victorian": "/face-assets/references/hair/hair_history/hair_history_western_victorian.webp",
+    "hair_history_western_victory_rolls": "/face-assets/references/hair/hair_history/hair_history_western_victory_rolls.webp",
+    "hair_silhouette_a_line": "/face-assets/references/hair/hair_silhouette/hair_silhouette_a_line.webp",
+    "hair_silhouette_asymmetric": "/face-assets/references/hair/hair_silhouette/hair_silhouette_asymmetric.webp",
+    "hair_silhouette_high_crown": "/face-assets/references/hair/hair_silhouette/hair_silhouette_high_crown.webp",
+    "hair_silhouette_inverted_triangle": "/face-assets/references/hair/hair_silhouette/hair_silhouette_inverted_triangle.webp",
+    "hair_silhouette_layered": "/face-assets/references/hair/hair_silhouette/hair_silhouette_layered.webp",
+    "hair_silhouette_round": "/face-assets/references/hair/hair_silhouette/hair_silhouette_round.webp",
+    "hair_silhouette_sleek": "/face-assets/references/hair/hair_silhouette/hair_silhouette_sleek.webp",
+    "hair_silhouette_vertical": "/face-assets/references/hair/hair_silhouette/hair_silhouette_vertical.webp",
+    "brow_eye_close": "/face-assets/references/eyes/brow_eye/brow_eye_close.webp",
+    "brow_eye_defined": "/face-assets/references/eyes/brow_eye/brow_eye_defined.webp",
+    "brow_eye_sharp": "/face-assets/references/eyes/brow_eye/brow_eye_sharp.webp",
+    "brow_eye_soft": "/face-assets/references/eyes/brow_eye/brow_eye_soft.webp",
+    "brow_eye_wide": "/face-assets/references/eyes/brow_eye/brow_eye_wide.webp",
+    "eye_position_high": "/face-assets/references/eyes/eye_position/eye_position_high.webp",
+    "eye_position_low": "/face-assets/references/eyes/eye_position/eye_position_low.webp",
+    "eye_size_elongated": "/face-assets/references/eyes/eye_size/eye_size_elongated.webp",
+    "eye_size_large": "/face-assets/references/eyes/eye_size/eye_size_large.webp",
+    "eye_size_medium": "/face-assets/references/eyes/eye_size/eye_size_medium.webp",
+    "eye_size_small": "/face-assets/references/eyes/eye_size/eye_size_small.webp",
+    "eye_size_vertical": "/face-assets/references/eyes/eye_size/eye_size_vertical.webp",
+    "eye_spacing_close": "/face-assets/references/eyes/eye_spacing/eye_spacing_close.webp",
+    "eye_spacing_normal": "/face-assets/references/eyes/eye_spacing/eye_spacing_normal.webp",
+    "eye_spacing_wide": "/face-assets/references/eyes/eye_spacing/eye_spacing_wide.webp",
+    "lid_crescent": "/face-assets/references/eyes/eyelid/lid_crescent.webp",
+    "lid_deep_crease": "/face-assets/references/eyes/eyelid/lid_deep_crease.webp",
+    "lid_hooded": "/face-assets/references/eyes/eyelid/lid_hooded.webp",
+    "lid_inner_double": "/face-assets/references/eyes/eyelid/lid_inner_double.webp",
+    "lid_monolid": "/face-assets/references/eyes/eyelid/lid_monolid.webp",
+    "lid_open_fan": "/face-assets/references/eyes/eyelid/lid_open_fan.webp",
+    "lid_parallel_double": "/face-assets/references/eyes/eyelid/lid_parallel_double.webp",
+    "lid_puffy": "/face-assets/references/eyes/eyelid/lid_puffy.webp",
+    "lid_tapered_double": "/face-assets/references/eyes/eyelid/lid_tapered_double.webp"
   }
 }

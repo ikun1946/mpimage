@@ -575,3 +575,58 @@ body:not(.is-booting) .face-loading {
     font-size: 12px;
   }
 }
+
+/* ---------------------------------------------------- 分段按钮滑动指示块 */
+.seg,
+.random-scope {
+  position: relative;
+}
+
+.seg-thumb {
+  position: absolute;
+  z-index: 0;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 0;
+  border-radius: 6px;
+  background: var(--moss);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(0);
+  transition:
+    transform .24s cubic-bezier(.3, .7, .3, 1),
+    width .24s cubic-bezier(.3, .7, .3, 1);
+}
+
+.seg.is-ready .seg-thumb,
+.random-scope.is-ready .seg-thumb {
+  opacity: 1;
+}
+
+.random-scope.is-disabled .seg-thumb {
+  opacity: .38;
+}
+
+.seg button,
+.random-scope button {
+  position: relative;
+  z-index: 1;
+}
+
+.seg button.is-active {
+  background: transparent;
+  color: var(--on-moss);
+  box-shadow: none;
+}
+
+.random-scope button[aria-checked="true"] {
+  background: transparent;
+  color: #211a10;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seg-thumb {
+    transition: none;
+  }
+}

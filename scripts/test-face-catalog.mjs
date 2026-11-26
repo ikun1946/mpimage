@@ -32,7 +32,7 @@ try {
   assert.equal(initial.total, 592)
   assert.equal(initial.categories, 56)
   assert.equal(initial.presets, 14)
-  assert.equal(initial.references, 36)
+  assert.equal(initial.references, 272)
   assert.equal(store.getPublic().total, 592)
   assert.equal(store.getAdmin().schemaVersion, 2)
   assert.equal(store.getAdmin().version, '1.1')
@@ -149,7 +149,7 @@ try {
   assert.equal(migratedItems.find(item => item.id === 'face_square').name_zh, '管理员改过的方脸')
   assert.equal(migratedItems.find(item => item.id === 'face_square').visible, false)
   assert.ok(migratedItems.find(item => item.id === 'hair_male_fade'))
-  assert.equal(Object.keys(migrated.references).length, 36)
+  assert.equal(Object.keys(migrated.references).length, 272)
   assert.match(
     migrated.references.face_oval,
     /\/face-assets\/references\/face\/face_shape\/face_oval\.webp$/,
@@ -161,7 +161,7 @@ try {
   assert.equal(store.getPublic().total, 592)
   assert.ok(reset.revision > restored.revision)
 
-  console.log('✓ 种子目录：592 张卡片 / 56 个维度 / 14 套预设 / 36 张参考图')
+  console.log('✓ 种子目录：592 张卡片 / 56 个维度 / 14 套预设 / 272 张参考图')
   console.log('✓ 发型扩展：10 个新分类、108 张新卡片，ID 和分类计数正确')
   console.log('✓ 公共服务目录会过滤隐藏维度和隐藏卡片')
   console.log('✓ 保存会生成备份，并可恢复上一版')

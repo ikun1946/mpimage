@@ -27,6 +27,14 @@ data/
 # 本地工具产物（钩子状态、扫描报告等）
 .mimosa/
 
+# 本地生成与设计草稿，不入库
+outputs/
+.claude/
+.tmp-*
+icon-concepts/
+mockups/
+panel.html
+
 # 桌面端打包产物
 release/
 
